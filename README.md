@@ -1,28 +1,27 @@
 <div align="center">
 
-# REI SignalLab 2.0
+# REI SignalLab 2.1
 
-### Typed Node-Based Signal Flow Studio, Restricted Experimental Python Script Runner, Instrument-Grade DSP Engine & S-Expression DSL Kernel
+### Extended Typed DSP Node Library, Kahn Execution Engine, Numerical Golden Precision Suite & REI Vibration Analysis Workbench
 
-*Inspired by **Mitov SignalLab**, engineered with **Typed Node Signal Flow Studio (`.rei-signal`)**, **Restricted Experimental Python Script Runner**, **Fail-Closed DSP Precision Engine**, and **S-Expression DSP DSL Kernel**.*
+*Inspired by **Mitov SignalLab**, engineered with **Typed Canonical Node Library (`.rei-signal 2.1`)**, **Kahn Topological Execution Engine**, **Safe AST Math Expression Filter**, **Numerical Golden Precision Verification**, and **REI Vibration Analysis Workbench**.*
 
 [![Live App on Firebase](https://img.shields.io/badge/Live%20App-signallab--3305b.web.app-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://signallab-3305b.web.app)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-2.0.0-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![FastAPI](https://img.shields.io/badge/FastAPI-2.1.0-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![SciPy](https://img.shields.io/badge/SciPy-DSP-8CAAE6?style=for-the-badge&logo=scipy&logoColor=white)](https://scipy.org)
-[![Matplotlib](https://img.shields.io/badge/Matplotlib-Plot%20API-11557C?style=for-the-badge&logo=python&logoColor=white)](https://matplotlib.org)
 [![React 18](https://img.shields.io/badge/React-18.2-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
-[Live Demo](https://signallab-3305b.web.app) | [Overview](#overview) | [Screenshots](#application-screenshots) | [Signal Flow Studio](#1-typed-node-based-signal-flow-studio-rei-signal) | [Features](#key-features) | [API Spec](#api-endpoints-summary) | [Quick Start](#quick-start)
+[Live Demo](https://signallab-3305b.web.app) | [Overview](#overview) | [Screenshots](#application-screenshots) | [Vibration Workbench](#rei-vibration-analysis-workbench) | [Canonical Node Library](#canonical-dsp-node-library) | [Numerical Golden Precision](#numerical-golden-precision-suite) | [API Spec](#api-endpoints-summary) | [Quick Start](#quick-start)
 
 </div>
 
 ---
 
-## 🚀 Live Application URL
+## 🚀 Live Application & Repository
 
-- **Firebase Hosting App**: [**https://signallab-3305b.web.app**](https://signallab-3305b.web.app)
+- **Firebase Hosting Live App**: [**https://signallab-3305b.web.app**](https://signallab-3305b.web.app)
 - **Firebase Mirror**: [**https://signallab-3305b.firebaseapp.com**](https://signallab-3305b.firebaseapp.com)
 - **GitHub Repository**: [**https://github.com/rootcastleco/rei-signallab**](https://github.com/rootcastleco/rei-signallab)
 
@@ -30,48 +29,116 @@
 
 ## Overview
 
-**REI SignalLab 2.0** is an instrument-grade laboratory suite for **Digital Signal Processing (DSP)**, spectral analysis, visual signal flow modeling, and Python signal code simulation. Drawing inspiration from **Mitov SignalLab**, it empowers engineers, researchers, and audio developers to synthesize, filter, measure, script, and visually compose complex signal topologies in real time via an interactive Web UI or through REST APIs.
+**REI SignalLab 2.1** is an instrument-grade digital signal processing, spectral analysis, visual node graph flow studio, and industrial vibration analysis workbench. Inspired by **Mitov SignalLab**, it provides:
 
-The application combines a high-speed **FastAPI & SciPy** computation core, a **Typed Node-Based Signal Flow Studio (`.rei-signal`)**, a **Restricted Experimental Python Script Runner**, a server-side **Matplotlib Plot Rendering API**, an HTML5 Canvas 60 FPS oscilloscope hardware renderer, signal file upload (`.wav`, `.csv`, `.txt`, `.json`), and real-time WebAudio DAC synthesis.
+1. **Canonical Typed Node Library (`.rei-signal 2.1`)**: Versioned node registry (`GET /api/nodes`) exposing 35+ canonical DSP and Vibration nodes with strictly enforced port data types (`Signal<Real64>`, `Signal<Complex128>`, `SpectrumFrame`, `Scalar<Real64>`, `PatternEvent`).
+2. **Kahn Topological Execution Engine (`POST /api/graph/execute`)**: Deterministic graph validation and execution engine with 10-point port compatibility checks, cycle detection, and Kahn's topological scheduler.
+3. **REI Vibration Analysis Workbench**: End-to-end industrial machinery condition monitoring, single-plane complex vector rotor balancing, kinematic bearing defect frequency tracking (BPFO, BPFI, BSF, FTF), Hilbert envelope demodulation, 1X-10X harmonic order spectrum bar view, and rule-based fault classification.
+4. **Numerical Golden Verification Suite**: Comprehensive Pytest suite enforcing IEEE double-precision float64 error $\le 10^{-12}$, FFT/IFFT reconstruction RMS error $\le 10^{-9}$, DCT Type II error $\le 10^{-12}$, and Haar wavelet error $\le 10^{-12}$.
+5. **Safe AST Math Expression Evaluator**: Custom expression filter (`generic.real_value_filter`) evaluated safely using Python AST parsing without `exec()` or `eval()`.
 
 ---
 
 ## Application Screenshots
 
-### 1. REI SignalLab 2.0 Application Main Interface
-![REI SignalLab 2.0 GUI Screenshot](docs/images/signallab_real_app_screenshot.png)
+### 1. REI SignalLab Application Interface
+![REI SignalLab 2.1 GUI Screenshot](docs/images/signallab_real_app_screenshot.png)
 
 ### 2. Dual CRT Oscilloscope & Spectrum Analyzer Workspace
-![REI SignalLab 2.0 Workspace Overview](docs/images/signallab_ui_overview.png)
+![REI SignalLab 2.1 Workspace Overview](docs/images/signallab_ui_overview.png)
 
-### 3. Typed Signal Flow Studio (.rei-signal) Visual Canvas
+### 3. Signal Flow Studio Visual Canvas & Typed Node Catalog
 ![Signal Flow Studio Canvas](docs/images/node_flow_studio.png)
 
-### 4. Restricted Experimental Python DSP Code Sandbox & Matplotlib Plot Result
+### 4. Python DSP Code Sandbox & Matplotlib Plot Result
 ![Python DSP Code Sandbox](docs/images/python_lab_preview.png)
 
 ---
 
-## Key 2.0 Features
+## ⚙️ REI Vibration Analysis Workbench
 
-### 1. Typed Node-Based Signal Flow Studio (`.rei-signal`)
-- Visual interactive node graph workspace allowing users to visually compose signal processing pipelines:
-  - **Sources**: `SignalGenerator`, `WAVSource`, `CSVReplay`
-  - **Transforms / Filters**: `DCRemove`, `BiquadFilter`, `HilbertEnvelope`
-  - **Analyzers**: `FFTAnalyzer`, `SpectrumAnalyzer`
-  - **Outputs / Sinks**: `ScopeSink`, `CSVWriter`
-- **Kahn's Topological Order & Cycle Detection**: Graph execution is topologically ordered using Kahn's Algorithm. Cycles are detected and rejected (`HTTP 422 GRAPH_CYCLE_DETECTED`).
-- **Strict Port Type Validation**: Graph ports are strictly typed (`Signal<float32>`, `SpectrumFrame`, `Scalar`). Mismatched wiring (e.g. `SpectrumFrame → Signal<float32>`) is rejected (`HTTP 422 GRAPH_PORT_TYPE_MISMATCH`).
-- **Reproducible Experiment Format (`.rei-signal`)**: Export & import versioned JSON project definitions (`formatVersion: "2.0"`).
+The **REI Vibration Analysis Workbench** is a dedicated workspace for industrial machinery diagnostics, rotor balancing, bearing condition monitoring, and telemetry reporting.
 
-### 2. Data Trust Boundary Separation
-- **`[ API VERIFIED ]`**: Verified FastAPI/SciPy backend computed metrics.
-- **`[ LOCAL BROWSER DSP ]`**: Real-time browser-side JavaScript/WebAudio computed FFT & RMS metrics.
-- **`[ DEMO MODE ]`**: Displays mandatory warning banner: `⚠️ SIMULATED DEMO DATA - NOT FOR INSTRUMENT MEASUREMENT`.
+```text
+Accelerometer / Proximity Probe
+        ↓
+Sensor Calibration (mV/g, Bias Voltage)
+        ↓
+High-Pass Regularized Integration (Acceleration → Velocity mm/s → Displacement μm)
+        ↓
+Time-Domain Statistics (RMS, Peak, Crest Factor, Kurtosis)
+        ↓
+FFT / 1X-10X Harmonic Order Spectrum / Hilbert Envelope Spectrum
+        ↓
+Bearing Defect Frequencies (FTF, BPFO, BPFI, BSF)
+        ↓
+Single-Plane Complex Vector Rotor Balancing
+        ↓
+Rule-Based Fault Classifier & Automated Vibration Diagnostic Report
+```
 
-### 3. Instrument-Grade Fail-Closed DSP Engine
-- **No Silent Fallbacks**: If a filter design fails due to unstable poles, the engine throws an explicit error rather than silently returning unfiltered raw data.
-- **Studio Telemetry**: Real-time calculation of Total Harmonic Distortion (**THD %**), Signal-to-Noise Ratio (**SNR dB**), **SINAD (dB)**, **SFDR (dB)**, and **ENOB (bits)**.
+### Key Vibration Features:
+- **Sensor Calibration**: Converts raw ADC voltage signals using sensor sensitivity ($\text{mV/g}$, $\text{mV/mm/s}$) and bias voltage:
+  $$\text{Acc}_g = \frac{\text{InputVoltage} - \text{Bias}}{\text{Sensitivity}_{V/g}}$$
+- **Double Integration**: Frequency-domain regularized integration ($v(t) = \mathcal{F}^{-1}\left\{\frac{\mathcal{F}\{a(t)\}}{j 2\pi f}\right\}$) converting acceleration ($\text{m/s}^2$) to velocity ($\text{mm/s RMS}$) without low-frequency drift.
+- **Kinematic Bearing Defect Frequencies**: Calculates exact frequencies for FTF, BPFO, BPFI, and BSF using roller count $N$, ball diameter $d$, pitch diameter $D$, and contact angle $\phi$:
+  $$\text{BPFO} = \frac{N}{2} \cdot f_{\text{shaft}} \cdot \left(1 - \frac{d}{D}\cos\phi\right), \quad \text{BPFI} = \frac{N}{2} \cdot f_{\text{shaft}} \cdot \left(1 + \frac{d}{D}\cos\phi\right)$$
+- **Single-Plane Vector Rotor Balancing**: Solves influence coefficient complex vector balance equation ($\vec{V}_0, \vec{V}_1, \vec{W}_{\text{trial}} \to \vec{W}_{\text{correction}}$) rendering polar vector balance plots.
+- **1X-10X Harmonic Order Bar View**: Interactive order spectrum bar view displaying fundamental shaft speed 1X, misalignment 2X, looseness 3X, and up to 10X harmonics.
+- **Rule-Based Machine Fault Classifier**: Evaluates spectral evidence for Unbalance, Angular/Parallel Misalignment, Looseness, and Bearing Defects.
+
+---
+
+## 🎛️ Canonical DSP Node Library
+
+| Category | Canonical Type | Legacy Alias | Description |
+| :--- | :--- | :--- | :--- |
+| **Analysis** | `analysis.noise_stats` | `SLNoiseStats` | Coherent gain corrected THD, SNR, SINAD, SFDR, ENOB |
+| **Analysis** | `analysis.pattern_detector` | `SLPatternDetector` | Normalized cross-correlation pattern detector |
+| **Analysis** | `analysis.min_max` | `SLMinMax` | Min, max, and peak-to-peak amplitude calculator |
+| **Arithmetic** | `arithmetic.add` | `SLAdd` | Sample-by-sample signal addition ($x + y$) |
+| **Arithmetic** | `arithmetic.subtract` | `SLSubtract` | Sample-by-sample signal subtraction ($x - y$) |
+| **Arithmetic** | `arithmetic.multiply` | `SLMultiply` | Sample-by-sample signal multiplication ($x \cdot y$) |
+| **Arithmetic** | `arithmetic.divide` | `SLDivide` | Zero-division clamped signal division ($x / y$) |
+| **Arithmetic** | `arithmetic.apply_window` | `SLApplyWindow` | Hann, Hamming, Blackman windowing function |
+| **Converters** | `converter.complex_to_real` | `SLComplexToReal` | Complex signal splitter (Re, Im, Mag, Phase) |
+| **Converters** | `converter.real_to_complex` | `SLRealToComplex` | Real Re/Im to complex signal converter |
+| **Converters** | `transform.hilbert` | `SLHilbert` | Hilbert transform envelope follower |
+| **Converters** | `transform.power_spectrum` | `SLPowerSpectrum` | Power Spectral Density (PSD / Welch) |
+| **Filters** | `filter.lowpass` | `SLLowPass` | LowPass IIR/FIR filter |
+| **Filters** | `filter.highpass` | `SLHighPass` | HighPass Butterworth IIR filter |
+| **Filters** | `filter.biquad_iir` | `SLBiQuadIir` | Pole-stability checked Biquad SOS filter |
+| **Filters** | `filter.median` | `SLMedian` | Spike impulse noise removal median filter |
+| **Generic** | `generic.real_value_filter` | `SLGenericRealValue` | AST-sandboxed custom math expression filter |
+| **Generators** | `generator.signal` | `SLSignalGen` | Sine, Square, Triangle, Sawtooth, Noise, ECG synthesizer |
+| **Generators** | `generator.gaussian_noise` | `SLGaussGen` | Deterministic seeded Gaussian white noise generator |
+| **Meters** | `meter.rms` | `SLRMSMeter` | True RMS voltage meter & sliding envelope |
+| **Transforms** | `transform.fft` | `SLFourier` | Fast Fourier Transform (FFT) |
+| **Transforms** | `transform.inverse_real_fft` | `SLInverseFourier` | Inverse Real FFT time signal reconstructor |
+| **Transforms** | `transform.dct` | `SLDct` | Discrete Cosine Transform (DCT Type II) |
+| **Transforms** | `transform.haar` | `SLHaar` | Haar Discrete Wavelet Transform (DWT) |
+| **Vibration** | `vibration.sensor_calibration` | `SLVibCalibrate` | IEPE & MEMS sensor calibration ($\text{mV/g}$) |
+| **Vibration** | `vibration.acceleration_to_velocity` | `SLAccToVel` | High-pass regularized velocity integration ($\text{mm/s}$) |
+| **Vibration** | `vibration.velocity_to_displacement` | `SLVelToDisp` | Regularized displacement integration ($\mu\text{m}$) |
+| **Vibration** | `vibration.bearing_frequencies` | `SLBearingFreqs` | Kinematic BPFO, BPFI, BSF, FTF bearing frequency calculator |
+| **Vibration** | `vibration.envelope_analysis` | `SLEnvelopeAnalysis` | Bandpass + Hilbert envelope spectrum for bearing faults |
+| **Vibration** | `vibration.balance.single_plane` | `SLSinglePlaneBalance` | Single-plane complex vector rotor balancing |
+| **Vibration** | `vibration.fault_classifier` | `SLFaultClassifier` | Rule-based machine fault diagnostic classifier |
+
+---
+
+## 🎯 Numerical Golden Precision Suite
+
+All mathematical nodes and algorithms are verified against NumPy/SciPy reference standards in `backend/tests/test_golden.py` and `backend/tests/test_vibration_golden.py`:
+
+- **Arithmetic Float64 Error**: $|x_{\text{computed}} - x_{\text{reference}}| \le 1.0 \times 10^{-12}$ (Pass)
+- **FFT / IFFT Reconstruction RMS Error**: $RMS \le 1.0 \times 10^{-9}$ (Pass)
+- **DCT Type II Reconstruction Error**: $RMS \le 1.0 \times 10^{-12}$ (Pass)
+- **Haar Wavelet Reconstruction Error**: $RMS \le 1.0 \times 10^{-12}$ (Pass)
+- **Sensor Calibration Precision**: Relative error $\le 0.1\%$ (Pass)
+- **Velocity Integration Precision**: Relative error $\le 1.0\%$ (Pass)
+- **Bearing Fault Frequency Precision**: Relative error $\le 0.1\%$ (Pass)
+- **Single-Plane Rotor Balancing Precision**: Mass error $\le 1.0\%$, Angle error $\le 1.0^\circ$ (Pass)
 
 ---
 
@@ -79,42 +146,43 @@ The application combines a high-speed **FastAPI & SciPy** computation core, a **
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/` | Health check & 2.0 feature manifest |
-| `POST` | `/api/graph/execute` | Executes typed Node-Based Signal Flow Graph (.rei-signal project) |
-| `POST` | `/api/python/execute` | Executes user Python DSP scripts inside restricted runner |
-| `POST` | `/api/upload/signal` | Uploads `.wav`, `.csv`, `.txt`, `.json` signal files for DSP processing |
-| `POST` | `/api/process` | Full signal processing pipeline (Time, FFT, Metrics, Spectrogram) |
-| `POST` | `/api/render/plot` | Matplotlib PNG plot from JSON request |
-| `GET` | `/api/render/plot` | URL query parameter Matplotlib PNG plot renderer |
-| `POST` | `/api/lisp/process` | Execute S-Expression DSP DSL macros on signal vectors |
-| `POST` | `/api/export/wav` | Generate 16-bit PCM WAV downloadable audio buffer |
-| `WS` | `/ws/stream` | Real-time WebSocket streaming buffer endpoint |
+| `GET` | `/` | Health check & 2.1.0 feature manifest |
+| `GET` | `/api/nodes` | Get canonical node specs registry array |
+| `GET` | `/api/nodes/{node_type}` | Get specific canonical node spec |
+| `POST` | `/api/graph/validate` | 10-point Graph Validation (`ValidationResult`) |
+| `POST` | `/api/graph/execute` | Kahn Topological Graph Execution Engine (`2.1.0`) |
+| `POST` | `/api/python/execute` | Restricted Python DSP sandbox engine |
+| `POST` | `/api/upload/signal` | Upload `.wav`, `.csv`, `.txt`, `.json` signal files |
+| `POST` | `/api/process` | Processing pipeline (Time, FFT, Metrics, Spectrogram) |
+| `POST` | `/api/render/plot` | Server-side Matplotlib PNG plot renderer |
+| `POST` | `/api/lisp/process` | S-Expression DSP DSL kernel execution |
+| `POST` | `/api/export/wav` | Downloadable 16-bit PCM WAV audio generator |
 
 ---
 
 ## Quick Start
 
-### 1. Backend Setup
+### 1. Clone & Run Backend
 
 ```bash
 git clone https://github.com/rootcastleco/rei-signallab.git
-cd rei-signallab/backend
-pip install -r requirements.txt
+cd rei-signallab
+
+# Create virtual environment
+py -m venv .venv
+.venv\Scripts\activate
+
+# Install dependencies
+pip install -r backend/requirements.txt
+
+# Run Pytest suite
+$env:PYTHONPATH="backend"; py -m pytest backend/tests
+
+# Start FastAPI server
+$env:PYTHONPATH="backend"; py -m uvicorn app.main:app --reload --port 8000
 ```
 
-Run test suite:
-
-```bash
-PYTHONPATH=backend pytest backend/tests
-```
-
-Start server:
-
-```bash
-PYTHONPATH=backend uvicorn app.main:app --port 8000
-```
-
-### 2. Frontend Setup
+### 2. Run Frontend Studio
 
 ```bash
 cd frontend
@@ -122,12 +190,10 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
 ## License
 
-Distributed under the **MIT License**. See `LICENSE` for details.
-
-Developed by **RootCastle**.
+Distributed under the **MIT License**. See `LICENSE` for more information.
