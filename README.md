@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ REI SignalLab
+# REI SignalLab
 
 ### High-Performance Digital Signal Processing & Spectral Instrumentation Suite
 
@@ -13,13 +13,13 @@
 [![Vite](https://img.shields.io/badge/Vite-5.1-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
-[Features](#-key-features) • [Architecture](#-architecture--dataflow) • [Math & DSP](#-mathematical--dsp-specifications) • [Quick Start](#-quick-start) • [API Spec](#-api-endpoints) • [Testing](#-defensive-harness--testing)
+[Features](#key-features) • [Architecture](#architecture--dataflow) • [Math & DSP](#mathematical--dsp-specifications) • [Quick Start](#quick-start) • [API Spec](#api-endpoints) • [Testing](#defensive-harness--testing)
 
 </div>
 
 ---
 
-## 🌟 Overview
+## Overview
 
 **REI SignalLab** is a next-generation laboratory suite for **Digital Signal Processing (DSP)**, spectral analysis, and interactive signal flow modeling. Drawing inspiration from **Mitov SignalLab**, it empowers engineers, researchers, and audio developers to synthesize, filter, measure, and analyze complex signal topologies in real time—without writing tedious boilerplate code.
 
@@ -27,9 +27,9 @@ The application features an **Apple macOS/iOS translucent glassmorphism interfac
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
-### 📺 1. CRT Oscilloscope (Time Domain)
+### 1. CRT Oscilloscope (Time Domain)
 - **60 FPS Hardware Acceleration**: HTML5 Canvas engine rendering ultra-smooth signal trajectories.
 - **Dual-Channel Monitoring**: 
   - **CH1 (Cyan)**: Raw input signal with additive Gaussian noise.
@@ -37,34 +37,34 @@ The application features an **Apple macOS/iOS translucent glassmorphism interfac
 - **Telemetry Controls**: Variable timebase (`0.2ms - 10ms/div`), voltage scaling (`0.1V - 5V/div`), trigger mode level indicator.
 - **Precision Crosshair Cursor**: Interactive coordinate readout measuring delta time ($\Delta T$) and peak voltage ($\Delta V$).
 
-### 📊 2. Spectrum Analyzer (Frequency Domain - FFT)
+### 2. Spectrum Analyzer (Frequency Domain - FFT)
 - **Real & Complex FFT**: High-resolution Fast Fourier Transforms ($256$ to $4096$ points).
 - **Dual Axis Scaling**: Switch seamlessly between **Linear (Hz)** and **Logarithmic** frequency axes.
 - **Harmonic Annotations**: Automatic tracking of fundamental peak frequency and harmonic markers ($2H, 3H, 4H, 5H$).
 - **Spectral Metrics**: Instant calculation of Total Harmonic Distortion (**THD %**) and Signal-to-Noise Ratio (**SNR dB**).
 
-### 🌊 3. 2D Waterfall Spectrogram
+### 3. 2D Waterfall Spectrogram
 - **Time vs. Frequency Power Rolling Surface**: Real-time spectral heatmap updating over continuous time buffers.
 - **Custom Colormaps**: Built-in palette switching (**Plasma**, **Viridis**, **Thermal Heat**, **Jet Rainbow**).
 
-### 🔀 4. Visual Component Pipeline (Mitov Flow Editor)
+### 4. Visual Component Pipeline (Mitov Flow Editor)
 - **Interactive Node Wiring Graph**: Visual representation of signal nodes:
   $$\text{[Signal Generator]} \longrightarrow \text{[DSP Filter]} \longrightarrow \text{[FFT Spectral Engine]} \longrightarrow \text{[Oscilloscope / Audio DAC]}$$
 - **Zero-Latency State Visualizer**: Real-time status badges, parameters, and buffer metrics per node block.
 
-### 📻 5. Waveform Generators & Digital Filters
+### 5. Waveform Generators & Digital Filters
 - **Waveforms**: Sine, Square, Triangle, Sawtooth, Gaussian White Noise, Frequency Chirp Sweeps, Synthetic ECG Cardiac Heartbeat, and Multi-tone Harmonic Composites.
 - **Digital Filters**: LowPass, HighPass, BandPass, BandStop responses utilizing Butterworth IIR, Chebyshev Type I/II, and Windowed FIR topologies.
 - **Window Functions**: Hanning, Hamming, Blackman, Kaiser ($\beta$), FlatTop, and Rectangular.
 
-### 🔊 6. Real-Time WebAudio DAC & Data Exporters
+### 6. Real-Time WebAudio DAC & Data Exporters
 - **Live WebAudio Synthesizer**: Monitor synthesized waveforms directly through system speakers.
 - **16-bit PCM WAV Export**: Generate downloadable high-fidelity audio `.wav` files directly from current DSP parameters.
 - **CSV Data Export**: Export full time-series voltage matrices for MATLAB, Python, or Excel analysis.
 
 ---
 
-## 🏗 Architecture & Dataflow
+## Architecture & Dataflow
 
 ```
                              ┌─────────────────────────────────────────────────────────┐
@@ -91,7 +91,7 @@ The application features an **Apple macOS/iOS translucent glassmorphism interfac
 
 ---
 
-## 📐 Mathematical & DSP Specifications
+## Mathematical & DSP Specifications
 
 ### 1. Fast Fourier Transform (FFT)
 The discrete-time spectrum $X[k]$ is computed from windowed time signal $x[n] \cdot w[n]$:
@@ -114,7 +114,7 @@ $$\text{SNR}_{\text{dB}} = 10 \log_{10} \left( \frac{P_{\text{signal}}}{P_{\text
 
 ---
 
-## 💻 Technical Stack
+## Technical Stack
 
 | Domain | Technologies |
 | :--- | :--- |
@@ -126,7 +126,7 @@ $$\text{SNR}_{\text{dB}} = 10 \log_{10} \left( \frac{P_{\text{signal}}}{P_{\text
 
 ---
 
-## ⚡ Quick Start
+## Quick Start
 
 ### Prerequisites
 - Python 3.11+
@@ -163,7 +163,7 @@ Open your browser at `http://localhost:3000`.
 
 ---
 
-## 🔌 API Endpoints
+## API Endpoints
 
 ### `POST /api/process`
 Main REST computation endpoint for signal generation, filtering, FFT, metrics, and spectrogram matrices.
@@ -204,7 +204,7 @@ High-speed WebSocket streaming endpoint pushing live 30 FPS oscilloscope buffer 
 
 ---
 
-## 🛡 Defensive Harness & Testing
+## Defensive Harness & Testing
 
 REI SignalLab is built following defensive programming standards:
 - **Numerical Bounds Protection**: Inputs clamped defensively against NaN/Infinity, Nyquist violations, and buffer overflows.
@@ -217,8 +217,8 @@ $env:PYTHONPATH="backend"; py -m pytest backend/tests
 
 ---
 
-## 📜 License
+## License
 
 Distributed under the **MIT License**. See `LICENSE` for details.
 
-Developed with ❤️ by **RootCastle & Antigravity** team.
+Developed by **RootCastle**.
