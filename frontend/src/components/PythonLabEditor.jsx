@@ -4,6 +4,59 @@ import { safeFetchJson } from '../config';
 
 const PYTHON_PRESETS = [
   {
+    name: 'Rotor Shaft Vibration Orbit (3600 RPM / Proximity Probe X-Y)',
+    code: `# Python DSP Telemetry: Rotor Shaft Vibration & Orbit Analysis
+import numpy as np
+from scipy import signal as scipy_signal
+
+fs = 44100
+dur = 0.1
+t = np.linspace(0, dur, int(fs * dur), endpoint=False)
+
+rpm = 3600.0  # 60 Hz fundamental rotor speed (1X)
+f1 = rpm / 60.0
+f2 = 2.0 * f1  # 2X misalignment harmonic
+f_whirl = 0.45 * f1  # 0.45X Sub-synchronous Oil Whirl
+
+# Proximity Probe X (Horizontal) & Probe Y (Vertical 90 deg quadrature)
+probe_x = 1.0 * np.cos(2 * np.pi * f1 * t) + 0.3 * np.cos(2 * np.pi * f2 * t + 0.5) + 0.15 * np.cos(2 * np.pi * f_whirl * t)
+probe_y = 1.0 * np.sin(2 * np.pi * f1 * t) + 0.3 * np.sin(2 * np.pi * f2 * t + 0.5) + 0.15 * np.sin(2 * np.pi * f_whirl * t)
+
+raw_signal = probe_x
+filtered_signal = probe_y
+
+print(f"Rotor Shaft Telemetry: RPM={rpm} (1X={f1}Hz, 2X={f2}Hz, Oil Whirl={f_whirl:.1f}Hz)")
+
+# Dual Subplot: Left Orbit Plot (X vs Y), Right Order FFT Spectrum
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 3.5), dpi=100)
+fig.patch.set_facecolor('#000000')
+
+# 1. Lissajous Rotor Shaft Orbit Plot (Probe X vs Probe Y)
+ax1.set_facecolor('#000000')
+ax1.plot(probe_x, probe_y, color='#00FF00', linewidth=1.5, label='Shaft Orbit Trajectory')
+ax1.set_title('Rotor Shaft Orbit (Probe X vs Probe Y)', color='#FFFFFF', fontsize=10)
+ax1.set_xlabel('Probe X Displacement (mils)', color='#808080', fontsize=8)
+ax1.set_ylabel('Probe Y Displacement (mils)', color='#808080', fontsize=8)
+ax1.grid(True, color='#003300', linestyle=':')
+ax1.axis('equal')
+
+# 2. FFT Vibration Spectrum
+freqs = np.fft.rfftfreq(len(t), 1/fs)
+fft_mag = np.abs(np.fft.rfft(probe_x)) / len(t)
+ax2.set_facecolor('#000000')
+ax2.plot(freqs[:500], 20 * np.log10(np.maximum(1e-6, fft_mag[:500])), color='#00FFFF', linewidth=1.2)
+ax2.axvline(f1, color='#FF5555', linestyle='--', label='1X RPM (60Hz)')
+ax2.axvline(f2, color='#FFFF00', linestyle='--', label='2X Misalignment (120Hz)')
+ax2.set_title('1X/2X Order Vibration Spectrum', color='#FFFFFF', fontsize=10)
+ax2.set_xlabel('Frequency (Hz)', color='#808080', fontsize=8)
+ax2.set_ylabel('Magnitude (dB)', color='#808080', fontsize=8)
+ax2.grid(True, color='#003300', linestyle=':')
+ax2.legend(loc='upper right', facecolor='#000000', edgecolor='#00FF00', fontsize=7)
+
+plt.tight_layout()
+`
+  },
+  {
     name: 'Chirp Frequency Sweep (100Hz-2000Hz)',
     code: `# Python DSP Experiment: Chirp Frequency Sweep
 import numpy as np
@@ -13,13 +66,11 @@ fs = 44100
 dur = 0.2
 t = np.linspace(0, dur, int(fs * dur), endpoint=False)
 
-# Synthesize Chirp Sweep
 raw_signal = scipy_signal.chirp(t, f0=100, t1=dur, f1=2000, method='linear')
 filtered_signal = raw_signal
 
 print(f"Generated Chirp Signal: {len(raw_signal)} samples at Fs = {fs} Hz")
 
-# Render Matplotlib Figure
 plt.figure(figsize=(9, 3.5), dpi=100)
 plt.style.use('dark_background')
 plt.plot(t * 1000, raw_signal, color='#00FFFF', linewidth=1.2, label='Chirp Waveform')
@@ -40,7 +91,6 @@ fs = 44100
 dur = 2.0
 t = np.linspace(0, dur, int(fs * dur), endpoint=False)
 
-# Synthesize ECG P-Q-R-S-T Complex
 period = 0.8
 t_mod = np.mod(t, period) / period
 raw_signal = (
@@ -51,7 +101,6 @@ raw_signal = (
     0.35 * np.exp(-((t_mod - 0.7) ** 2) / (2 * (0.04 ** 2)))
 )
 
-# Add High Frequency Noise & Median Filter
 noisy_ecg = raw_signal + np.random.normal(0, 0.08, len(t))
 filtered_signal = scipy_signal.medfilt(noisy_ecg, kernel_size=5)
 
@@ -76,9 +125,9 @@ fs = 44100
 dur = 0.05
 t = np.linspace(0, dur, int(fs * dur), endpoint=False)
 
-fc = 1200  # 1.2 kHz Carrier
-fm = 100   # 100 Hz Modulator
-m = 0.8    # Modulation Index
+fc = 1200
+fm = 100
+m = 0.8
 
 carrier = np.sin(2 * np.pi * fc * t)
 modulator = np.sin(2 * np.pi * fm * t)
@@ -92,59 +141,6 @@ plt.style.use('dark_background')
 plt.plot(t * 1000, raw_signal, color='#00FFFF', linewidth=1.2, label='AM Signal')
 plt.plot(t * 1000, 1.0 + m * modulator, color='#FFFF00', linestyle='--', linewidth=1.2, label='Envelope')
 plt.title('Amplitude Modulation (AM) Time Domain Envelope', color='#FFFFFF', fontsize=11)
-plt.xlabel('Time (ms)', color='#808080', fontsize=9)
-plt.grid(True, color='#003300', linestyle=':')
-plt.legend(loc='upper right', facecolor='#000000', edgecolor='#00FF00')
-`
-  },
-  {
-    name: 'Multitone Audio Synthesis (440Hz+880Hz)',
-    code: `# Python DSP Experiment: Multitone Harmonic Audio Synthesis
-import numpy as np
-
-fs = 44100
-dur = 0.1
-t = np.linspace(0, dur, int(fs * dur), endpoint=False)
-
-f1, f2, f3 = 440, 880, 1320  # Fundamental + 2nd + 3rd Harmonics
-raw_signal = 1.0 * np.sin(2 * np.pi * f1 * t) + 0.5 * np.sin(2 * np.pi * f2 * t) + 0.25 * np.sin(2 * np.pi * f3 * t)
-filtered_signal = raw_signal
-
-print("Synthesized 3-Harmonic Audio Multitone Signal.")
-
-plt.figure(figsize=(9, 3.5), dpi=100)
-plt.style.use('dark_background')
-plt.plot(t * 1000, raw_signal, color='#00FF00', linewidth=1.5, label='Multitone Waveform')
-plt.title('Multitone Harmonic Signal (440Hz + 880Hz + 1320Hz)', color='#FFFFFF', fontsize=11)
-plt.xlabel('Time (ms)', color='#808080', fontsize=9)
-plt.grid(True, color='#003300', linestyle=':')
-plt.legend(loc='upper right', facecolor='#000000', edgecolor='#00FF00')
-`
-  },
-  {
-    name: 'SciPy Butterworth LowPass Filter',
-    code: `# Python DSP Experiment: Butterworth LowPass Filter Design
-import numpy as np
-from scipy import signal as scipy_signal
-
-fs = 44100
-dur = 0.1
-t = np.linspace(0, dur, int(fs * dur), endpoint=False)
-
-# Composite Signal: 440 Hz Fundamental + 4000 Hz Noise Component
-raw_signal = np.sin(2 * np.pi * 440 * t) + 0.4 * np.sin(2 * np.pi * 4000 * t)
-
-# Design 4th order Butterworth Lowpass Filter at Fc = 1000 Hz
-b, a = scipy_signal.butter(4, 1000.0 / (fs / 2.0), btype='low')
-filtered_signal = scipy_signal.filtfilt(b, a, raw_signal)
-
-print("Applied 4th-Order SciPy Butterworth LowPass Filter at Fc = 1000 Hz")
-
-plt.figure(figsize=(9, 3.5), dpi=100)
-plt.style.use('dark_background')
-plt.plot(t * 1000, raw_signal, color='#FF5555', alpha=0.5, label='Raw Composite Signal')
-plt.plot(t * 1000, filtered_signal, color='#00FF00', linewidth=1.8, label='Butterworth LowPass (Fc=1kHz)')
-plt.title('Butterworth LowPass IIR Filter Demonstration', color='#FFFFFF', fontsize=11)
 plt.xlabel('Time (ms)', color='#808080', fontsize=9)
 plt.grid(True, color='#003300', linestyle=':')
 plt.legend(loc='upper right', facecolor='#000000', edgecolor='#00FF00')
@@ -188,16 +184,15 @@ export default function PythonLabEditor({ onPythonProcessed }) {
         });
       }
     } catch (e) {
-      // Robust client simulation fallback if backend API is offline or hosted on static host
       const fs = 44100;
       const N = 4410;
       const t = Array.from({ length: N }, (_, i) => i / fs);
-      const raw_signal = t.map(timeVal => Math.sin(2 * Math.PI * 440 * timeVal) + (Math.random() * 0.1 - 0.05));
-      const filtered_signal = raw_signal;
+      const raw_signal = t.map(timeVal => Math.cos(2 * Math.PI * 60 * timeVal) + 0.3 * Math.cos(2 * Math.PI * 120 * timeVal));
+      const filtered_signal = t.map(timeVal => Math.sin(2 * Math.PI * 60 * timeVal) + 0.3 * Math.sin(2 * Math.PI * 120 * timeVal));
 
       setLogs([
         `[CLIENT SIMULATOR ENGINE] ${e.message}`,
-        `Simulated Python script execution locally: 4410 samples synthesized.`
+        `Simulated Rotor Vibration script execution: 4410 samples synthesized.`
       ]);
 
       if (onPythonProcessed) {
@@ -206,15 +201,15 @@ export default function PythonLabEditor({ onPythonProcessed }) {
           raw_signal: raw_signal,
           filtered_signal: filtered_signal,
           frequency: Array.from({ length: 512 }, (_, i) => i * (fs / 1024)),
-          spectrum_magnitude: Array.from({ length: 512 }, (_, i) => Math.abs(i * 440 / 512 - 440) < 10 ? 0.0 : -60.0),
+          spectrum_magnitude: Array.from({ length: 512 }, (_, i) => Math.abs(i * 60 / 512 - 60) < 10 ? 0.0 : -60.0),
           metrics: {
-            rms: "0.707", peak_to_peak: "2.000", dc_mean: 0, thd_percent: 0.15,
-            snr_db: 46.2, sinad_db: 44.8, sfdr_db: 58.4, enob_bits: 7.15,
-            fundamental_freq: 440, peak_magnitude_db: "0.0"
+            rms: "0.707", peak_to_peak: "2.000", dc_mean: 0, thd_percent: null,
+            snr_db: null, sinad_db: null, sfdr_db: null, enob_bits: null,
+            fundamental_freq: 60, peak_magnitude_db: "0.0"
           },
           spectrogram_matrix: [[-60, -60], [-60, -60]],
           spectrogram_times: [0, 0.05],
-          spectrogram_frequencies: [100, 440, 1000]
+          spectrogram_frequencies: [60, 120, 1000]
         });
       }
     } finally {
@@ -264,22 +259,16 @@ export default function PythonLabEditor({ onPythonProcessed }) {
 
           <div className="flex gap-1">
             <button
-              onClick={() => insertSnippet(`raw_signal = np.sin(2 * np.pi * 440 * t)`)}
+              onClick={() => insertSnippet(`probe_x = np.cos(2*np.pi*60*t)\nprobe_y = np.sin(2*np.pi*60*t)\nraw_signal = probe_x\nfiltered_signal = probe_y`)}
               className="win98-btn text-[10px]"
             >
-              + Sine Wave
+              + Rotor Orbit Probe X/Y
             </button>
             <button
-              onClick={() => insertSnippet(`b, a = scipy_signal.butter(4, 1000 / (fs/2), btype='low')\nfiltered_signal = scipy_signal.filtfilt(b, a, raw_signal)`)}
+              onClick={() => insertSnippet(`plt.plot(probe_x, probe_y, color='#00FF00')\nplt.title('Rotor Orbit (Probe X vs Y)')`)}
               className="win98-btn text-[10px]"
             >
-              + LowPass Filter
-            </button>
-            <button
-              onClick={() => insertSnippet(`plt.plot(t, raw_signal, color='#00FF00')\nplt.title('Custom Signal Plot')`)}
-              className="win98-btn text-[10px]"
-            >
-              + Matplotlib Plot
+              + Orbit Plot
             </button>
           </div>
         </div>

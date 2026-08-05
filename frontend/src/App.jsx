@@ -40,6 +40,13 @@ const PRESETS = {
     math: { envelope_extraction: false, bit_depth: null, dc_remove: true, gain_db: 0 },
     filter: { enabled: true, filter_type: 'lowpass', filter_design: 'fir_window', cutoff: 40, order: 4 },
     fft: { n_fft: 2048, window: 'hanning', log_scale: true }
+  },
+  ROTOR_VIBRATION: {
+    name: 'Rotor Vibration Orbit (3600 RPM / 1X-2X)',
+    generator: { waveform: 'sine', frequency: 60, amplitude: 1.5, phase: 0, offset: 0, noise_level: 0.08, sample_rate: 44100, duration: 0.1, modulation_type: 'none' },
+    math: { envelope_extraction: false, bit_depth: null, dc_remove: false, gain_db: 0 },
+    filter: { enabled: true, filter_type: 'lowpass', filter_design: 'butterworth', cutoff: 500, order: 4 },
+    fft: { n_fft: 2048, window: 'hanning', log_scale: true }
   }
 };
 
