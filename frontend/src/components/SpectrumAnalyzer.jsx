@@ -12,24 +12,22 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
-
     const minDb = -100, maxDb = 20, dbRange = maxDb - minDb;
 
-    ctx.fillStyle = '#000';
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, W, H);
 
-    // Graticule
     const rows = 6, cols = 8;
     const cw = W / cols, ch = H / rows;
 
-    ctx.strokeStyle = '#151920';
+    ctx.strokeStyle = '#003300';
     ctx.lineWidth = 1;
     for (let r = 1; r < rows; r++) {
       ctx.beginPath(); ctx.moveTo(0, r*ch); ctx.lineTo(W, r*ch); ctx.stroke();
       const db = maxDb - (r / rows) * dbRange;
-      ctx.fillStyle = '#4b5260';
-      ctx.font = '500 9px "JetBrains Mono"';
-      ctx.fillText(`${db.toFixed(0)}`, 5, r*ch - 3);
+      ctx.fillStyle = '#00AA00';
+      ctx.font = '10px "Courier New", monospace';
+      ctx.fillText(`${db.toFixed(0)}dB`, 5, r*ch - 3);
     }
     for (let c = 1; c < cols; c++) { ctx.beginPath(); ctx.moveTo(c*cw, 0); ctx.lineTo(c*cw, H); ctx.stroke(); }
 
@@ -44,7 +42,6 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
       return (f / maxFreq) * W;
     };
 
-    // Peak hold
     if (peakHoldRef.current.length !== magnitudeData.length) {
       peakHoldRef.current = [...magnitudeData];
     } else {
@@ -54,7 +51,7 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
     }
 
     if (showPeakHold) {
-      ctx.strokeStyle = '#f59e0b';
+      ctx.strokeStyle = '#FFFF00';
       ctx.lineWidth = 1;
       ctx.setLineDash([2, 2]);
       ctx.beginPath();
@@ -67,10 +64,10 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
       ctx.setLineDash([]);
     }
 
-    // FFT fill gradient
+    // FFT Spectrum Fill Gradient
     const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, 'rgba(139,92,246,0.35)');
-    grad.addColorStop(1, 'rgba(139,92,246,0)');
+    grad.addColorStop(0, 'rgba(0, 255, 255, 0.4)');
+    grad.addColorStop(1, 'rgba(0, 255, 255, 0.0)');
 
     ctx.fillStyle = grad;
     ctx.beginPath();
@@ -84,9 +81,9 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
     ctx.closePath();
     ctx.fill();
 
-    // FFT line
-    ctx.strokeStyle = '#8b5cf6';
-    ctx.lineWidth = 1.5;
+    // FFT Cyan Trace Line
+    ctx.strokeStyle = '#00FFFF';
+    ctx.lineWidth = 1.6;
     ctx.beginPath();
     for (let i = 0; i < frequencyData.length; i++) {
       const x = getX(frequencyData[i]);
@@ -95,32 +92,32 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
     }
     ctx.stroke();
 
-    // Peak & harmonics
+    // Fundamental Peak Marker
     if (metrics && metrics.fundamental_freq > 0) {
       const f0 = metrics.fundamental_freq;
       const px = getX(f0);
       const pMag = metrics.peak_magnitude_db || 0;
       const py = Math.max(10, ((maxDb - pMag) / dbRange) * H);
 
-      ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#FF0000';
+      ctx.lineWidth = 1.2;
       ctx.beginPath(); ctx.moveTo(px, py - 10); ctx.lineTo(px, py + 10); ctx.stroke();
 
-      ctx.fillStyle = '#ef4444';
-      ctx.font = '600 10px "JetBrains Mono"';
-      ctx.fillText(`${f0.toFixed(0)} Hz`, Math.min(W - 60, px + 6), py - 6);
+      ctx.fillStyle = '#FF0000';
+      ctx.font = 'bold 11px "Courier New", monospace';
+      ctx.fillText(`${f0.toFixed(0)}Hz`, Math.min(W - 60, px + 6), py - 6);
 
       if (showHarmonics) {
         [2, 3, 4, 5].forEach(h => {
           const hf = f0 * h;
           if (hf < maxFreq) {
             const hx = getX(hf);
-            ctx.strokeStyle = '#232830';
+            ctx.strokeStyle = '#808080';
             ctx.setLineDash([2, 2]);
             ctx.beginPath(); ctx.moveTo(hx, 0); ctx.lineTo(hx, H); ctx.stroke();
             ctx.setLineDash([]);
-            ctx.fillStyle = '#4b5260';
-            ctx.font = '500 9px "JetBrains Mono"';
+            ctx.fillStyle = '#00FF00';
+            ctx.font = '10px "Courier New", monospace';
             ctx.fillText(`${h}H`, hx - 4, 12);
           }
         });
@@ -130,26 +127,44 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
   }, [frequencyData, magnitudeData, metrics, logScale, showPeakHold, showHarmonics]);
 
   return (
-    <div className="panel p-3 flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <span className="ctrl-label" style={{ fontSize: '11px', letterSpacing: '0.08em' }}>Spectrum Analyzer</span>
-        <div className="flex items-center gap-2">
-          <div className="tab-bar" style={{ padding: '2px' }}>
-            <button onClick={() => setLogScale(false)} className={`tab-btn ${!logScale ? 'active' : ''}`} style={{ padding: '3px 10px', fontSize: '10.5px' }}>Lin</button>
-            <button onClick={() => setLogScale(true)} className={`tab-btn ${logScale ? 'active' : ''}`} style={{ padding: '3px 10px', fontSize: '10.5px' }}>Log</button>
-          </div>
-          <button onClick={() => setShowPeakHold(!showPeakHold)} className="btn" style={{ padding: '3px 8px', fontSize: '10px', color: showPeakHold ? '#f59e0b' : undefined }}>Peak</button>
-          <button onClick={() => setShowHarmonics(!showHarmonics)} className="btn" style={{ padding: '3px 8px', fontSize: '10px', color: showHarmonics ? '#8b5cf6' : undefined }}>nH</button>
+    <div className="win95-outset p-2 flex flex-col gap-2">
+      {/* Title Bar */}
+      <div className="win95-titlebar">
+        <span>Spectrum_Analyzer_FFT.exe</span>
+        <div className="flex gap-1">
+          <div className="win95-btn-box">_</div>
+          <div className="win95-btn-box">□</div>
+          <div className="win95-btn-box">✕</div>
         </div>
       </div>
 
-      <div className="scope-display">
-        <canvas ref={canvasRef} width={800} height={380} style={{ height: 380 }} />
+      {/* Control Bar */}
+      <div className="flex items-center justify-between flex-wrap gap-2 py-1 border-b border-[#808080]">
+        <div className="flex gap-1">
+          <button onClick={() => setLogScale(false)} className={`win95-btn text-xs ${!logScale ? 'bg-[#FFFFFF]' : ''}`}>
+            LINEAR
+          </button>
+          <button onClick={() => setLogScale(true)} className={`win95-btn text-xs ${logScale ? 'bg-[#FFFFFF]' : ''}`}>
+            LOG_SCALE
+          </button>
+        </div>
+
+        <div className="flex gap-1">
+          <button onClick={() => setShowPeakHold(!showPeakHold)} className={`win95-btn text-xs ${showPeakHold ? 'text-[#AA5500]' : ''}`}>
+            PEAK_HOLD
+          </button>
+          <button onClick={() => setShowHarmonics(!showHarmonics)} className={`win95-btn text-xs ${showHarmonics ? 'text-[#0000FF]' : ''}`}>
+            HARMONICS
+          </button>
+        </div>
+      </div>
+
+      {/* CRT Screen */}
+      <div className="win95-crt-screen p-1 relative">
+        <canvas ref={canvasRef} width={800} height={360} className="w-full h-[360px] block cursor-crosshair" />
         {metrics && (
-          <div className="scope-overlay">
-            <span style={{ color: '#10b981' }}>THD {metrics.thd_percent}%</span>
-            <span style={{ color: '#3b82f6' }}>SNR {metrics.snr_db}dB</span>
-            <span style={{ color: '#f59e0b' }}>SINAD {metrics.sinad_db || 0}dB</span>
+          <div className="absolute top-2 right-2 bg-[#000000]/90 border border-[#00FF00] px-2 py-0.5 text-[10px] font-mono text-[#00FF00]">
+            THD: {metrics.thd_percent}% | SNR: {metrics.snr_db}dB | SINAD: {metrics.sinad_db || 0}dB
           </div>
         )}
       </div>

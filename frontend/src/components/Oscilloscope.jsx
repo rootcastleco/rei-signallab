@@ -7,7 +7,6 @@ export default function Oscilloscope({ timeData, rawSignal, filteredSignal, enve
   const [voltsDiv, setVoltsDiv] = useState(1);
   const [showCh1, setShowCh1] = useState(true);
   const [showCh2, setShowCh2] = useState(true);
-  const [cursorPos, setCursorPos] = useState(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -16,21 +15,22 @@ export default function Oscilloscope({ timeData, rawSignal, filteredSignal, enve
     const W = canvas.width;
     const H = canvas.height;
 
-    ctx.fillStyle = '#000';
+    // Pitch Black CRT Screen
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, W, H);
 
-    // Graticule
+    // 90s Green CRT Grid Lines (10 cols, 8 rows)
     const cols = 10, rows = 8;
     const cw = W / cols, ch = H / rows;
 
-    ctx.strokeStyle = '#151920';
+    ctx.strokeStyle = '#003300';
     ctx.lineWidth = 1;
     for (let i = 1; i < cols; i++) { ctx.beginPath(); ctx.moveTo(i*cw, 0); ctx.lineTo(i*cw, H); ctx.stroke(); }
     for (let j = 1; j < rows; j++) { ctx.beginPath(); ctx.moveTo(0, j*ch); ctx.lineTo(W, j*ch); ctx.stroke(); }
 
-    // Center cross
-    ctx.strokeStyle = '#232830';
-    ctx.setLineDash([3, 3]);
+    // Center CRT Axes
+    ctx.strokeStyle = '#006600';
+    ctx.setLineDash([2, 2]);
     ctx.beginPath();
     ctx.moveTo(0, H/2); ctx.lineTo(W, H/2);
     ctx.moveTo(W/2, 0); ctx.lineTo(W/2, H);
@@ -39,9 +39,8 @@ export default function Oscilloscope({ timeData, rawSignal, filteredSignal, enve
 
     if (displayMode === 'xy') {
       if (!rawSignal || !filteredSignal || rawSignal.length === 0) return;
-      ctx.strokeStyle = '#3b82f6';
-      ctx.lineWidth = 1.5;
-      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = '#00FF00';
+      ctx.lineWidth = 1.8;
       ctx.beginPath();
       const n = Math.min(rawSignal.length, filteredSignal.length);
       for (let i = 0; i < n; i++) {
@@ -50,7 +49,6 @@ export default function Oscilloscope({ timeData, rawSignal, filteredSignal, enve
         i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       }
       ctx.stroke();
-      ctx.globalAlpha = 1;
       return;
     }
 
@@ -75,84 +73,73 @@ export default function Oscilloscope({ timeData, rawSignal, filteredSignal, enve
       ctx.stroke();
     };
 
-    if (showCh1 && rawSignal) drawTrace(rawSignal, '#3b82f6', 1.8);
-    if (showCh2 && filteredSignal) drawTrace(filteredSignal, '#10b981', 2);
-    if (envelopeSignal) drawTrace(envelopeSignal, '#f59e0b', 1.2);
+    // CH1 Raw (Bright Cyan), CH2 Filtered (Lime Green), Envelope (Yellow)
+    if (showCh1 && rawSignal) drawTrace(rawSignal, '#00FFFF', 1.8);
+    if (showCh2 && filteredSignal) drawTrace(filteredSignal, '#00FF00', 2.0);
+    if (envelopeSignal) drawTrace(envelopeSignal, '#FFFF00', 1.2);
 
-    // Cursor readout
-    if (cursorPos) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-      ctx.setLineDash([2, 3]);
-      ctx.beginPath();
-      ctx.moveTo(cursorPos.x, 0); ctx.lineTo(cursorPos.x, H);
-      ctx.moveTo(0, cursorPos.y); ctx.lineTo(W, cursorPos.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      const vVal = ((H/2 - cursorPos.y) / ch) * voltsDiv;
-      const tVal = (cursorPos.x / W) * totalMs;
-
-      ctx.fillStyle = 'rgba(8,9,12,0.85)';
-      ctx.fillRect(cursorPos.x + 8, cursorPos.y - 22, 130, 18);
-      ctx.fillStyle = '#eaf0f6';
-      ctx.font = '500 10px "JetBrains Mono"';
-      ctx.fillText(`T:${tVal.toFixed(2)}ms  V:${vVal.toFixed(2)}V`, cursorPos.x + 12, cursorPos.y - 8);
-    }
-
-  }, [timeData, rawSignal, filteredSignal, envelopeSignal, displayMode, timeDiv, voltsDiv, showCh1, showCh2, cursorPos, sampleRate]);
+  }, [timeData, rawSignal, filteredSignal, envelopeSignal, displayMode, timeDiv, voltsDiv, showCh1, showCh2, sampleRate]);
 
   return (
-    <div className="panel p-3 flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <span className="ctrl-label" style={{ fontSize: '11px', letterSpacing: '0.08em' }}>Oscilloscope</span>
+    <div className="win95-outset p-2 flex flex-col gap-2">
+      {/* Title Bar */}
+      <div className="win95-titlebar">
+        <span>Oscilloscope_CRT_98.exe</span>
+        <div className="flex gap-1">
+          <div className="win95-btn-box">_</div>
+          <div className="win95-btn-box">□</div>
+          <div className="win95-btn-box">✕</div>
+        </div>
+      </div>
+
+      {/* Control Bar */}
+      <div className="flex items-center justify-between flex-wrap gap-2 py-1 border-b border-[#808080]">
+        <div className="flex gap-1">
+          <button onClick={() => setDisplayMode('time')} className={`win95-btn text-xs ${displayMode === 'time' ? 'bg-[#FFFFFF]' : ''}`}>
+            TIME_DOMAIN
+          </button>
+          <button onClick={() => setDisplayMode('xy')} className={`win95-btn text-xs ${displayMode === 'xy' ? 'bg-[#FFFFFF]' : ''}`}>
+            XY_LISSAJOUS
+          </button>
+        </div>
+
         <div className="flex items-center gap-2">
-          <div className="tab-bar" style={{ padding: '2px' }}>
-            <button onClick={() => setDisplayMode('time')} className={`tab-btn ${displayMode === 'time' ? 'active' : ''}`} style={{ padding: '3px 10px', fontSize: '10.5px' }}>Time</button>
-            <button onClick={() => setDisplayMode('xy')} className={`tab-btn ${displayMode === 'xy' ? 'active' : ''}`} style={{ padding: '3px 10px', fontSize: '10.5px' }}>XY</button>
-          </div>
-          <button onClick={() => setShowCh1(!showCh1)} className="btn" style={{ padding: '3px 8px', fontSize: '10px', color: showCh1 ? '#3b82f6' : undefined }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }}></span> CH1
+          <button onClick={() => setShowCh1(!showCh1)} className={`win95-btn text-xs ${showCh1 ? 'text-[#0000FF]' : ''}`}>
+            CH1 (CYAN)
           </button>
-          <button onClick={() => setShowCh2(!showCh2)} className="btn" style={{ padding: '3px 8px', fontSize: '10px', color: showCh2 ? '#10b981' : undefined }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span> CH2
+          <button onClick={() => setShowCh2(!showCh2)} className={`win95-btn text-xs ${showCh2 ? 'text-[#00AA00]' : ''}`}>
+            CH2 (GREEN)
           </button>
+        </div>
+
+        <div className="flex items-center gap-2 font-mono text-xs">
+          <span>TB:</span>
+          <select value={timeDiv} onChange={(e) => setTimeDiv(parseFloat(e.target.value))}>
+            <option value="0.2">0.2ms</option>
+            <option value="0.5">0.5ms</option>
+            <option value="1">1.0ms</option>
+            <option value="2">2.0ms</option>
+            <option value="5">5.0ms</option>
+            <option value="10">10.0ms</option>
+          </select>
+
+          <span>V/DIV:</span>
+          <select value={voltsDiv} onChange={(e) => setVoltsDiv(parseFloat(e.target.value))}>
+            <option value="0.1">0.1V</option>
+            <option value="0.2">0.2V</option>
+            <option value="0.5">0.5V</option>
+            <option value="1">1.0V</option>
+            <option value="2">2.0V</option>
+            <option value="5">5.0V</option>
+          </select>
         </div>
       </div>
 
-      <div className="scope-display">
-        <canvas
-          ref={canvasRef}
-          width={800}
-          height={380}
-          style={{ height: 380 }}
-          onMouseMove={(e) => {
-            const r = canvasRef.current.getBoundingClientRect();
-            setCursorPos({ x: e.clientX - r.left, y: e.clientY - r.top });
-          }}
-          onMouseLeave={() => setCursorPos(null)}
-        />
-        <div className="scope-overlay">
-          <span style={{ color: '#3b82f6' }}>CH1</span>
-          <span style={{ color: '#10b981' }}>CH2</span>
-          <span>{timeDiv}ms/div</span>
-          <span>{voltsDiv}V/div</span>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1.5">
-          <span className="ctrl-label">Time/Div</span>
-          <select value={timeDiv} onChange={(e) => setTimeDiv(parseFloat(e.target.value))} style={{ width: 72 }}>
-            <option value="0.2">0.2 ms</option><option value="0.5">0.5 ms</option><option value="1">1 ms</option>
-            <option value="2">2 ms</option><option value="5">5 ms</option><option value="10">10 ms</option>
-          </select>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="ctrl-label">V/Div</span>
-          <select value={voltsDiv} onChange={(e) => setVoltsDiv(parseFloat(e.target.value))} style={{ width: 72 }}>
-            <option value="0.1">0.1 V</option><option value="0.2">0.2 V</option><option value="0.5">0.5 V</option>
-            <option value="1">1 V</option><option value="2">2 V</option><option value="5">5 V</option>
-          </select>
+      {/* Sunken CRT Display */}
+      <div className="win95-crt-screen p-1 relative">
+        <canvas ref={canvasRef} width={800} height={360} className="w-full h-[360px] block cursor-crosshair" />
+        <div className="absolute top-2 right-2 bg-[#000000]/80 border border-[#00FF00] px-2 py-0.5 text-[10px] font-mono text-[#00FF00]">
+          CH1: {voltsDiv}V | CH2: {voltsDiv}V | {timeDiv}ms/DIV
         </div>
       </div>
     </div>

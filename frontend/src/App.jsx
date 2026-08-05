@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, Terminal } from 'lucide-react';
+import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code } from 'lucide-react';
 
 import Oscilloscope from './components/Oscilloscope';
 import SpectrumAnalyzer from './components/SpectrumAnalyzer';
@@ -169,7 +169,7 @@ export default function App() {
     for (let i = 0; i < dsp.time.length; i++) csv += `${dsp.time[i]},${dsp.raw_signal[i]},${dsp.filtered_signal[i]}\n`;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = 'signallab.csv'; a.click();
+    a.download = 'signallab98.csv'; a.click();
   };
 
   const exportWAV = async () => {
@@ -181,13 +181,13 @@ export default function App() {
       if (res.ok) {
         const a = document.createElement('a');
         a.href = URL.createObjectURL(await res.blob());
-        a.download = 'signallab.wav'; a.click();
+        a.download = 'signallab98.wav'; a.click();
       }
     } catch {}
   };
 
   return (
-    <div style={{ minHeight: '100vh', padding: '16px', maxWidth: 1520, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="min-h-screen p-3 max-w-[1550px] mx-auto flex flex-col gap-3">
 
       {/* Hidden File Input */}
       <input
@@ -198,112 +198,187 @@ export default function App() {
         style={{ display: 'none' }}
       />
 
-      {/* ── Header ──────────────────────────── */}
-      <header className="panel" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-sm)', background: 'var(--bg-card)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Activity size={16} color="var(--ch1)" />
+      {/* ── WINDOWS 95 MAIN APPLICATION FRAME ──────────────────────────── */}
+      <div className="win95-outset-deep flex flex-col gap-2 p-1.5">
+
+        {/* Windows Title Bar */}
+        <div className="win95-titlebar">
+          <div className="flex items-center gap-2">
+            <span className="bg-[#FFFF00] text-[#000000] px-1 font-bold text-xs">98</span>
+            <span>REI_SignalLab_98.exe - [DSP Signal Analysis & Python Code Sandbox]</span>
           </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              REI SignalLab
-              <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, padding: '2px 6px', borderRadius: 4, background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--ch1)' }}>v1.5</span>
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text-2)' }}>Digital Signal Processing, Python Code Sandbox & Signal Upload Engine</div>
+          <div className="flex gap-1">
+            <div className="win95-btn-box">_</div>
+            <div className="win95-btn-box">□</div>
+            <div className="win95-btn-box">✕</div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          {uploadedFileName && (
-            <div className="panel-inset" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', color: '#10b981', fontSize: 11, fontFamily: 'var(--font-mono)' }}>
-              <FileAudio size={13} /> {uploadedFileName}
-            </div>
-          )}
+        {/* 90s Menu Bar */}
+        <div className="flex items-center justify-between border-b border-[#808080] pb-1 px-1 text-xs font-bold gap-4 flex-wrap">
+          <div className="flex gap-4 underline">
+            <span className="cursor-pointer hover:text-[#0000FF]">File</span>
+            <span className="cursor-pointer hover:text-[#0000FF]">Edit</span>
+            <span className="cursor-pointer hover:text-[#0000FF]">DSP_Presets</span>
+            <span className="cursor-pointer hover:text-[#0000FF]">Lisp_Kernel</span>
+            <span className="cursor-pointer hover:text-[#0000FF]">Python_Lab</span>
+            <span className="cursor-pointer hover:text-[#0000FF]">Help</span>
+          </div>
 
-          <div className="panel-inset" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px' }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)' }}>PRESET</span>
-            <select value={uploadedFileName ? 'upload' : presetKey} onChange={e => { if (e.target.value !== 'upload') loadPreset(e.target.value); }} style={{ background: 'transparent', border: 'none', color: 'var(--text-1)', fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}>
-              {uploadedFileName && <option value="upload" style={{ background: 'var(--bg-panel)' }}>File: {uploadedFileName}</option>}
-              {Object.entries(PRESETS).map(([k, p]) => <option key={k} value={k} style={{ background: 'var(--bg-panel)' }}>{p.name}</option>)}
+          <div className="flex items-center gap-2">
+            <span className="badge-blink">NEW!</span>
+            <span className="text-[#0000FF] font-bold text-xs font-mono">VISITORS: 0004291</span>
+          </div>
+        </div>
+
+        {/* 90s MARQUEE SCROLLING TICKER */}
+        <div className="bg-[#000000] text-[#00FF00] font-mono text-xs p-1 border-2 border-t-[#808080] border-l-[#808080] border-r-[#FFFFFF] border-b-[#FFFFFF] overflow-hidden whitespace-nowrap">
+          <marquee scrollamount="5" behavior="scroll">
+            *** WELCOME TO REI SIGNALLAB 98 *** FASTAPI + SCIPY + MATPLOTLIB API RENDERER *** MACHINE-LEVEL COMMON LISP SIMD ENGINE ACTIVE *** PYTHON SCRIPTING SANDBOX READY ***
+          </marquee>
+        </div>
+
+        {/* Action Controls & Preset Bar */}
+        <div className="flex items-center justify-between flex-wrap gap-2 px-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold text-xs">DSP Preset:</span>
+            <select
+              value={uploadedFileName ? 'upload' : presetKey}
+              onChange={e => { if (e.target.value !== 'upload') loadPreset(e.target.value); }}
+            >
+              {uploadedFileName && <option value="upload">File: {uploadedFileName}</option>}
+              {Object.entries(PRESETS).map(([k, p]) => (
+                <option key={k} value={k}>{p.name}</option>
+              ))}
             </select>
+
+            <button className="win95-btn win95-btn-blue" onClick={() => fileInputRef.current?.click()}>
+              <Upload size={13} /> Upload File (.wav, .csv)
+            </button>
           </div>
 
-          <button className="btn" onClick={() => fileInputRef.current?.click()} style={{ color: 'var(--ch1)', borderColor: 'rgba(59,130,246,0.3)' }}>
-            <Upload size={13} /> Upload File (.wav, .csv)
-          </button>
+          <div className="flex items-center gap-2">
+            <button className="win95-btn" onClick={exportCSV}>
+              <FileSpreadsheet size={13} className="text-[#00AA00]" /> CSV Export
+            </button>
 
-          <button className="btn" onClick={exportCSV}><FileSpreadsheet size={13} color="var(--ch2)" /> CSV</button>
-          <button className="btn" onClick={exportWAV}><Download size={13} color="var(--ch1)" /> WAV</button>
+            <button className="win95-btn" onClick={exportWAV}>
+              <Download size={13} className="text-[#0000FF]" /> WAV Audio
+            </button>
 
-          <div className="panel-inset" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-2)' }}>
-            <span className={`status-dot ${status === 'online' ? 'online' : 'fallback'}`}></span>
-            {status === 'online' ? 'API ONLINE' : 'CLIENT DSP'}
+            <div className="win95-hitcounter flex-row items-center gap-2 py-0.5 px-2">
+              <span className="w-2 h-2 bg-[#00FF00]"></span>
+              <span className="text-xs">{status === 'online' ? 'API_ONLINE' : 'CLIENT_DSP'}</span>
+            </div>
           </div>
         </div>
-      </header>
 
-      {/* ── Metrics ─────────────────────────── */}
-      <SignalMetrics metrics={dsp?.metrics} />
+        {/* 3D Groove Divider */}
+        <hr className="hr-groove" />
 
-      {/* ── Main Layout ────────────────────── */}
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {/* ── Signal Telemetry Metrics ── */}
+        <SignalMetrics metrics={dsp?.metrics} />
 
-        {/* Left: Display Stage */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* 3D Groove Divider */}
+        <hr className="hr-groove" />
 
-          {/* View tabs */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div className="tab-bar">
-              <button onClick={() => setActiveView('dual')} className={`tab-btn ${activeView === 'dual' ? 'active' : ''}`}>
-                <Activity size={13} /> Scope + FFT
-              </button>
-              <button onClick={() => setActiveView('python')} className={`tab-btn ${activeView === 'python' ? 'active' : ''}`}>
-                <Code size={13} color="#38BDF8" /> Python Lab
-              </button>
-              <button onClick={() => setActiveView('waterfall')} className={`tab-btn ${activeView === 'waterfall' ? 'active' : ''}`}>
-                <Waves size={13} /> Waterfall
-              </button>
-              <button onClick={() => setActiveView('lisp')} className={`tab-btn ${activeView === 'lisp' ? 'active' : ''}`}>
-                <Cpu size={13} /> Lisp Plugin
-              </button>
+        {/* ── Main Workspace Split Stage ── */}
+        <div className="flex flex-col lg:flex-row gap-3 items-start">
+
+          {/* Left Stage */}
+          <div className="flex-1 flex flex-col gap-2 w-full">
+
+            {/* Workspace View Tabs */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="win95-tabs">
+                <button
+                  onClick={() => setActiveView('dual')}
+                  className={`win95-tab ${activeView === 'dual' ? 'active' : ''}`}
+                >
+                  Oscilloscope + Spectrum
+                </button>
+                <button
+                  onClick={() => setActiveView('python')}
+                  className={`win95-tab flex items-center gap-1 ${activeView === 'python' ? 'active' : ''}`}
+                >
+                  <Code size={12} className="text-[#0000FF]" /> Python Lab <span className="badge-blink">NEW!</span>
+                </button>
+                <button
+                  onClick={() => setActiveView('waterfall')}
+                  className={`win95-tab ${activeView === 'waterfall' ? 'active' : ''}`}
+                >
+                  2D Waterfall
+                </button>
+                <button
+                  onClick={() => setActiveView('lisp')}
+                  className={`win95-tab ${activeView === 'lisp' ? 'active' : ''}`}
+                >
+                  Common Lisp Engine
+                </button>
+              </div>
+
+              <AudioEngine generatorConfig={genCfg} filterConfig={filterCfg} />
             </div>
-            <AudioEngine generatorConfig={genCfg} filterConfig={filterCfg} />
+
+            {/* Display Panes */}
+            {activeView === 'dual' && (
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
+                <Oscilloscope
+                  timeData={dsp?.time}
+                  rawSignal={dsp?.raw_signal}
+                  filteredSignal={dsp?.filtered_signal}
+                  envelopeSignal={dsp?.envelope_signal}
+                  sampleRate={genCfg.sample_rate}
+                />
+                <SpectrumAnalyzer
+                  frequencyData={dsp?.frequency}
+                  magnitudeData={dsp?.spectrum_magnitude}
+                  metrics={dsp?.metrics}
+                />
+              </div>
+            )}
+
+            {activeView === 'python' && (
+              <PythonLabEditor onPythonProcessed={(pythonData) => setDsp(pythonData)} />
+            )}
+
+            {activeView === 'waterfall' && (
+              <WaterfallSpectrogram
+                spectrogramMatrix={dsp?.spectrogram_matrix}
+                frequencies={dsp?.spectrogram_frequencies}
+                times={dsp?.spectrogram_times}
+              />
+            )}
+
+            {activeView === 'lisp' && (
+              <LispPluginEditor
+                generatorConfig={genCfg}
+                fftConfig={fftCfg}
+                onLispProcessed={d => setDsp(d)}
+              />
+            )}
           </div>
 
-          {/* Display Panes */}
-          {activeView === 'dual' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Oscilloscope timeData={dsp?.time} rawSignal={dsp?.raw_signal} filteredSignal={dsp?.filtered_signal} envelopeSignal={dsp?.envelope_signal} sampleRate={genCfg.sample_rate} />
-              <SpectrumAnalyzer frequencyData={dsp?.frequency} magnitudeData={dsp?.spectrum_magnitude} metrics={dsp?.metrics} />
-            </div>
-          )}
-
-          {activeView === 'python' && (
-            <PythonLabEditor onPythonProcessed={(pythonData) => setDsp(pythonData)} />
-          )}
-
-          {activeView === 'waterfall' && (
-            <WaterfallSpectrogram spectrogramMatrix={dsp?.spectrogram_matrix} frequencies={dsp?.spectrogram_frequencies} times={dsp?.spectrogram_times} />
-          )}
-
-          {activeView === 'lisp' && (
-            <LispPluginEditor generatorConfig={genCfg} fftConfig={fftCfg} onLispProcessed={d => setDsp(d)} />
-          )}
+          {/* Right Control Sidebar */}
+          <ControlPanel
+            generatorConfig={genCfg} setGeneratorConfig={setGenCfg}
+            mathConfig={mathCfg} setMathConfig={setMathCfg}
+            filterConfig={filterCfg} setFilterConfig={setFilterCfg}
+          />
         </div>
 
-        {/* Right: Controls */}
-        <ControlPanel
-          generatorConfig={genCfg} setGeneratorConfig={setGenCfg}
-          mathConfig={mathCfg} setMathConfig={setMathCfg}
-          filterConfig={filterCfg} setFilterConfig={setFilterCfg}
-        />
+        {/* Construction Stripes Accent Bar */}
+        <div className="bg-construction h-4 w-full border border-[#000000] flex items-center justify-center text-[9px] font-bold tracking-widest text-[#000000]">
+          UNDER CONSTRUCTION -- REI SIGNALLAB 98 -- POWERED BY ROOTCASTLE
+        </div>
+
+        {/* Windows Status Bar Footer */}
+        <footer className="win95-inset p-1 flex justify-between text-xs font-mono text-[#000000]">
+          <span>Status: Ready | Press F1 for Help</span>
+          <span>RootCastle &copy; 1998-2026</span>
+        </footer>
+
       </div>
-
-      {/* ── Footer ──────────────────────────── */}
-      <footer className="panel" style={{ padding: '8px 14px', display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)' }}>
-        <span>REI SignalLab -- RootCastle 2026</span>
-        <span>FastAPI + SciPy + Matplotlib + Python Sandbox | React 18 + Canvas</span>
-      </footer>
     </div>
   );
 }
