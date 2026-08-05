@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText, Layers, AlertTriangle } from 'lucide-react';
+import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText, Layers, AlertTriangle, Gauge } from 'lucide-react';
 import { safeFetchJson } from './config';
 
 import Oscilloscope from './components/Oscilloscope';
