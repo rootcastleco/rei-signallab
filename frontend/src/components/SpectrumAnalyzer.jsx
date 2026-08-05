@@ -1,12 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { BarChart2, Hash, Sparkles } from 'lucide-react';
+import { BarChart2, Sparkles, Activity, ShieldCheck, Cpu } from 'lucide-react';
 
 export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics }) {
   const canvasRef = useRef(null);
   const [logScale, setLogScale] = useState(false);
   const [showHarmonics, setShowHarmonics] = useState(true);
-  const [minDb, setMinDb] = useState(-100);
-  const [maxDb, setMaxDb] = useState(20);
+  const [showPeakHold, setShowPeakHold] = useState(true);
+  const peakHoldRef = useRef([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -15,18 +15,19 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
     const width = canvas.width;
     const height = canvas.height;
 
-    // Clear background
-    ctx.fillStyle = '#05070A';
+    const minDb = -100;
+    const maxDb = 20;
+    const dbRange = maxDb - minDb;
+
+    ctx.fillStyle = '#04060A';
     ctx.fillRect(0, 0, width, height);
 
-    // Draw Spectrum Grid
-    const dbRange = maxDb - minDb;
+    // Spectrum Grid
     const gridRows = 6;
     const gridCols = 8;
     const cellW = width / gridCols;
     const cellH = height / gridRows;
 
-    // dB grid lines
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 1;
     for (let r = 1; r < gridRows; r++) {
@@ -42,7 +43,6 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
       ctx.fillText(`${dbVal.toFixed(0)} dB`, 6, y - 3);
     }
 
-    // Freq grid lines
     for (let c = 1; c < gridCols; c++) {
       const x = c * cellW;
       ctx.beginPath();
@@ -55,7 +55,6 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
 
     const maxFreq = frequencyData[frequencyData.length - 1] || 22050;
 
-    // Function to calculate X position based on linear/log scale
     const getX = (freq) => {
       if (logScale) {
         const minF = Math.max(10, frequencyData[0] || 10);
@@ -65,11 +64,40 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
       return (freq / maxFreq) * width;
     };
 
-    // Draw Spectrum Curve with Gradient Fill
+    // Update Peak Hold Buffer
+    if (peakHoldRef.current.length !== magnitudeData.length) {
+      peakHoldRef.current = [...magnitudeData];
+    } else {
+      for (let i = 0; i < magnitudeData.length; i++) {
+        // Slow decay max hold
+        peakHoldRef.current[i] = Math.max(peakHoldRef.current[i] - 0.3, magnitudeData[i]);
+      }
+    }
+
+    // Draw Peak Hold Trace (Amber Line)
+    if (showPeakHold && peakHoldRef.current.length > 0) {
+      ctx.strokeStyle = 'rgba(255, 159, 10, 0.8)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      for (let i = 0; i < frequencyData.length; i++) {
+        const x = getX(frequencyData[i]);
+        const magDb = peakHoldRef.current[i];
+        const normY = (maxDb - magDb) / dbRange;
+        const y = Math.max(0, Math.min(height, normY * height));
+
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Draw Spectrum Curve Gradient
     const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, 'rgba(191, 90, 242, 0.8)');
-    gradient.addColorStop(0.5, 'rgba(10, 132, 255, 0.4)');
-    gradient.addColorStop(1, 'rgba(10, 132, 255, 0.0)');
+    gradient.addColorStop(0, 'rgba(191, 90, 242, 0.85)');
+    gradient.addColorStop(0.5, 'rgba(0, 240, 255, 0.4)');
+    gradient.addColorStop(1, 'rgba(0, 240, 255, 0.0)');
 
     ctx.beginPath();
     ctx.moveTo(0, height);
@@ -79,7 +107,6 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
       const magDb = magnitudeData[i];
       const x = getX(freq);
 
-      // Clamp magnitude Y between 0 and height
       const normY = (maxDb - magDb) / dbRange;
       const y = Math.max(0, Math.min(height, normY * height));
 
@@ -87,14 +114,12 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
       else ctx.lineTo(x, y);
     }
 
-    // Line stroke
     ctx.strokeStyle = '#BF5AF2';
     ctx.shadowColor = '#BF5AF2';
     ctx.shadowBlur = 10;
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Fill area under curve
     ctx.lineTo(width, height);
     ctx.lineTo(0, height);
     ctx.closePath();
@@ -102,14 +127,13 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
     ctx.shadowBlur = 0;
     ctx.fill();
 
-    // Annotate Peak Fundamental Frequency
+    // Annotate Peak Fundamental & Harmonics
     if (metrics && metrics.fundamental_freq > 0) {
       const fundFreq = metrics.fundamental_freq;
       const peakX = getX(fundFreq);
       const peakMag = metrics.peak_magnitude_db || 0;
       const peakY = Math.max(10, ((maxDb - peakMag) / dbRange) * height);
 
-      // Draw Peak Indicator Pin
       ctx.strokeStyle = '#FF3B30';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -122,12 +146,10 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
       ctx.arc(peakX, peakY, 4, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Peak Label Box
-      ctx.fillStyle = 'rgba(255, 59, 48, 0.9)';
+      ctx.fillStyle = '#FF453A';
       ctx.font = '11px "JetBrains Mono", monospace';
-      ctx.fillText(`Peak: ${fundFreq.toFixed(1)} Hz (${peakMag.toFixed(1)} dB)`, Math.min(width - 150, peakX + 8), peakY - 8);
+      ctx.fillText(`Peak: ${fundFreq.toFixed(1)} Hz (${peakMag.toFixed(1)} dB)`, Math.min(width - 160, peakX + 8), peakY - 8);
 
-      // Draw Harmonic Markers if enabled
       if (showHarmonics) {
         [2, 3, 4, 5].forEach((h) => {
           const hFreq = fundFreq * h;
@@ -149,19 +171,17 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
       }
     }
 
-  }, [frequencyData, magnitudeData, metrics, logScale, showHarmonics, minDb, maxDb]);
+  }, [frequencyData, magnitudeData, metrics, logScale, showHarmonics, showPeakHold]);
 
   return (
     <div className="glass-panel p-4 flex flex-col gap-3">
-      {/* Header Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
         <div className="flex items-center gap-2">
           <BarChart2 className="w-5 h-5 text-purple-400" />
-          <span className="font-semibold text-sm tracking-wide text-white">SPECTRUM ANALYZER (FREQUENCY DOMAIN - FFT)</span>
+          <span className="font-semibold text-sm tracking-wide text-white">SPECTRUM ANALYZER (FFT & PEAK ENVELOPE)</span>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Axis Scale Toggle */}
+        <div className="flex items-center gap-2.5">
           <div className="apple-segmented">
             <button
               onClick={() => setLogScale(false)}
@@ -178,17 +198,25 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
           </div>
 
           <button
-            onClick={() => setShowHarmonics(!showHarmonics)}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 border ${
-              showHarmonics ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-white/5 text-gray-400 border-white/10'
+            onClick={() => setShowPeakHold(!showPeakHold)}
+            className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1 border ${
+              showPeakHold ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-white/5 text-gray-400 border-white/10'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5" /> Harmonics (2H-5H)
+            Peak Hold
+          </button>
+
+          <button
+            onClick={() => setShowHarmonics(!showHarmonics)}
+            className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1 border ${
+              showHarmonics ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' : 'bg-white/5 text-gray-400 border-white/10'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" /> Harmonics
           </button>
         </div>
       </div>
 
-      {/* Spectrum Display Canvas */}
       <div className="relative w-full overflow-hidden rounded-lg border border-white/10 bg-black">
         <canvas
           ref={canvasRef}
@@ -197,18 +225,14 @@ export default function SpectrumAnalyzer({ frequencyData, magnitudeData, metrics
           className="w-full h-[380px] block cursor-crosshair"
         />
 
-        {/* Legend Overlay */}
-        <div className="absolute top-2 right-3 flex items-center gap-4 bg-black/70 backdrop-blur border border-white/10 rounded px-3 py-1 text-[11px] font-mono text-gray-300">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-purple-500"></span> FFT Mag (dBV)
-          </span>
-          {metrics && (
-            <>
-              <span className="text-emerald-400">THD: {metrics.thd_percent}%</span>
-              <span className="text-cyan-400">SNR: {metrics.snr_db} dB</span>
-            </>
-          )}
-        </div>
+        {metrics && (
+          <div className="absolute top-2 right-3 flex flex-wrap items-center gap-3 bg-black/80 backdrop-blur border border-white/10 rounded px-3 py-1 text-[11px] font-mono text-gray-300">
+            <span className="text-emerald-400">THD: {metrics.thd_percent}%</span>
+            <span className="text-cyan-400">SNR: {metrics.snr_db} dB</span>
+            <span className="text-amber-400">SINAD: {metrics.sinad_db || 0} dB</span>
+            <span className="text-purple-400">ENOB: {metrics.enob_bits || 0} bits</span>
+          </div>
+        )}
       </div>
     </div>
   );
