@@ -1,39 +1,34 @@
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Query, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, Response
-from pydantic import BaseModel, Field
+from fastapi.responses import Response, JSONResponse
 import numpy as np
 import io
 import wave
-import asyncio
-import json
 import logging
-import csv
-from typing import Dict, Any, List
+from typing import Dict, Any, Optional, List
 
-from .schemas import (
+from app.schemas import (
     SignalProcessingRequest,
-    SignalProcessingResponse,
-    FFTConfig,
-    SignalGeneratorConfig,
-    FilterConfig,
-    MathQuantizerConfig,
-    WaveformType,
-    FilterType,
-    FilterDesign
+    LispProcessingRequest,
+    PythonScriptRequest,
+    PlotRenderRequest,
+    SignalProcessingResponse
 )
-from .dsp_engine import DSPEngine
-from .lisp_engine import LispDSPEngine
-from .python_engine import PythonDSPEngine
-from .graph_engine import SignalFlowGraphEngine
+from app.dsp_engine import DSPEngine
+from app.lisp_engine import LispDSPEngine
+from app.python_engine import PythonSandboxEngine
+from app.graph.registry import NodeRegistry, NodeSpec
+from app.graph.validator import GraphValidator
+from app.graph.engine import GraphExecutionEngine
+from app.graph.migration import ProjectMigrationManager
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("signallab_api")
+logger = logging.getLogger("signallab")
 
 app = FastAPI(
-    title="REI SignalLab 2.0 API with Signal Flow Studio Engine",
-    description="Instrument-Grade Digital Signal Processing, Typed Node-Based Signal Flow Studio, Hardened Python Sandbox, Server-Side Matplotlib Plot Rendering, Signal File Upload, and S-Expression DSP DSL Kernel",
-    version="2.0.0"
+    title="REI SignalLab 2.1 Engine API",
+    description="Instrument-Grade Typed Signal Processing, Node Graph Engine & Sandbox Suite",
+    version="2.1.0"
 )
 
 app.add_middleware(
@@ -44,54 +39,80 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-class LispProcessingRequest(BaseModel):
-    lisp_code: str = Field(default="(biquad-filter-simd signal 0.1 0.2 0.1 -0.5 0.25)")
-    generator: SignalGeneratorConfig
-    fft: FFTConfig = Field(default_factory=FFTConfig)
-
-
-class PythonScriptRequest(BaseModel):
-    python_code: str = Field(..., description="Python DSP simulation script code")
-
-
-class GraphExecutionRequest(BaseModel):
-    project: Dict[str, Any] = Field(..., description=".rei-signal project definition")
-
-
 @app.get("/")
-def get_root():
+def read_root():
     return {
-        "app": "REI SignalLab 2.0 DSP Engine",
+        "app": "REI SignalLab 2.1 DSP Engine",
+        "version": "2.1.0",
         "status": "online",
-        "version": "2.0.0",
-        "features": [
-            "Typed Node-Based Signal Flow Studio (.rei-signal)",
-            "Hardened Python Script Sandbox & Quotas",
-            "Instrument-Grade Fail-Closed DSP Engine",
-            "S-Expression DSP DSL Kernel",
-            "Signal File Upload (.wav, .csv, .txt, .json)",
-            "Matplotlib Server-Side PNG/SVG API Plot Renderer",
-            "Studio Telemetry (THD, SNR, SINAD, SFDR, ENOB)",
-            "Real-time WebSocket Streaming"
-        ]
+        "engine": "SciPy/FastAPI",
+        "registered_nodes_count": len(NodeRegistry.list_all())
     }
 
+# 1. Node Catalog Registry Endpoints
+@app.get("/api/nodes")
+def list_nodes():
+    return [spec.model_dump() for spec in NodeRegistry.list_all()]
 
+@app.get("/api/nodes/{node_type}")
+def get_node_spec(node_type: str):
+    spec = NodeRegistry.get(node_type)
+    if not spec:
+        raise HTTPException(status_code=404, detail=f"Node type '{node_type}' not found in registry.")
+    return spec.model_dump()
+
+# 2. Graph Validation & Execution Endpoints
+@app.post("/api/graph/validate")
+def validate_graph(request_data: Dict[str, Any]):
+    project = request_data.get("project", request_data)
+    migrated_project = ProjectMigrationManager.migrate_to_2_1(project)
+    val_result = GraphValidator.validate_graph(migrated_project)
+    if not val_result.valid:
+        return JSONResponse(status_code=422, content=val_result.model_dump())
+    return val_result.model_dump()
+
+@app.post("/api/graph/execute")
+def execute_graph(request_data: Dict[str, Any]):
+    project = request_data.get("project", request_data)
+    migrated_project = ProjectMigrationManager.migrate_to_2_1(project)
+
+    engine = GraphExecutionEngine()
+    exec_result = engine.execute_project(migrated_project)
+
+    if exec_result.get("status") == "error":
+        return JSONResponse(status_code=422, content=exec_result)
+
+    return exec_result
+
+# 3. Time-Domain / Spectral DSP Endpoint
 @app.post("/api/process", response_model=SignalProcessingResponse)
 def process_signal(req: SignalProcessingRequest):
     try:
         t, raw_sig = DSPEngine.generate_signal(req.generator)
-        fs = req.generator.sample_rate
-        quantized_sig, envelope_sig = DSPEngine.apply_math_quantizer(raw_sig, req.math)
-        filtered_sig = DSPEngine.apply_filter(quantized_sig, fs, req.filter)
 
-        fft_config_linear = req.fft.model_copy(update={"log_scale": False})
-        freqs, mag_linear, phase = DSPEngine.compute_fft(filtered_sig, fs, fft_config_linear)
-        _, mag_db, _ = DSPEngine.compute_fft(filtered_sig, fs, req.fft)
+        if req.math.dc_remove:
+            raw_sig = raw_sig - np.mean(raw_sig)
 
-        metrics = DSPEngine.compute_metrics(filtered_sig, freqs, mag_linear, fs)
-        spec_freqs, spec_times, spec_matrix = DSPEngine.compute_spectrogram(filtered_sig, fs)
+        if req.math.gain_db != 0:
+            gain_lin = 10.0 ** (req.math.gain_db / 20.0)
+            raw_sig = raw_sig * gain_lin
+
+        if req.math.bit_depth and req.math.bit_depth in [8, 12, 16]:
+            q_max = 2.0 ** (req.math.bit_depth - 1) - 1
+            raw_sig = np.round(raw_sig * q_max) / q_max
+
+        envelope_sig = None
+        if req.math.envelope_extraction:
+            envelope_sig = DSPEngine.extract_envelope(raw_sig)
+
+        filtered_sig = DSPEngine.apply_filter(raw_sig, req.generator.sample_rate, req.filter)
+        freqs, mag_db, phase = DSPEngine.compute_fft(filtered_sig, req.generator.sample_rate, req.fft)
+
+        fft_linear_cfg = req.fft.model_copy(update={"log_scale": False})
+        _, mag_linear, _ = DSPEngine.compute_fft(filtered_sig, req.generator.sample_rate, fft_linear_cfg)
+
+        metrics = DSPEngine.compute_metrics(filtered_sig, freqs, mag_linear, req.generator.sample_rate)
+        freqs_spec, times_spec, matrix_spec = DSPEngine.compute_spectrogram(filtered_sig, req.generator.sample_rate)
 
         return SignalProcessingResponse(
             time=t.tolist(),
@@ -100,57 +121,18 @@ def process_signal(req: SignalProcessingRequest):
             envelope_signal=envelope_sig.tolist() if envelope_sig is not None else None,
             frequency=freqs.tolist(),
             spectrum_magnitude=mag_db.tolist(),
-            spectrum_phase=phase.tolist(),
             metrics=metrics,
-            spectrogram_matrix=spec_matrix.tolist(),
-            spectrogram_times=spec_times.tolist(),
-            spectrogram_frequencies=spec_freqs.tolist()
+            spectrogram_matrix=matrix_spec.tolist(),
+            spectrogram_times=times_spec.tolist(),
+            spectrogram_frequencies=freqs_spec.tolist()
         )
     except Exception as e:
-        logger.error(f"Error in process_signal: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"DSP computation error: {str(e)}")
+        logger.error(f"Error processing signal: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"DSP Engine Processing Failure: {str(e)}")
 
-
-@app.post("/api/graph/execute")
-def execute_graph_pipeline(req: GraphExecutionRequest):
-    """
-    POST Endpoint: Executes a typed Node-Based Signal Flow Graph (.rei-signal project).
-    """
-    try:
-        project = req.project
-        graph_data = project.get("graph", {})
-        nodes_list = graph_data.get("nodes", [])
-        conns_list = graph_data.get("connections", [])
-
-        engine = SignalFlowGraphEngine()
-        for nd in nodes_list:
-            engine.create_node(
-                node_type=nd.get("type", "SignalGenerator"),
-                name=nd.get("name", "Node"),
-                params=nd.get("params", {}),
-                node_id=nd.get("id")
-            )
-
-        for c in conns_list:
-            engine.connect(c["from_node"], c["from_port"], c["to_node"], c["to_port"])
-
-        results = engine.run_graph()
-        return {
-            "status": "success",
-            "version": "2.0.0",
-            "results": results,
-            "project": engine.export_project()
-        }
-    except ValueError as val_err:
-        logger.warning(f"Graph validation failed: {str(val_err)}")
-        raise HTTPException(status_code=422, detail=f"Graph Validation Error: {str(val_err)}")
-    except Exception as e:
-        logger.error(f"Error executing graph pipeline: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Graph runtime error: {str(e)}")
-
-
-@app.post("/api/upload/signal", response_model=SignalProcessingResponse)
-async def upload_signal_file(
+# 4. Signal File Upload
+@app.post("/api/upload/signal")
+async def upload_signal(
     file: UploadFile = File(...),
     filter_enabled: bool = Form(False),
     filter_cutoff: float = Form(1000.0),
@@ -159,276 +141,96 @@ async def upload_signal_file(
 ):
     try:
         content = await file.read()
-        filename = file.filename.lower()
-        fs = 44100
-        raw_sig = np.array([], dtype=np.float64)
+        fs, raw_sig = DSPEngine.parse_signal_file(file.filename, content)
 
-        if filename.endswith(".wav"):
-            with wave.open(io.BytesIO(content), "rb") as wf:
-                fs = wf.getframerate()
-                n_frames = wf.getnframes()
-                audio_bytes = wf.readframes(n_frames)
-                sampwidth = wf.getsampwidth()
-                
-                if sampwidth == 2:
-                    raw_sig = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float64) / 32768.0
-                elif sampwidth == 1:
-                    raw_sig = (np.frombuffer(audio_bytes, dtype=np.uint8).astype(np.float64) - 128.0) / 128.0
-                elif sampwidth == 4:
-                    raw_sig = np.frombuffer(audio_bytes, dtype=np.int32).astype(np.float64) / 2147483648.0
-                else:
-                    raw_sig = np.frombuffer(audio_bytes, dtype=np.float32).astype(np.float64)
+        t = np.linspace(0, len(raw_sig) / fs, len(raw_sig), endpoint=False)
 
-                if wf.getnchannels() > 1:
-                    raw_sig = raw_sig.reshape(-1, wf.getnchannels()).mean(axis=1)
+        flt_cfg = type("FltCfg", (), {"enabled": filter_enabled, "cutoff": filter_cutoff, "filter_type": filter_type, "filter_design": "butterworth", "order": 4})()
+        filtered_sig = DSPEngine.apply_filter(raw_sig, fs, flt_cfg)
 
-        elif filename.endswith(".json"):
-            data = json.loads(content.decode("utf-8"))
-            if isinstance(data, list):
-                raw_sig = np.array(data, dtype=np.float64)
-            elif isinstance(data, dict):
-                raw_sig = np.array(data.get("signal", data.get("data", [])), dtype=np.float64)
-                fs = int(data.get("sample_rate", 44100))
+        envelope_sig = DSPEngine.extract_envelope(filtered_sig) if envelope_extraction else None
 
-        elif filename.endswith(".csv") or filename.endswith(".txt"):
-            text = content.decode("utf-8", errors="ignore")
-            lines = text.strip().splitlines()
-            values = []
-            for line in lines:
-                parts = [p.strip() for p in line.replace("\t", ",").split(",") if p.strip()]
-                if not parts or parts[0].isalpha():
-                    continue
-                try:
-                    val = float(parts[-1])
-                    values.append(val)
-                except ValueError:
-                    continue
-            raw_sig = np.array(values, dtype=np.float64)
+        fft_cfg = type("FFTCfg", (), {"n_fft": 1024, "window": "hanning", "log_scale": True})()
+        freqs, mag_db, phase = DSPEngine.compute_fft(filtered_sig, fs, fft_cfg)
 
-        else:
-            raise HTTPException(status_code=400, detail="Unsupported file format. Please upload .wav, .csv, .txt, or .json")
-
-        if len(raw_sig) == 0:
-            raise HTTPException(status_code=400, detail="No numerical signal data found in uploaded file")
-
-        if len(raw_sig) > 16384:
-            raw_sig = raw_sig[:16384]
-
-        num_samples = len(raw_sig)
-        t = np.linspace(0, num_samples / fs, num_samples, endpoint=False)
-
-        math_cfg = MathQuantizerConfig(envelope_extraction=envelope_extraction)
-        flt_cfg = FilterConfig(enabled=filter_enabled, cutoff=filter_cutoff, filter_type=FilterType(filter_type))
-        fft_cfg = FFTConfig()
-
-        quantized_sig, envelope_sig = DSPEngine.apply_math_quantizer(raw_sig, math_cfg)
-        filtered_sig = DSPEngine.apply_filter(quantized_sig, fs, flt_cfg)
-
-        fft_config_linear = fft_cfg.model_copy(update={"log_scale": False})
-        freqs, mag_linear, phase = DSPEngine.compute_fft(filtered_sig, fs, fft_config_linear)
-        _, mag_db, _ = DSPEngine.compute_fft(filtered_sig, fs, fft_cfg)
+        fft_linear_cfg = type("FFTCfg", (), {"n_fft": 1024, "window": "hanning", "log_scale": False})()
+        _, mag_linear, _ = DSPEngine.compute_fft(filtered_sig, fs, fft_linear_cfg)
 
         metrics = DSPEngine.compute_metrics(filtered_sig, freqs, mag_linear, fs)
-        spec_freqs, spec_times, spec_matrix = DSPEngine.compute_spectrogram(filtered_sig, fs)
+        freqs_spec, times_spec, matrix_spec = DSPEngine.compute_spectrogram(filtered_sig, fs)
 
-        return SignalProcessingResponse(
-            time=t.tolist(),
-            raw_signal=raw_sig.tolist(),
-            filtered_signal=filtered_sig.tolist(),
-            envelope_signal=envelope_sig.tolist() if envelope_sig is not None else None,
-            frequency=freqs.tolist(),
-            spectrum_magnitude=mag_db.tolist(),
-            spectrum_phase=phase.tolist(),
-            metrics=metrics,
-            spectrogram_matrix=spec_matrix.tolist(),
-            spectrogram_times=spec_times.tolist(),
-            spectrogram_frequencies=spec_freqs.tolist()
-        )
-    except HTTPException:
-        raise
+        return {
+            "time": t.tolist(),
+            "raw_signal": raw_sig.tolist(),
+            "filtered_signal": filtered_sig.tolist(),
+            "envelope_signal": envelope_sig.tolist() if envelope_sig is not None else None,
+            "frequency": freqs.tolist(),
+            "spectrum_magnitude": mag_db.tolist(),
+            "metrics": metrics.model_dump(),
+            "spectrogram_matrix": matrix_spec.tolist(),
+            "spectrogram_times": times_spec.tolist(),
+            "spectrogram_frequencies": freqs_spec.tolist()
+        }
     except Exception as e:
-        logger.error(f"Error processing uploaded signal file: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"File parsing error: {str(e)}")
+        logger.error(f"Error parsing uploaded file: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Signal File Parse Error: {str(e)}")
 
-
-@app.post("/api/render/plot")
-def render_plot_post(req: SignalProcessingRequest, plot_type: str = Query("oscilloscope", enum=["oscilloscope", "spectrum"])):
-    try:
-        t, raw_sig = DSPEngine.generate_signal(req.generator)
-        fs = req.generator.sample_rate
-        quantized_sig, envelope_sig = DSPEngine.apply_math_quantizer(raw_sig, req.math)
-        filtered_sig = DSPEngine.apply_filter(quantized_sig, fs, req.filter)
-
-        if plot_type == "spectrum":
-            freqs, mag_linear, _ = DSPEngine.compute_fft(filtered_sig, fs, req.fft.model_copy(update={"log_scale": False}))
-            freqs, mag_db, _ = DSPEngine.compute_fft(filtered_sig, fs, req.fft)
-            metrics = DSPEngine.compute_metrics(filtered_sig, freqs, mag_linear, fs)
-            png_bytes = DSPEngine.render_matplotlib_spectrum(freqs, mag_db, metrics)
-        else:
-            png_bytes = DSPEngine.render_matplotlib_oscilloscope(t, raw_sig, filtered_sig, envelope_sig)
-
-        return Response(content=png_bytes, media_type="image/png")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Matplotlib plot rendering failed: {str(e)}")
-
-
-@app.get("/api/render/plot")
-def render_plot_get(
-    waveform: WaveformType = Query(WaveformType.SINE),
-    frequency: float = Query(440.0, ge=0.1, le=20000.0),
-    amplitude: float = Query(1.0, ge=0.0, le=100.0),
-    filter_enabled: bool = Query(False),
-    filter_cutoff: float = Query(1000.0, ge=1.0, le=96000.0),
-    plot_type: str = Query("oscilloscope", enum=["oscilloscope", "spectrum"])
-):
-    try:
-        gen = SignalGeneratorConfig(waveform=waveform, frequency=frequency, amplitude=amplitude)
-        flt = FilterConfig(enabled=filter_enabled, cutoff=filter_cutoff)
-        fft = FFTConfig()
-
-        t, raw_sig = DSPEngine.generate_signal(gen)
-        fs = gen.sample_rate
-        filtered_sig = DSPEngine.apply_filter(raw_sig, fs, flt)
-
-        if plot_type == "spectrum":
-            freqs, mag_linear, _ = DSPEngine.compute_fft(filtered_sig, fs, fft.model_copy(update={"log_scale": False}))
-            freqs, mag_db, _ = DSPEngine.compute_fft(filtered_sig, fs, fft)
-            metrics = DSPEngine.compute_metrics(filtered_sig, freqs, mag_linear, fs)
-            png_bytes = DSPEngine.render_matplotlib_spectrum(freqs, mag_db, metrics)
-        else:
-            png_bytes = DSPEngine.render_matplotlib_oscilloscope(t, raw_sig, filtered_sig)
-
-        return Response(content=png_bytes, media_type="image/png")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Matplotlib GET rendering failed: {str(e)}")
-
-
+# 5. Python Sandbox Script Execution
 @app.post("/api/python/execute")
-def process_python_script(req: PythonScriptRequest):
-    try:
-        result = PythonDSPEngine.execute_python_script(req.python_code)
-        raw_sig = np.array(result.get("raw_signal", []), dtype=np.float64)
-        fs = 44100
+def execute_python_script(req: PythonScriptRequest):
+    res = PythonSandboxEngine.execute_script(req.python_code)
+    if res.get("status") == "error":
+        raise HTTPException(status_code=400, detail=res.get("error"))
+    return res
 
-        if len(raw_sig) > 0:
-            fft_cfg = FFTConfig()
-            freqs, mag_linear, phase = DSPEngine.compute_fft(raw_sig, fs, fft_cfg.model_copy(update={"log_scale": False}))
-            _, mag_db, _ = DSPEngine.compute_fft(raw_sig, fs, fft_cfg)
-            metrics = DSPEngine.compute_metrics(raw_sig, freqs, mag_linear, fs)
-            spec_freqs, spec_times, spec_matrix = DSPEngine.compute_spectrogram(raw_sig, fs)
-            result["metrics"] = metrics.model_dump()
-            result["frequency"] = freqs.tolist()
-            result["spectrum_magnitude"] = mag_db.tolist()
-            result["spectrogram_matrix"] = spec_matrix.tolist()
-            result["spectrogram_times"] = spec_times.tolist()
-            result["spectrogram_frequencies"] = spec_freqs.tolist()
-
-        return result
-    except Exception as e:
-        logger.error(f"Error executing Python script: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Python execution failed: {str(e)}")
-
-
-@app.post("/api/lisp/process", response_model=SignalProcessingResponse)
-def process_lisp_plugin(req: LispProcessingRequest):
+# 6. S-Expression DSL Execution
+@app.post("/api/lisp/process")
+def process_lisp_expression(req: LispProcessingRequest):
     try:
         t, raw_sig = DSPEngine.generate_signal(req.generator)
-        fs = req.generator.sample_rate
-        lisp_filtered, logs = LispDSPEngine.execute_lisp_dsp(req.lisp_code, raw_sig, fs)
+        lisp_sig, lisp_logs = LispDSPEngine.execute_lisp_dsp(req.lisp_code, raw_sig)
 
-        fft_config_linear = req.fft.model_copy(update={"log_scale": False})
-        freqs, mag_linear, phase = DSPEngine.compute_fft(lisp_filtered, fs, fft_config_linear)
-        _, mag_db, _ = DSPEngine.compute_fft(lisp_filtered, fs, req.fft)
+        freqs, mag_db, phase = DSPEngine.compute_fft(lisp_sig, req.generator.sample_rate, req.fft)
 
-        metrics = DSPEngine.compute_metrics(lisp_filtered, freqs, mag_linear, fs)
-        spec_freqs, spec_times, spec_matrix = DSPEngine.compute_spectrogram(lisp_filtered, fs)
+        fft_linear_cfg = req.fft.model_copy(update={"log_scale": False})
+        _, mag_linear, _ = DSPEngine.compute_fft(lisp_sig, req.generator.sample_rate, fft_linear_cfg)
+        metrics = DSPEngine.compute_metrics(lisp_sig, freqs, mag_linear, req.generator.sample_rate)
 
-        return SignalProcessingResponse(
-            time=t.tolist(),
-            raw_signal=raw_sig.tolist(),
-            filtered_signal=lisp_filtered.tolist(),
-            frequency=freqs.tolist(),
-            spectrum_magnitude=mag_db.tolist(),
-            spectrum_phase=phase.tolist(),
-            metrics=metrics,
-            spectrogram_matrix=spec_matrix.tolist(),
-            spectrogram_times=spec_times.tolist(),
-            spectrogram_frequencies=spec_freqs.tolist()
-        )
+        freqs_spec, times_spec, matrix_spec = DSPEngine.compute_spectrogram(lisp_sig, req.generator.sample_rate)
+
+        return {
+            "time": t.tolist(),
+            "raw_signal": raw_sig.tolist(),
+            "filtered_signal": lisp_sig.tolist(),
+            "frequency": freqs.tolist(),
+            "spectrum_magnitude": mag_db.tolist(),
+            "metrics": metrics,
+            "spectrogram_matrix": matrix_spec.tolist(),
+            "spectrogram_times": times_spec.tolist(),
+            "spectrogram_frequencies": freqs_spec.tolist(),
+            "lisp_logs": lisp_logs
+        }
     except Exception as e:
-        logger.error(f"Error executing Lisp plugin: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"S-Expression DSP DSL error: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"S-Expression DSL Execution Error: {str(e)}")
 
-
+# 7. Downloadable WAV Stream
 @app.post("/api/export/wav")
 def export_wav(req: SignalProcessingRequest):
     try:
-        t, raw_sig = DSPEngine.generate_signal(req.generator)
-        fs = req.generator.sample_rate
-        quantized_sig, _ = DSPEngine.apply_math_quantizer(raw_sig, req.math)
-        filtered_sig = DSPEngine.apply_filter(quantized_sig, fs, req.filter)
+        _, raw_sig = DSPEngine.generate_signal(req.generator)
+        filtered_sig = DSPEngine.apply_filter(raw_sig, req.generator.sample_rate, req.filter)
 
-        max_val = np.max(np.abs(filtered_sig))
-        norm_sig = filtered_sig / max_val if max_val > 0 else filtered_sig
-        pcm_data = (norm_sig * 32767.0).astype(np.int16)
+        sig_norm = np.clip(filtered_sig, -1.0, 1.0)
+        pcm_16 = (sig_norm * 32767).astype(np.int16)
 
-        wav_buffer = io.BytesIO()
-        with wave.open(wav_buffer, "wb") as wav_file:
+        wav_io = io.BytesIO()
+        with wave.open(wav_io, 'wb') as wav_file:
             wav_file.setnchannels(1)
             wav_file.setsampwidth(2)
-            wav_file.setframerate(fs)
-            wav_file.writeframes(pcm_data.tobytes())
+            wav_file.setframerate(req.generator.sample_rate)
+            wav_file.writeframes(pcm_16.tobytes())
 
-        wav_buffer.seek(0)
-        return StreamingResponse(
-            wav_buffer,
-            media_type="audio/wav",
-            headers={"Content-Disposition": "attachment; filename=signallab_export.wav"}
-        )
+        wav_io.seek(0)
+        return Response(content=wav_io.read(), media_type="audio/wav", headers={"Content-Disposition": "attachment; filename=signallab21.wav"})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"WAV export failed: {str(e)}")
-
-
-@app.websocket("/ws/stream")
-async def websocket_stream(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        phase_acc = 0.0
-        while True:
-            try:
-                data_text = await asyncio.wait_for(websocket.receive_text(), timeout=0.02)
-                config_dict = json.loads(data_text)
-                gen_cfg = SignalGeneratorConfig(**config_dict.get("generator", {}))
-                flt_cfg = FilterConfig(**config_dict.get("filter", {}))
-                fft_cfg = FFTConfig(**config_dict.get("fft", {}))
-            except asyncio.TimeoutError:
-                gen_cfg = SignalGeneratorConfig()
-                flt_cfg = FilterConfig()
-                fft_cfg = FFTConfig()
-            except Exception:
-                gen_cfg = SignalGeneratorConfig()
-                flt_cfg = FilterConfig()
-                fft_cfg = FFTConfig()
-
-            gen_cfg.phase = (gen_cfg.phase + phase_acc) % 360.0
-            phase_acc = (phase_acc + 15.0) % 360.0
-
-            t, raw_sig = DSPEngine.generate_signal(gen_cfg)
-            fs = gen_cfg.sample_rate
-            filtered_sig = DSPEngine.apply_filter(raw_sig, fs, flt_cfg)
-            freqs, mag_db, _ = DSPEngine.compute_fft(filtered_sig, fs, fft_cfg)
-
-            payload = {
-                "time": t[:512].tolist(),
-                "raw_signal": raw_sig[:512].tolist(),
-                "filtered_signal": filtered_sig[:512].tolist(),
-                "frequency": freqs[:256].tolist(),
-                "spectrum_magnitude": mag_db[:256].tolist(),
-            }
-            await websocket.send_json(payload)
-            await asyncio.sleep(0.033)
-
-    except WebSocketDisconnect:
-        pass
-    except Exception as e:
-        logger.error(f"WebSocket streaming error: {e}")
+        raise HTTPException(status_code=500, detail=f"WAV Export Failure: {str(e)}")

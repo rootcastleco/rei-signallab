@@ -1,16 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Cpu, Play, Download, Plus, ArrowRight, ShieldCheck, Layers, Trash2, X } from 'lucide-react';
+import { Cpu, Play, Download, Plus, ArrowRight, ShieldCheck, Layers, Trash2, X, Search, CheckCircle, AlertTriangle } from 'lucide-react';
 import { safeFetchJson } from '../config';
-
-const NODE_CATALOG = [
-  { type: 'SignalGenerator', category: 'Sources', name: 'Signal Generator', outPorts: ['signal_out'], params: { waveform: 'sine', frequency: 440, amplitude: 1.0 } },
-  { type: 'WAVSource', category: 'Sources', name: 'WAV File Reader', outPorts: ['audio_out'], params: { file_path: 'sample.wav' } },
-  { type: 'DCRemove', category: 'Transforms', name: 'DC Remove Filter', inPorts: ['signal_in'], outPorts: ['signal_out'], params: {} },
-  { type: 'BiquadFilter', category: 'Filters', name: 'Biquad IIR Filter', inPorts: ['signal_in'], outPorts: ['signal_out'], params: { filter_type: 'lowpass', cutoff: 1000, order: 4 } },
-  { type: 'FFTAnalyzer', category: 'Analyzers', name: 'FFT Spectrum Analyzer', inPorts: ['signal_in'], outPorts: ['spectrum_out'], params: { n_fft: 1024, window: 'hanning' } },
-  { type: 'ScopeSink', category: 'Outputs', name: 'Oscilloscope Screen', inPorts: ['signal_in'], params: { time_div: 2 } },
-  { type: 'CSVWriter', category: 'Outputs', name: 'CSV File Exporter', inPorts: ['signal_in'], params: { output_filename: 'result.csv' } }
-];
 
 function drawOscilloscope(canvas, time, signal, filteredSignal, label) {
   if (!canvas || !signal || signal.length === 0) return;
@@ -20,7 +10,6 @@ function drawOscilloscope(canvas, time, signal, filteredSignal, label) {
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, W, H);
 
-  // Grid
   ctx.strokeStyle = '#003300';
   ctx.lineWidth = 0.5;
   for (let i = 0; i <= 10; i++) {
@@ -57,9 +46,6 @@ function drawOscilloscope(canvas, time, signal, filteredSignal, label) {
   ctx.fillStyle = '#00FF00';
   ctx.font = 'bold 11px monospace';
   ctx.fillText(label || 'CH1: Signal Output', 8, 14);
-  ctx.fillStyle = '#00FFFF';
-  ctx.font = '10px monospace';
-  ctx.fillText(`Samples: ${signal.length} | Peak: ${maxVal.toFixed(3)}V`, 8, H - 8);
 }
 
 function drawSpectrum(canvas, frequency, magnitude, label) {
@@ -96,47 +82,34 @@ function drawSpectrum(canvas, frequency, magnitude, label) {
   }
   ctx.stroke();
 
-  ctx.lineTo(W, H);
-  ctx.lineTo(0, H);
-  ctx.closePath();
-  ctx.fillStyle = 'rgba(0, 255, 255, 0.08)';
-  ctx.fill();
-
-  const peakIdx = magnitude.indexOf(maxMag);
-  const peakFreq = frequency[peakIdx] || 0;
-  const peakX = (peakIdx / magnitude.length) * W;
-  ctx.strokeStyle = '#FF0000';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath(); ctx.moveTo(peakX, 0); ctx.lineTo(peakX, H); ctx.stroke();
-  ctx.setLineDash([]);
-
   ctx.fillStyle = '#00FF00';
   ctx.font = 'bold 11px monospace';
   ctx.fillText(label || 'FFT Spectrum Analyzer', 8, 14);
-  ctx.fillStyle = '#FF0000';
-  ctx.font = '10px monospace';
-  ctx.fillText(`Peak: ${peakFreq.toFixed(0)} Hz | ${maxMag.toFixed(1)} dB`, 8, H - 8);
 }
 
 export default function NodeGraphStudio({ onGraphExecuted }) {
+  const [nodeCatalog, setNodeCatalog] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+
   const [nodes, setNodes] = useState([
-    { id: 'node_1', type: 'SignalGenerator', name: 'Signal Generator (440Hz)', x: 40, y: 30, params: { waveform: 'sine', frequency: 440, amplitude: 1.0 } },
-    { id: 'node_2', type: 'BiquadFilter', name: 'LowPass Filter (1000Hz)', x: 280, y: 30, params: { filter_type: 'lowpass', cutoff: 1000, order: 4 } },
-    { id: 'node_3', type: 'FFTAnalyzer', name: 'FFT Spectrum Analyzer', x: 520, y: 30, params: { n_fft: 1024, window: 'hanning' } }
+    { id: 'node_gen', type: 'generator.signal', name: 'Signal Generator (440Hz)', x: 40, y: 30, params: { waveform: 'sine', frequency: 440, amplitude: 1.0 } },
+    { id: 'node_flt', type: 'filter.lowpass', name: 'LowPass Filter (1000Hz)', x: 280, y: 30, params: { cutoff: 1000, order: 4 } },
+    { id: 'node_fft', type: 'transform.fft', name: 'FFT Spectrum Analyzer', x: 520, y: 30, params: { n_fft: 1024, window: 'hanning' } }
   ]);
 
   const [connections, setConnections] = useState([
-    { id: 'c1', from_node: 'node_1', from_port: 'signal_out', to_node: 'node_2', to_port: 'signal_in' },
-    { id: 'c2', from_node: 'node_2', from_port: 'signal_out', to_node: 'node_3', to_port: 'signal_in' }
+    { id: 'c1', from_node: 'node_gen', from_port: 'signal_out', to_node: 'node_flt', to_port: 'signal_in' },
+    { id: 'c2', from_node: 'node_flt', from_port: 'signal_out', to_node: 'node_fft', to_port: 'signal_in' }
   ]);
 
-  const [selectedNodeId, setSelectedNodeId] = useState('node_1');
-  const [wiringFrom, setWiringFrom] = useState(null); // { nodeId, port }
+  const [selectedNodeId, setSelectedNodeId] = useState('node_gen');
+  const [wiringFrom, setWiringFrom] = useState(null);
   const [draggingNode, setDraggingNode] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   const [executionResult, setExecutionResult] = useState(null);
+  const [validationResult, setValidationResult] = useState(null);
   const [executionMode, setExecutionMode] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
   const [signalData, setSignalData] = useState(null);
@@ -144,6 +117,26 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
   const canvasContainerRef = useRef(null);
   const scopeCanvasRef = useRef(null);
   const spectrumCanvasRef = useRef(null);
+
+  // 1. Fetch Backend Registry Catalog (GET /api/nodes)
+  useEffect(() => {
+    async function loadCatalog() {
+      try {
+        const data = await safeFetchJson('/api/nodes');
+        if (Array.isArray(data)) setNodeCatalog(data);
+      } catch (e) {
+        // Fallback Client Spec Catalog
+        setNodeCatalog([
+          { type: 'generator.signal', category: 'Generators', display_name: 'Signal Generator', input_ports: [], output_ports: [{ name: 'signal_out', data_type: 'Signal<Real64>' }], parameter_schema: { frequency: { type: 'number', default: 440 } } },
+          { type: 'filter.lowpass', category: 'Filters', display_name: 'LowPass Filter', input_ports: [{ name: 'signal_in', data_type: 'Signal<Real64>' }], output_ports: [{ name: 'signal_out', data_type: 'Signal<Real64>' }], parameter_schema: { cutoff: { type: 'number', default: 1000 } } },
+          { type: 'transform.fft', category: 'Transformations', display_name: 'Fast Fourier Transform', input_ports: [{ name: 'signal_in', data_type: 'Signal<Real64>' }], output_ports: [{ name: 'spectrum_out', data_type: 'SpectrumFrame' }], parameter_schema: { n_fft: { type: 'integer', default: 1024 } } },
+          { type: 'converter.complex_to_real', category: 'Converters', display_name: 'Complex to Real Splitter', input_ports: [{ name: 'complex_in', data_type: 'Signal<Complex128>' }], output_ports: [{ name: 'real', data_type: 'Signal<Real64>' }], parameter_schema: {} },
+          { type: 'analysis.noise_stats', category: 'Analysis', display_name: 'Noise & THD Analyzer', input_ports: [{ name: 'signal_in', data_type: 'Signal<Real64>' }], output_ports: [{ name: 'stats', data_type: 'StructuredFrame' }], parameter_schema: {} }
+        ]);
+      }
+    }
+    loadCatalog();
+  }, []);
 
   const selectedNode = nodes.find(n => n.id === selectedNodeId);
 
@@ -153,10 +146,7 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
     setSelectedNodeId(node.id);
     setDraggingNode(node.id);
     const rect = e.currentTarget.getBoundingClientRect();
-    setDragOffset({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    });
+    setDragOffset({ x: e.clientX - rect.left, y: e.clientY - rect.top });
   };
 
   const handleMouseMoveCanvas = (e) => {
@@ -168,38 +158,48 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
     setNodes(prev => prev.map(n => n.id === draggingNode ? { ...n, x: newX, y: newY } : n));
   };
 
-  const handleMouseUpCanvas = () => {
-    setDraggingNode(null);
-  };
+  const handleMouseUpCanvas = () => setDraggingNode(null);
 
   // Add Node
-  const addNode = (catItem) => {
+  const addNode = (spec) => {
     const newId = `node_${Date.now()}`;
+    const defaultParams = {};
+    if (spec.parameter_schema) {
+      Object.entries(spec.parameter_schema).forEach(([k, v]) => {
+        if (v.default !== undefined) defaultParams[k] = v.default;
+      });
+    }
     const newNode = {
       id: newId,
-      type: catItem.type,
-      name: catItem.name,
+      type: spec.type,
+      name: spec.display_name,
       x: 40 + (nodes.length % 3) * 220,
       y: 40 + Math.floor(nodes.length / 3) * 100,
-      params: { ...catItem.params }
+      params: defaultParams
     };
     setNodes(prev => [...prev, newNode]);
     setSelectedNodeId(newId);
   };
 
-  // Delete Node
   const deleteNode = (nodeId) => {
     setNodes(prev => prev.filter(n => n.id !== nodeId));
     setConnections(prev => prev.filter(c => c.from_node !== nodeId && c.to_node !== nodeId));
     if (selectedNodeId === nodeId) setSelectedNodeId(null);
   };
 
-  // Wiring Click Handler
-  const handlePortClick = (nodeId, portName, isOutput) => {
+  // Wiring Handler
+  const handlePortClick = (nodeId, portName, isOutput, dataType) => {
     if (isOutput) {
-      setWiringFrom({ nodeId, port: portName });
+      setWiringFrom({ nodeId, port: portName, dataType });
     } else {
       if (wiringFrom && wiringFrom.nodeId !== nodeId) {
+        // Validate Port Type Compatibility
+        if (wiringFrom.dataType !== dataType && dataType !== '*' && wiringFrom.dataType !== '*') {
+          alert(`GRAPH PORT TYPE MISMATCH: Cannot wire '${wiringFrom.dataType}' to '${dataType}'. Add an explicit converter node.`);
+          setWiringFrom(null);
+          return;
+        }
+
         const newConn = {
           id: `c_${Date.now()}`,
           from_node: wiringFrom.nodeId,
@@ -207,7 +207,6 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
           to_node: nodeId,
           to_port: portName
         };
-        // Avoid duplicate connection
         if (!connections.some(c => c.from_node === newConn.from_node && c.to_node === newConn.to_node)) {
           setConnections(prev => [...prev, newConn]);
         }
@@ -216,17 +215,12 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
     }
   };
 
-  const deleteConnection = (connId) => {
-    setConnections(prev => prev.filter(c => c.id !== connId));
-  };
-
-  const updateParam = (key, val) => {
-    setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, params: { ...n.params, [key]: val } } : n));
-  };
+  const deleteConnection = (connId) => setConnections(prev => prev.filter(c => c.id !== connId));
+  const updateParam = (key, val) => setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, params: { ...n.params, [key]: val } } : n));
 
   const generateBrowserSignal = useCallback(() => {
-    const genNode = nodes.find(n => n.type === 'SignalGenerator');
-    const filterNode = nodes.find(n => n.type === 'BiquadFilter');
+    const genNode = nodes.find(n => n.type.includes('generator'));
+    const filterNode = nodes.find(n => n.type.includes('filter'));
 
     const freq = genNode?.params?.frequency || 440;
     const amp = genNode?.params?.amplitude || 1.0;
@@ -270,25 +264,7 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
       magDb.push(20 * Math.log10(Math.max(mag, 1e-10)));
     }
 
-    let sumSq = 0, peak = 0, sumDC = 0;
-    for (let i = 0; i < N; i++) {
-      sumSq += filtered[i] * filtered[i];
-      sumDC += filtered[i];
-      if (Math.abs(filtered[i]) > peak) peak = Math.abs(filtered[i]);
-    }
-    const rms = Math.sqrt(sumSq / N);
-
-    return {
-      time: t, raw_signal: raw, filtered_signal: filtered,
-      frequency: freqs, spectrum_magnitude: magDb,
-      metrics: {
-        rms: rms.toFixed(4),
-        peak_to_peak: (peak * 2).toFixed(4),
-        dc_mean: (sumDC / N).toFixed(6),
-        fundamental_freq: freq,
-        peak_magnitude_db: magDb[Math.round(freq * nFft / fs)]?.toFixed(1) || '0.0'
-      }
-    };
+    return { time: t, raw_signal: raw, filtered_signal: filtered, frequency: freqs, spectrum_magnitude: magDb };
   }, [nodes]);
 
   useEffect(() => {
@@ -298,26 +274,27 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
 
     if (scopeCanvas) {
       scopeCanvas.width = scopeCanvas.parentElement.clientWidth;
-      scopeCanvas.height = 200;
-      drawOscilloscope(scopeCanvas, signalData.time, signalData.raw_signal, signalData.filtered_signal, 'Graph Output: Oscilloscope');
+      scopeCanvas.height = 180;
+      drawOscilloscope(scopeCanvas, signalData.time, signalData.raw_signal, signalData.filtered_signal, 'Graph Pipeline Output: Oscilloscope');
     }
     if (spectrumCanvas) {
       spectrumCanvas.width = spectrumCanvas.parentElement.clientWidth;
-      spectrumCanvas.height = 200;
-      drawSpectrum(spectrumCanvas, signalData.frequency, signalData.spectrum_magnitude, 'Graph Output: FFT Spectrum');
+      spectrumCanvas.height = 180;
+      drawSpectrum(spectrumCanvas, signalData.frequency, signalData.spectrum_magnitude, 'Graph Pipeline Output: FFT Spectrum');
     }
   }, [signalData]);
 
   const runGraphPipeline = async () => {
     setIsRunning(true);
     const projectSpec = {
-      formatVersion: '2.0',
-      projectId: 'project_studio_01',
+      formatVersion: '2.1',
+      projectId: 'project_studio_21',
       sampleClock: { rateHz: 44100, timebase: 'monotonic' },
       graph: {
         nodes: nodes.map(n => ({ id: n.id, type: n.type, name: n.name, params: n.params })),
         connections: connections.map(c => ({ from_node: c.from_node, from_port: c.from_port, to_node: c.to_node, to_port: c.to_port }))
-      }
+      },
+      environment: { dspEngineVersion: '2.1.0' }
     };
 
     let apiData = null;
@@ -331,54 +308,37 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
 
     if (apiData && apiData.results) {
       setExecutionResult(apiData);
-      setExecutionMode('API');
+      setExecutionMode('API_VERIFIED');
     } else {
       const localResults = {};
       nodes.forEach(n => {
         localResults[n.id] = {
-          name: n.name,
+          node_id: n.id,
           node_type: n.type,
-          outputs: {
-            signal_out: {
-              type: "Signal<float32>",
-              data_length: 2205,
-              computed: true
-            }
-          }
+          display_name: n.name,
+          outputs: { signal_out: { data_type: "Signal<Real64>", data_length: 2205 } }
         };
       });
 
       setExecutionResult({
         status: "success",
-        version: "2.0.0",
+        version: "2.1.0",
         results: localResults,
         project: projectSpec
       });
-      setExecutionMode('BROWSER');
+      setExecutionMode('LOCAL_DSP');
     }
 
-    const visData = generateBrowserSignal();
-    setSignalData(visData);
+    setSignalData(generateBrowserSignal());
     setIsRunning(false);
   };
 
-  const exportProjectFile = () => {
-    const projectSpec = {
-      formatVersion: '2.0',
-      projectId: 'project_studio_01',
-      sampleClock: { rateHz: 44100, timebase: 'monotonic' },
-      graph: {
-        nodes: nodes.map(n => ({ id: n.id, type: n.type, name: n.name, params: n.params })),
-        connections: connections
-      },
-      environment: { dspEngineVersion: '2.0.0' }
-    };
-
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(projectSpec, null, 2)], { type: 'application/json' }));
-    a.download = 'experiment_flow.rei-signal';
-    a.click();
-  };
+  const categories = ['All', ...new Set(nodeCatalog.map(n => n.category))];
+  const filteredCatalog = nodeCatalog.filter(n => {
+    const matchesCat = selectedCategory === 'All' || n.category === selectedCategory;
+    const matchesSearch = n.display_name.toLowerCase().includes(searchQuery.toLowerCase()) || n.type.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCat && matchesSearch;
+  });
 
   return (
     <div className="win98-outset p-3 flex flex-col gap-3 select-none">
@@ -386,7 +346,7 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
       <div className="win98-titlebar">
         <div className="flex items-center gap-2">
           <Layers size={14} className="text-[#FFFF00]" />
-          <span>REI_SignalFlow_Studio_2.0.exe - [Visual Interactive Node Graph Canvas (.rei-signal)]</span>
+          <span>REI_SignalFlow_Studio_2.1.exe - [Typed Node Catalog & Kahn Execution Scheduler]</span>
         </div>
         <div className="flex gap-1">
           <div className="win98-btn-box">_</div>
@@ -395,24 +355,40 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
         </div>
       </div>
 
-      {/* Toolbar Controls */}
-      <div className="flex items-center justify-between flex-wrap gap-2 py-1 border-b border-[#808080]">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-xs font-bold">Add Node:</span>
-          {NODE_CATALOG.map((catItem, idx) => (
-            <button key={idx} onClick={() => addNode(catItem)} className="win98-btn text-[10px]">
-              <Plus size={10} /> {catItem.name}
+      {/* Node Catalog Palette Bar */}
+      <div className="win98-outset p-2 flex flex-col gap-2 bg-[#C0C0C0]">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold text-xs">Node Palette:</span>
+            <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="text-xs font-mono">
+              {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+            </select>
+            <div className="flex items-center bg-[#FFFFFF] border border-[#808080] px-1 text-xs">
+              <Search size={12} className="text-[#808080] mr-1" />
+              <input
+                type="text"
+                placeholder="Search canonical nodes..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="bg-transparent border-none outline-none font-mono text-xs w-40"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-1.5">
+            <button onClick={runGraphPipeline} disabled={isRunning} className="win98-btn text-xs bg-[#00AA00] text-[#FFFFFF]">
+              <Play size={12} /> {isRunning ? 'EXECUTING...' : 'RUN PIPELINE (KAHN 2.1)'}
             </button>
-          ))}
+          </div>
         </div>
 
-        <div className="flex gap-1.5">
-          <button onClick={exportProjectFile} className="win98-btn text-xs">
-            <Download size={12} className="text-[#0000FF]" /> Export .rei-signal
-          </button>
-          <button onClick={runGraphPipeline} disabled={isRunning} className="win98-btn text-xs bg-[#00AA00] text-[#FFFFFF]">
-            <Play size={12} /> {isRunning ? 'EXECUTING...' : 'RUN PIPELINE'}
-          </button>
+        {/* Catalog Items */}
+        <div className="flex gap-1.5 overflow-x-auto py-1">
+          {filteredCatalog.slice(0, 10).map((spec) => (
+            <button key={spec.type} onClick={() => addNode(spec)} className="win98-btn text-[10px] flex items-center gap-1 whitespace-nowrap">
+              <Plus size={10} className="text-[#0000FF]" /> {spec.display_name}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -427,7 +403,6 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
             onMouseUp={handleMouseUpCanvas}
             className="win98-crt-screen p-3 min-h-[340px] relative overflow-hidden bg-[#000000] border-2 border-[#808080] cursor-crosshair"
           >
-            {/* Grid background */}
             <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#00FF00 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
 
             {/* SVG Connection Cable Overlay */}
@@ -437,7 +412,7 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
                 const toNode = nodes.find(n => n.id === conn.to_node);
                 if (!fromNode || !toNode) return null;
 
-                const x1 = fromNode.x + 200;
+                const x1 = fromNode.x + 210;
                 const y1 = fromNode.y + 55;
                 const x2 = toNode.x;
                 const y2 = toNode.y + 55;
@@ -445,12 +420,7 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
 
                 return (
                   <g key={conn.id || `${conn.from_node}-${conn.to_node}`}>
-                    <path
-                      d={`M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`}
-                      fill="none"
-                      stroke="#00FF00"
-                      strokeWidth="2.5"
-                    />
+                    <path d={`M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`} fill="none" stroke="#00FF00" strokeWidth="2.5" />
                     <circle cx={(x1 + x2) / 2} cy={(y1 + y2) / 2} r="4" fill="#FFFF00" />
                   </g>
                 );
@@ -459,75 +429,60 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
 
             {/* Draggable Node Cards */}
             <div className="relative z-10 w-full h-full min-h-[300px]">
-              {nodes.map((node) => (
-                <div
-                  key={node.id}
-                  style={{ position: 'absolute', left: `${node.x}px`, top: `${node.y}px` }}
-                  onMouseDown={(e) => handleMouseDownNode(e, node)}
-                  className={`win98-outset p-2 w-52 shadow-lg cursor-grab active:cursor-grabbing ${selectedNodeId === node.id ? 'border-2 border-[#0000FF] bg-[#FFFFCC]' : 'bg-[#C0C0C0]'}`}
-                >
-                  <div className="win98-titlebar text-[10px] py-0.5 mb-1.5 flex justify-between items-center">
-                    <span>{node.type}</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }}
-                      className="text-[#FF5555] hover:text-[#FF0000] p-0.5 font-bold"
-                    >
-                      <X size={10} />
-                    </button>
-                  </div>
-                  <div className="text-xs font-bold mb-2 truncate">{node.name}</div>
+              {nodes.map((node) => {
+                const spec = nodeCatalog.find(s => s.type === node.type) || { input_ports: [{ name: 'signal_in', data_type: 'Signal<Real64>' }], output_ports: [{ name: 'signal_out', data_type: 'Signal<Real64>' }] };
 
-                  {/* Ports */}
-                  <div className="flex justify-between items-center text-[10px] font-mono bg-[#000000] text-[#00FF00] p-1 border border-[#808080]">
-                    <span
-                      onClick={(e) => { e.stopPropagation(); handlePortClick(node.id, 'signal_in', false); }}
-                      className="hover:bg-[#00FF00] hover:text-[#000000] px-1 cursor-pointer rounded"
-                    >
-                      ● in
-                    </span>
-                    <ArrowRight size={10} />
-                    <span
-                      onClick={(e) => { e.stopPropagation(); handlePortClick(node.id, 'signal_out', true); }}
-                      className={`hover:bg-[#00FFFF] hover:text-[#000000] px-1 cursor-pointer rounded ${wiringFrom?.nodeId === node.id ? 'bg-[#FFFF00] text-[#000000]' : ''}`}
-                    >
-                      out ●
-                    </span>
+                return (
+                  <div
+                    key={node.id}
+                    style={{ position: 'absolute', left: `${node.x}px`, top: `${node.y}px` }}
+                    onMouseDown={(e) => handleMouseDownNode(e, node)}
+                    className={`win98-outset p-2 w-56 shadow-lg cursor-grab active:cursor-grabbing ${selectedNodeId === node.id ? 'border-2 border-[#0000FF] bg-[#FFFFCC]' : 'bg-[#C0C0C0]'}`}
+                  >
+                    <div className="win98-titlebar text-[10px] py-0.5 mb-1.5 flex justify-between items-center">
+                      <span className="truncate">{node.type}</span>
+                      <button onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }} className="text-[#FF5555] hover:text-[#FF0000] p-0.5 font-bold">
+                        <X size={10} />
+                      </button>
+                    </div>
+                    <div className="text-xs font-bold mb-2 truncate">{node.name}</div>
+
+                    {/* Typed Ports with Explicit Data Type Badges */}
+                    <div className="flex flex-col gap-1 text-[9px] font-mono bg-[#000000] p-1 border border-[#808080]">
+                      {spec.input_ports.map(ip => (
+                        <div key={ip.name} onClick={(e) => { e.stopPropagation(); handlePortClick(node.id, ip.name, false, ip.data_type); }} className="flex justify-between items-center text-[#00FF00] hover:bg-[#00FF00] hover:text-[#000000] px-1 cursor-pointer rounded">
+                          <span>● in: {ip.name}</span>
+                          <span className="text-[#FFFF00] text-[8px]">{ip.data_type}</span>
+                        </div>
+                      ))}
+                      {spec.output_ports.map(op => (
+                        <div key={op.name} onClick={(e) => { e.stopPropagation(); handlePortClick(node.id, op.name, true, op.data_type); }} className={`flex justify-between items-center text-[#00FFFF] hover:bg-[#00FFFF] hover:text-[#000000] px-1 cursor-pointer rounded ${wiringFrom?.nodeId === node.id ? 'bg-[#FFFF00] text-[#000000]' : ''}`}>
+                          <span className="text-[#FFFF00] text-[8px]">{op.data_type}</span>
+                          <span>out: {op.name} ●</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Wiring Status Badge */}
             <div className="absolute bottom-2 left-2 bg-[#000000]/90 border border-[#00FF00] px-2 py-1 text-[10px] font-mono text-[#00FF00] flex items-center gap-2 z-20">
               <ShieldCheck size={12} className="text-[#00FF00]" />
               <span>
-                {wiringFrom ? `CLICK INPUT PORT TO CONNECT FROM [${wiringFrom.nodeId}]` : `DRAG NODES | CLICK PORTS TO WIRE CABLES (${connections.length} WIRED)`}
+                {wiringFrom ? `CLICK INPUT PORT TO CONNECT FROM [${wiringFrom.nodeId}:${wiringFrom.port}] (${wiringFrom.dataType})` : `STRICT TYPED PORTS | WIRING VALIDATED (${connections.length} CABLES)`}
               </span>
             </div>
           </div>
 
-          {/* Connection List */}
-          {connections.length > 0 && (
-            <div className="win98-outset p-2 bg-[#C0C0C0] text-xs font-mono flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-[#000080]">Wired Cables:</span>
-              {connections.map((c) => (
-                <div key={c.id} className="bg-[#000000] text-[#00FF00] px-2 py-0.5 flex items-center gap-1.5 border border-[#808080]">
-                  <span>{c.from_node} ➔ {c.to_node}</span>
-                  <button onClick={() => deleteConnection(c.id)} className="text-[#FF5555] hover:text-[#FF0000]">
-                    <Trash2 size={10} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Visual Signal Output Displays */}
+          {/* Signal Displays */}
           {signalData && (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
               <div className="win98-outset p-1 flex flex-col gap-1">
                 <div className="win98-titlebar text-[11px] py-0.5">
                   <span>Graph_Pipeline_Oscilloscope.exe</span>
-                  <span className="text-[9px]">[{executionMode === 'API' ? 'API VERIFIED' : 'BROWSER DSP'}]</span>
+                  <span className="text-[9px]">[{executionMode}]</span>
                 </div>
                 <div className="win98-inset bg-[#000000]">
                   <canvas ref={scopeCanvasRef} style={{ width: '100%', display: 'block' }} />
@@ -537,7 +492,7 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
               <div className="win98-outset p-1 flex flex-col gap-1">
                 <div className="win98-titlebar text-[11px] py-0.5">
                   <span>Graph_Pipeline_FFT_Analyzer.exe</span>
-                  <span className="text-[9px]">[{executionMode === 'API' ? 'API VERIFIED' : 'BROWSER DSP'}]</span>
+                  <span className="text-[9px]">[{executionMode}]</span>
                 </div>
                 <div className="win98-inset bg-[#000000]">
                   <canvas ref={spectrumCanvasRef} style={{ width: '100%', display: 'block' }} />
@@ -559,7 +514,7 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
                 <span className="font-bold">Node ID:</span> <code className="font-mono text-[#0000FF]">{selectedNode.id}</code>
               </div>
               <div>
-                <span className="font-bold">Type:</span> {selectedNode.type}
+                <span className="font-bold">Canonical Type:</span> <code className="font-mono text-[#00AA00]">{selectedNode.type}</code>
               </div>
 
               <div className="flex flex-col gap-1 border-t border-[#808080] pt-2">
@@ -572,42 +527,17 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
                 />
               </div>
 
-              {selectedNode.params.frequency !== undefined && (
-                <div className="flex flex-col gap-1">
-                  <label className="font-bold">Frequency (Hz):</label>
+              {Object.entries(selectedNode.params).map(([pk, pv]) => (
+                <div key={pk} className="flex flex-col gap-1">
+                  <label className="font-bold">{pk}:</label>
                   <input
-                    type="number"
-                    value={selectedNode.params.frequency}
-                    onChange={(e) => updateParam('frequency', parseFloat(e.target.value))}
+                    type={typeof pv === 'number' ? 'number' : 'text'}
+                    value={pv}
+                    onChange={(e) => updateParam(pk, typeof pv === 'number' ? parseFloat(e.target.value) : e.target.value)}
                     className="w-full text-xs font-mono"
                   />
                 </div>
-              )}
-
-              {selectedNode.params.amplitude !== undefined && (
-                <div className="flex flex-col gap-1">
-                  <label className="font-bold">Amplitude (V):</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={selectedNode.params.amplitude}
-                    onChange={(e) => updateParam('amplitude', parseFloat(e.target.value))}
-                    className="w-full text-xs font-mono"
-                  />
-                </div>
-              )}
-
-              {selectedNode.params.cutoff !== undefined && (
-                <div className="flex flex-col gap-1">
-                  <label className="font-bold">Cutoff (Hz):</label>
-                  <input
-                    type="number"
-                    value={selectedNode.params.cutoff}
-                    onChange={(e) => updateParam('cutoff', parseFloat(e.target.value))}
-                    className="w-full text-xs font-mono"
-                  />
-                </div>
-              )}
+              ))}
             </div>
           ) : (
             <div className="text-xs text-[#808080]">Select a node on canvas to edit properties.</div>
@@ -616,9 +546,9 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
           {executionResult && (
             <div className="mt-auto border-t border-[#808080] pt-2 flex flex-col gap-1">
               <span className="font-bold text-[11px] text-[#00AA00]">
-                Runtime Output [{executionMode === 'API' ? 'API VERIFIED' : 'BROWSER DSP'}]:
+                Execution Result [{executionMode}]:
               </span>
-              <div className="win98-crt-screen p-1 text-[9px] font-mono h-20 overflow-y-auto">
+              <div className="win98-crt-screen p-1 text-[9px] font-mono h-24 overflow-y-auto">
                 <pre>{JSON.stringify(executionResult.results, null, 2)}</pre>
               </div>
             </div>

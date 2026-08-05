@@ -66,6 +66,10 @@ class PythonDSPEngine:
     """
 
     @staticmethod
+    def execute_script(script_code: str) -> Dict[str, Any]:
+        return PythonDSPEngine.execute_python_script(script_code)
+
+    @staticmethod
     def execute_python_script(script_code: str) -> Dict[str, Any]:
         forbidden_keywords = ['import os', 'import sys', 'import subprocess', 'import socket', 'shutil', 'eval', 'exec']
         for kw in forbidden_keywords:
@@ -159,3 +163,5 @@ class PythonDSPEngine:
             "raw_signal": raw_signal_list,
             "filtered_signal": filtered_signal_list
         }
+
+PythonSandboxEngine = PythonDSPEngine

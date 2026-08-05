@@ -23,8 +23,8 @@ def test_root_endpoint():
     response = client.get("/")
     assert response.status_code == 200
     data = response.json()
-    assert data["app"] == "REI SignalLab 2.0 DSP Engine"
-    assert data["version"] == "2.0.0"
+    assert data["app"] == "REI SignalLab 2.1 DSP Engine"
+    assert data["version"] == "2.1.0"
 
 
 def test_signal_generator_sine():

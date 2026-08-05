@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -60,7 +60,7 @@ class SignalGeneratorConfig(BaseModel):
     duration: float = Field(default=0.1, ge=0.001, le=10.0)
     frequency2: Optional[float] = Field(default=880.0, ge=0.1, le=20000.0)
     
-    # Modulation parameters (Mitov SignalLab Modulator component)
+    # Modulation parameters
     modulation_type: ModulationType = Field(default=ModulationType.NONE)
     mod_frequency: float = Field(default=20.0, ge=0.1, le=5000.0)
     mod_index: float = Field(default=0.5, ge=0.0, le=10.0)
@@ -103,6 +103,25 @@ class SignalProcessingRequest(BaseModel):
     fft: FFTConfig = Field(default_factory=FFTConfig)
 
 
+class LispProcessingRequest(BaseModel):
+    lisp_code: str
+    generator: SignalGeneratorConfig
+    fft: FFTConfig = Field(default_factory=FFTConfig)
+
+
+class PythonScriptRequest(BaseModel):
+    python_code: str
+
+
+class PlotRenderRequest(BaseModel):
+    plot_type: str = "waveform"
+    title: str = "REI SignalLab DSP Plot"
+    raw_signal: Optional[List[float]] = None
+    filtered_signal: Optional[List[float]] = None
+    frequency: Optional[List[float]] = None
+    spectrum_magnitude: Optional[List[float]] = None
+
+
 class SignalMetrics(BaseModel):
     rms: float
     peak_to_peak: float
@@ -123,7 +142,7 @@ class SignalProcessingResponse(BaseModel):
     envelope_signal: Optional[List[float]] = None
     frequency: List[float]
     spectrum_magnitude: List[float]
-    spectrum_phase: List[float]
+    spectrum_phase: Optional[List[float]] = None
     metrics: SignalMetrics
     spectrogram_matrix: Optional[List[List[float]]] = None
     spectrogram_times: Optional[List[float]] = None
