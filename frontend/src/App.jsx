@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code } from 'lucide-react';
+import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText } from 'lucide-react';
 
 import Oscilloscope from './components/Oscilloscope';
 import SpectrumAnalyzer from './components/SpectrumAnalyzer';
@@ -198,14 +198,14 @@ export default function App() {
         style={{ display: 'none' }}
       />
 
-      {/* ── WINDOWS 95 MAIN APPLICATION FRAME ──────────────────────────── */}
-      <div className="win95-outset-deep flex flex-col gap-2 p-1.5">
+      {/* ── WINDOWS 95 MAIN APPLICATION WINDOW FRAME ──────────────────────────── */}
+      <div className="win95-outset-deep flex flex-col gap-1 p-1">
 
-        {/* Windows Title Bar */}
+        {/* 1. Window Title Bar */}
         <div className="win95-titlebar">
           <div className="flex items-center gap-2">
             <span className="bg-[#FFFF00] text-[#000000] px-1 font-bold text-xs">98</span>
-            <span>REI_SignalLab_98.exe - [DSP Signal Analysis & Python Code Sandbox]</span>
+            <span>REI_SignalLab_98.exe - [Digital Signal Processing Suite & Python Sandbox]</span>
           </div>
           <div className="flex gap-1">
             <div className="win95-btn-box">_</div>
@@ -214,81 +214,81 @@ export default function App() {
           </div>
         </div>
 
-        {/* 90s Menu Bar */}
-        <div className="flex items-center justify-between border-b border-[#808080] pb-1 px-1 text-xs font-bold gap-4 flex-wrap">
-          <div className="flex gap-4 underline">
-            <span className="cursor-pointer hover:text-[#0000FF]">File</span>
-            <span className="cursor-pointer hover:text-[#0000FF]">Edit</span>
-            <span className="cursor-pointer hover:text-[#0000FF]">DSP_Presets</span>
-            <span className="cursor-pointer hover:text-[#0000FF]">Lisp_Kernel</span>
-            <span className="cursor-pointer hover:text-[#0000FF]">Python_Lab</span>
-            <span className="cursor-pointer hover:text-[#0000FF]">Help</span>
+        {/* 2. System Dropdown Menu Bar */}
+        <div className="flex items-center justify-between bg-[#C0C0C0] px-2 py-0.5 border-b border-[#808080] text-xs font-bold">
+          <div className="flex gap-4">
+            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">File</span>
+            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">Edit</span>
+            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">View</span>
+            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">Presets</span>
+            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">Tools</span>
+            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">Help</span>
           </div>
-
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 font-mono text-[11px]">
             <span className="badge-blink">NEW!</span>
-            <span className="text-[#0000FF] font-bold text-xs font-mono">VISITORS: 0004291</span>
+            <span className="text-[#0000FF] font-bold">VISITORS: 0004291</span>
           </div>
         </div>
 
-        {/* 90s MARQUEE SCROLLING TICKER */}
-        <div className="bg-[#000000] text-[#00FF00] font-mono text-xs p-1 border-2 border-t-[#808080] border-l-[#808080] border-r-[#FFFFFF] border-b-[#FFFFFF] overflow-hidden whitespace-nowrap">
+        {/* 3. Structured Command Toolbar Bar */}
+        <div className="win95-outset p-1 flex items-center justify-between flex-wrap gap-2 bg-[#C0C0C0]">
+          
+          {/* File Operations */}
+          <div className="flex items-center gap-1">
+            <button className="win95-btn win95-btn-blue text-xs" onClick={() => fileInputRef.current?.click()}>
+              <FolderOpen size={13} /> Open File (.wav, .csv)
+            </button>
+            <button className="win95-btn text-xs" onClick={exportCSV}>
+              <FileText size={13} className="text-[#00AA00]" /> Export CSV
+            </button>
+            <button className="win95-btn text-xs" onClick={exportWAV}>
+              <Save size={13} className="text-[#0000FF]" /> Export WAV
+            </button>
+          </div>
+
+          {/* Preset Selector */}
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-xs">Preset:</span>
+            <select
+              value={uploadedFileName ? 'upload' : presetKey}
+              onChange={e => { if (e.target.value !== 'upload') loadPreset(e.target.value); }}
+              className="text-xs"
+            >
+              {uploadedFileName && <option value="upload">Uploaded File: {uploadedFileName}</option>}
+              {Object.entries(PRESETS).map(([k, p]) => (
+                <option key={k} value={k}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Counter */}
+          <div className="win95-hitcounter flex-row items-center gap-2 py-0.5 px-2">
+            <span className="w-2 h-2 bg-[#00FF00]"></span>
+            <span className="text-xs">{status === 'online' ? 'API_ONLINE' : 'CLIENT_DSP'}</span>
+          </div>
+        </div>
+
+        {/* 4. Marquee Announcement Ticker */}
+        <div className="bg-[#000000] text-[#00FF00] font-mono text-xs p-0.5 border-2 border-t-[#808080] border-l-[#808080] border-r-[#FFFFFF] border-b-[#FFFFFF] overflow-hidden whitespace-nowrap">
           <marquee scrollamount="5" behavior="scroll">
             *** WELCOME TO REI SIGNALLAB 98 *** FASTAPI + SCIPY + MATPLOTLIB API RENDERER *** MACHINE-LEVEL COMMON LISP SIMD ENGINE ACTIVE *** PYTHON SCRIPTING SANDBOX READY ***
           </marquee>
         </div>
 
-        {/* Action Controls & Preset Bar */}
-        <div className="flex items-center justify-between flex-wrap gap-2 px-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-xs">DSP Preset:</span>
-            <select
-              value={uploadedFileName ? 'upload' : presetKey}
-              onChange={e => { if (e.target.value !== 'upload') loadPreset(e.target.value); }}
-            >
-              {uploadedFileName && <option value="upload">File: {uploadedFileName}</option>}
-              {Object.entries(PRESETS).map(([k, p]) => (
-                <option key={k} value={k}>{p.name}</option>
-              ))}
-            </select>
-
-            <button className="win95-btn win95-btn-blue" onClick={() => fileInputRef.current?.click()}>
-              <Upload size={13} /> Upload File (.wav, .csv)
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button className="win95-btn" onClick={exportCSV}>
-              <FileSpreadsheet size={13} className="text-[#00AA00]" /> CSV Export
-            </button>
-
-            <button className="win95-btn" onClick={exportWAV}>
-              <Download size={13} className="text-[#0000FF]" /> WAV Audio
-            </button>
-
-            <div className="win95-hitcounter flex-row items-center gap-2 py-0.5 px-2">
-              <span className="w-2 h-2 bg-[#00FF00]"></span>
-              <span className="text-xs">{status === 'online' ? 'API_ONLINE' : 'CLIENT_DSP'}</span>
-            </div>
-          </div>
+        {/* 5. Telemetry Metrics Section */}
+        <div className="p-1">
+          <SignalMetrics metrics={dsp?.metrics} />
         </div>
 
-        {/* 3D Groove Divider */}
         <hr className="hr-groove" />
 
-        {/* ── Signal Telemetry Metrics ── */}
-        <SignalMetrics metrics={dsp?.metrics} />
+        {/* 6. Main Workspace Split Stage */}
+        <div className="flex flex-col lg:flex-row gap-3 items-start p-1">
 
-        {/* 3D Groove Divider */}
-        <hr className="hr-groove" />
-
-        {/* ── Main Workspace Split Stage ── */}
-        <div className="flex flex-col lg:flex-row gap-3 items-start">
-
-          {/* Left Stage */}
+          {/* Left Main Instrument Stage */}
           <div className="flex-1 flex flex-col gap-2 w-full">
 
-            {/* Workspace View Tabs */}
+            {/* Navigation Tabs Bar */}
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="win95-tabs">
                 <button
@@ -359,7 +359,7 @@ export default function App() {
             )}
           </div>
 
-          {/* Right Control Sidebar */}
+          {/* Right Control Panel Sidebar */}
           <ControlPanel
             generatorConfig={genCfg} setGeneratorConfig={setGenCfg}
             mathConfig={mathCfg} setMathConfig={setMathCfg}
@@ -367,7 +367,7 @@ export default function App() {
           />
         </div>
 
-        {/* Construction Stripes Accent Bar */}
+        {/* Construction Warning Stripes Accent */}
         <div className="bg-construction h-4 w-full border border-[#000000] flex items-center justify-center text-[9px] font-bold tracking-widest text-[#000000]">
           UNDER CONSTRUCTION -- REI SIGNALLAB 98 -- POWERED BY ROOTCASTLE
         </div>
