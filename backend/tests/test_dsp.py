@@ -124,3 +124,16 @@ def test_lisp_engine_biquad():
     assert not np.isnan(out).any()
     assert logs["status"] == "success"
 
+
+def test_matplotlib_plot_rendering():
+    response = client.get("/api/render/plot?waveform=sine&frequency=440&amplitude=1.5&plot_type=oscilloscope")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert len(response.content) > 1000
+
+    response_spectrum = client.get("/api/render/plot?waveform=sine&frequency=440&amplitude=1.5&plot_type=spectrum")
+    assert response_spectrum.status_code == 200
+    assert response_spectrum.headers["content-type"] == "image/png"
+    assert len(response_spectrum.content) > 1000
+
+

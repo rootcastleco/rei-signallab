@@ -1,5 +1,9 @@
 import numpy as np
 from scipy import signal as scipy_signal
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive headless backend
+import matplotlib.pyplot as plt
+import io
 from typing import Tuple, Optional
 import logging
 
@@ -20,15 +24,14 @@ logger = logging.getLogger("dsp_engine")
 
 class DSPEngine:
     """
-    Advanced Digital Signal Processing (DSP) Engine inspired by Mitov SignalLab.
+    Advanced Digital Signal Processing (DSP) & Matplotlib Rendering Engine.
     Provides signal synthesis, AM/FM/PM modulation, Hilbert envelope detection,
     bit quantization, IIR/FIR/Elliptic/Bessel filtering, FFT spectral analysis,
-    and studio telemetry (THD, SNR, SINAD, SFDR, ENOB).
+    and server-side Matplotlib PNG plot rendering API endpoints.
     """
 
     @staticmethod
     def generate_signal(config: SignalGeneratorConfig) -> Tuple[np.ndarray, np.ndarray]:
-        """Generates time array and carrier/modulated waveform."""
         fs = max(100, int(config.sample_rate))
         dur = max(0.001, float(config.duration))
         num_samples = int(fs * dur)
@@ -39,7 +42,6 @@ class DSPEngine:
         amp = float(config.amplitude)
         waveform = config.waveform
 
-        # 1. Base Carrier Signal Synthesis
         if waveform == WaveformType.SINE:
             carrier = np.sin(2.0 * np.pi * freq * t + phase_rad)
         elif waveform == WaveformType.SQUARE:
@@ -68,7 +70,6 @@ class DSPEngine:
         else:
             carrier = np.sin(2.0 * np.pi * freq * t + phase_rad)
 
-        # 2. Modulation Synthesis (Mitov SignalLab Modulator component)
         mod_type = config.modulation_type
         if mod_type != ModulationType.NONE:
             mod_freq = float(config.mod_frequency)
@@ -76,34 +77,25 @@ class DSPEngine:
             mod_sig = np.sin(2.0 * np.pi * mod_freq * t)
 
             if mod_type == ModulationType.AM:
-                # Amplitude Modulation: y = A * (1 + m * mod(t)) * carrier(t)
                 y = amp * (1.0 + mod_idx * mod_sig) * carrier
             elif mod_type == ModulationType.FM:
-                # Frequency Modulation: y = A * sin(2*pi*fc*t + m * sin(2*pi*fm*t))
                 y = amp * np.sin(2.0 * np.pi * freq * t + mod_idx * mod_sig + phase_rad)
             elif mod_type == ModulationType.PM:
-                # Phase Modulation: y = A * sin(2*pi*fc*t + m * cos(2*pi*fm*t))
                 y = amp * np.sin(2.0 * np.pi * freq * t + mod_idx * np.cos(2.0 * np.pi * mod_freq * t) + phase_rad)
             else:
                 y = amp * carrier
         else:
             y = amp * carrier
 
-        # 3. Add DC Offset
         y = y + config.offset
-
-        # 4. Additive Noise
         if config.noise_level > 0:
-            noise = np.random.normal(0, config.noise_level, num_samples)
-            y += noise
+            y += np.random.normal(0, config.noise_level, num_samples)
 
-        # Clean NaN/Inf
         y = np.nan_to_num(y, nan=0.0)
         return t, y
 
     @staticmethod
     def _generate_pink_noise(num_samples: int) -> np.ndarray:
-        """Generates 1/f Pink Noise using Voss-McCartney algorithm approximation."""
         uneven = num_samples % 2
         X = np.random.randn(num_samples // 2 + 1 + uneven) + 1j * np.random.randn(num_samples // 2 + 1 + uneven)
         S = np.sqrt(np.arange(len(X)) + 1.0)
@@ -113,7 +105,6 @@ class DSPEngine:
 
     @staticmethod
     def _generate_ecg(t: np.ndarray, bpm_freq: float, amp: float) -> np.ndarray:
-        """Synthetic ECG cardiac signal generator."""
         period = 1.0 / max(0.1, bpm_freq)
         t_mod = np.mod(t, period) / period
         ecg = np.zeros_like(t)
@@ -126,19 +117,13 @@ class DSPEngine:
 
     @staticmethod
     def apply_math_quantizer(signal_in: np.ndarray, config: MathQuantizerConfig) -> Tuple[np.ndarray, Optional[np.ndarray]]:
-        """Applies Hilbert envelope extraction, bit depth quantization, and gain scaling."""
         y = signal_in.copy()
-
-        # Gain scaling (dB)
         if config.gain_db != 0.0:
-            linear_gain = 10.0 ** (config.gain_db / 20.0)
-            y *= linear_gain
+            y *= 10.0 ** (config.gain_db / 20.0)
 
-        # DC Removal
         if config.dc_remove:
             y -= np.mean(y)
 
-        # Bit Depth Quantization Simulation (e.g. 4-bit, 8-bit, 16-bit)
         if config.bit_depth is not None and config.bit_depth < 24:
             bits = config.bit_depth
             levels = 2 ** bits
@@ -147,7 +132,6 @@ class DSPEngine:
             y_quant = np.round((y_norm + 1.0) / 2.0 * (levels - 1))
             y = (y_quant / (levels - 1) * 2.0 - 1.0) * max_v
 
-        # Hilbert Envelope extraction
         envelope = None
         if config.envelope_extraction and len(y) > 10:
             analytic_signal = scipy_signal.hilbert(y)
@@ -157,7 +141,6 @@ class DSPEngine:
 
     @staticmethod
     def apply_filter(signal_in: np.ndarray, fs: int, config: FilterConfig) -> np.ndarray:
-        """Applies digital filter (Butterworth, Chebyshev, Elliptic, Bessel, Median, FIR)."""
         if not config.enabled or len(signal_in) < 10:
             return signal_in.copy()
 
@@ -178,28 +161,21 @@ class DSPEngine:
             if f_design == FilterDesign.BUTTERWORTH:
                 b, a = scipy_signal.butter(order, norm_c, btype=f_type)
                 filtered = scipy_signal.filtfilt(b, a, signal_in)
-
             elif f_design == FilterDesign.CHEBYSHEV1:
                 b, a = scipy_signal.cheby1(order, config.ripple_db, norm_c, btype=f_type)
                 filtered = scipy_signal.filtfilt(b, a, signal_in)
-
             elif f_design == FilterDesign.CHEBYSHEV2:
                 b, a = scipy_signal.cheby2(order, 40, norm_c, btype=f_type)
                 filtered = scipy_signal.filtfilt(b, a, signal_in)
-
             elif f_design == FilterDesign.ELLIPTIC:
-                b, a = scipy_signal.elliap(order, config.ripple_db, 40)
                 b, a = scipy_signal.ellip(order, config.ripple_db, 40, norm_c, btype=f_type)
                 filtered = scipy_signal.filtfilt(b, a, signal_in)
-
             elif f_design == FilterDesign.BESSEL:
                 b, a = scipy_signal.bessel(order, norm_c, btype=f_type)
                 filtered = scipy_signal.filtfilt(b, a, signal_in)
-
             elif f_design == FilterDesign.MEDIAN:
                 kernel = min(len(signal_in) // 2 * 2 + 1, order * 2 + 1)
                 filtered = scipy_signal.medfilt(signal_in, kernel_size=kernel)
-
             elif f_design == FilterDesign.FIR_WINDOW:
                 numtaps = min(len(signal_in) // 3, order * 10 + 1)
                 if numtaps % 2 == 0:
@@ -212,7 +188,7 @@ class DSPEngine:
 
             return np.nan_to_num(filtered, nan=0.0)
         except Exception as err:
-            logger.warning(f"Filter fallback due to error: {err}")
+            logger.warning(f"Filter fallback: {err}")
             return signal_in.copy()
 
     @staticmethod
@@ -254,7 +230,6 @@ class DSPEngine:
 
     @staticmethod
     def compute_metrics(signal_in: np.ndarray, freqs: np.ndarray, mag_linear: np.ndarray, fs: int) -> SignalMetrics:
-        """Calculates laboratory metrics: RMS, P2P, DC, THD, SNR, SINAD, SFDR, ENOB."""
         if len(signal_in) == 0:
             return SignalMetrics(
                 rms=0, peak_to_peak=0, dc_mean=0, thd_percent=0,
@@ -272,7 +247,6 @@ class DSPEngine:
             peak_mag_v = mag_linear[peak_idx]
             peak_mag_db = float(20.0 * np.log10(max(1e-12, peak_mag_v)))
 
-            # Harmonics computation
             harmonics_mag_sq = 0.0
             for h in range(2, 6):
                 h_freq = fundamental_freq * h
@@ -283,26 +257,20 @@ class DSPEngine:
             thd_frac = np.sqrt(harmonics_mag_sq) / max(1e-9, peak_mag_v)
             thd_percent = float(min(100.0, thd_frac * 100.0))
 
-            # SNR estimation
             signal_power = peak_mag_v ** 2
             total_power = np.sum(mag_linear[1:] ** 2)
             noise_power = max(1e-12, total_power - signal_power - harmonics_mag_sq)
             snr_db = float(10.0 * np.log10(max(1e-12, signal_power / noise_power)))
 
-            # SINAD (Signal-to-Noise-and-Distortion)
             nad_power = noise_power + harmonics_mag_sq
             sinad_db = float(10.0 * np.log10(max(1e-12, signal_power / nad_power)))
-
-            # ENOB (Effective Number of Bits)
             enob_bits = float(max(0.0, (sinad_db - 1.76) / 6.02))
 
-            # SFDR (Spurious-Free Dynamic Range)
             mag_copy = mag_linear.copy()
             mag_copy[0] = 0.0
             mag_copy[peak_idx] = 0.0
             spurious_peak = np.max(mag_copy)
             sfdr_db = float(20.0 * np.log10(max(1e-12, peak_mag_v / max(1e-12, spurious_peak))))
-
         else:
             fundamental_freq = 0.0
             peak_mag_db = -120.0
@@ -333,3 +301,60 @@ class DSPEngine:
         freqs, times, Sxx = scipy_signal.spectrogram(signal_in, fs=fs, nperseg=nperseg, noverlap=nperseg // 2)
         Sxx_db = 10.0 * np.log10(np.maximum(Sxx, 1e-12))
         return freqs, times, Sxx_db
+
+    # =========================================================================
+    # MATPLOTLIB BACKEND PNG PLOT RENDERING METHODS FOR API USERS
+    # =========================================================================
+
+    @staticmethod
+    def render_matplotlib_oscilloscope(t: np.ndarray, raw_sig: np.ndarray, filtered_sig: np.ndarray, envelope_sig: Optional[np.ndarray] = None) -> bytes:
+        """Renders high-resolution server-side PNG plot of Oscilloscope signal trajectories."""
+        plt.style.use('dark_background')
+        fig, ax = plt.subplots(figsize=(10, 4.5), dpi=120)
+        fig.patch.set_facecolor('#0D1117')
+        ax.set_facecolor('#000000')
+
+        t_ms = t * 1000.0
+        ax.plot(t_ms, raw_sig, color='#38BDF8', linewidth=1.2, label='CH1 Raw Signal', alpha=0.9)
+        ax.plot(t_ms, filtered_sig, color='#34D399', linewidth=1.5, label='CH2 Filtered Signal')
+        if envelope_sig is not None:
+            ax.plot(t_ms, envelope_sig, color='#FBBF24', linewidth=1.0, linestyle='--', label='Hilbert Envelope')
+
+        ax.set_title('REI SignalLab Oscilloscope (Time Domain)', color='#F0F6FC', fontsize=12, fontweight='bold', pad=12)
+        ax.set_xlabel('Time (ms)', color='#8B949E', fontsize=10)
+        ax.set_ylabel('Voltage (V)', color='#8B949E', fontsize=10)
+        ax.grid(True, color='#1C2128', linestyle=':', linewidth=0.8)
+        ax.legend(loc='upper right', facecolor='#161B22', edgecolor='#30363D', labelcolor='#F0F6FC', fontsize=9)
+        ax.tick_params(colors='#8B949E', labelsize=9)
+
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', bbox_inches='tight', facecolor=fig.get_facecolor())
+        plt.close(fig)
+        buf.seek(0)
+        return buf.getvalue()
+
+    @staticmethod
+    def render_matplotlib_spectrum(freqs: np.ndarray, mag_db: np.ndarray, metrics: SignalMetrics) -> bytes:
+        """Renders high-resolution server-side PNG plot of FFT Frequency Spectrum."""
+        plt.style.use('dark_background')
+        fig, ax = plt.subplots(figsize=(10, 4.5), dpi=120)
+        fig.patch.set_facecolor('#0D1117')
+        ax.set_facecolor('#000000')
+
+        ax.plot(freqs, mag_db, color='#A78BFA', linewidth=1.5, label='FFT Spectrum (dBV)')
+        if metrics and metrics.fundamental_freq > 0:
+            ax.axvline(metrics.fundamental_freq, color='#F87171', linestyle='--', linewidth=1.0, label=f'Peak: {metrics.fundamental_freq} Hz')
+
+        ax.set_title(f'REI SignalLab Spectrum Analyzer (THD: {metrics.thd_percent}% | SNR: {metrics.snr_db} dB)', color='#F0F6FC', fontsize=12, fontweight='bold', pad=12)
+        ax.set_xlabel('Frequency (Hz)', color='#8B949E', fontsize=10)
+        ax.set_ylabel('Magnitude (dBV)', color='#8B949E', fontsize=10)
+        ax.set_ylim(-110, 25)
+        ax.grid(True, color='#1C2128', linestyle=':', linewidth=0.8)
+        ax.legend(loc='upper right', facecolor='#161B22', edgecolor='#30363D', labelcolor='#F0F6FC', fontsize=9)
+        ax.tick_params(colors='#8B949E', labelsize=9)
+
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', bbox_inches='tight', facecolor=fig.get_facecolor())
+        plt.close(fig)
+        buf.seek(0)
+        return buf.getvalue()
