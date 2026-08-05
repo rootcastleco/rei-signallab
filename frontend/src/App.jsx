@@ -274,8 +274,8 @@ export default function App() {
         {/* 1. Title Bar */}
         <div className="win98-titlebar">
           <div className="flex items-center gap-2">
-            <span className="bg-[#FFFF00] text-[#000000] px-1 font-bold text-xs">v2.0</span>
-            <span>REI_SignalLab_2.0.exe - [Typed Signal Flow Studio & Instrument-Grade DSP Suite]</span>
+            <span className="bg-[#FFFF00] text-[#000000] px-1 font-bold text-xs">v2.1</span>
+            <span>REI_SignalLab_2.1.exe - [Typed Node Catalog & Kahn Execution Engine]</span>
           </div>
           <div className="flex gap-1">
             <div className="win98-btn-box">_</div>
@@ -284,23 +284,48 @@ export default function App() {
           </div>
         </div>
 
-        {/* 2. System Menu Bar */}
-        <div className="flex items-center justify-between bg-[#C0C0C0] px-2 py-0.5 border-b border-[#808080] text-xs font-bold">
-          <div className="flex gap-3">
-            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">File</span>
-            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">Edit</span>
-            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">View</span>
-            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">Presets</span>
-            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">Tools</span>
-            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">Help</span>
+        {/* Workspace Navigation Bar - Prominent Top View Switcher */}
+        <div className="win98-outset p-1.5 flex items-center justify-between flex-wrap gap-2 bg-[#C0C0C0] border-b-2 border-[#000000]">
+          <div className="win98-tabs flex-wrap">
+            <button
+              onClick={() => setActiveView('dual')}
+              className={`win98-tab font-bold text-xs ${activeView === 'dual' ? 'active font-black text-[#000080]' : ''}`}
+            >
+              📊 Oscilloscope + Spectrum
+            </button>
+            <button
+              onClick={() => setActiveView('graph')}
+              className={`win98-tab font-bold text-xs flex items-center gap-1 ${activeView === 'graph' ? 'active font-black text-[#000080] bg-[#FFFFCC]' : ''}`}
+            >
+              <Layers size={14} className="text-[#0000FF]" /> 🎛️ Signal Flow Studio <span className="badge-blink">v2.1</span>
+            </button>
+            <button
+              onClick={() => setActiveView('python')}
+              className={`win98-tab font-bold text-xs flex items-center gap-1 ${activeView === 'python' ? 'active font-black text-[#000080]' : ''}`}
+            >
+              <Code size={14} className="text-[#0000FF]" /> 🐍 Python Lab
+            </button>
+            <button
+              onClick={() => setActiveView('waterfall')}
+              className={`win98-tab font-bold text-xs ${activeView === 'waterfall' ? 'active font-black text-[#000080]' : ''}`}
+            >
+              🌊 2D Waterfall Spectrogram
+            </button>
+            <button
+              onClick={() => setActiveView('lisp')}
+              className={`win98-tab font-bold text-xs ${activeView === 'lisp' ? 'active font-black text-[#000080]' : ''}`}
+            >
+              📜 S-Expression DSP DSL
+            </button>
           </div>
+
           <div className="flex items-center gap-2 font-mono text-[11px]">
-            <span className="badge-blink">v2.0 RELEASE</span>
-            <span className="text-[#0000FF] font-bold">VISITORS: 0004820</span>
+            <span className="badge-blink">v2.1 RELEASE</span>
+            <span className="text-[#0000FF] font-bold">VISITORS: 0005140</span>
           </div>
         </div>
 
-        {/* 3. Single-Row Toolbar */}
+        {/* 2. System Toolbar */}
         <div className="win98-outset p-1 flex items-center justify-between flex-wrap gap-2 bg-[#C0C0C0]">
           <div className="flex items-center gap-1">
             <button className="win98-btn" onClick={() => fileInputRef.current?.click()}>
@@ -328,7 +353,6 @@ export default function App() {
             </select>
           </div>
 
-          {/* Data Trust Mode Indicator */}
           <div className="win98-hitcounter flex-row items-center gap-2 py-0.5 px-2">
             <span className={`w-2.5 h-2.5 rounded-full ${
               dataTrustMode === 'API_VERIFIED' ? 'bg-[#00FF00]' :
@@ -349,61 +373,25 @@ export default function App() {
           </div>
         )}
 
-        {/* 4. Marquee Ticker */}
+        {/* Marquee Ticker */}
         <div className="bg-[#000000] text-[#00FF00] font-mono text-xs p-0.5 border-2 border-t-[#808080] border-l-[#808080] border-r-[#FFFFFF] border-b-[#FFFFFF] overflow-hidden whitespace-nowrap">
           <marquee scrollamount="5" behavior="scroll">
-            *** WELCOME TO REI SIGNALLAB 2.0 *** TYPED NODE-BASED SIGNAL FLOW STUDIO (.rei-signal) *** RESTRICTED EXPERIMENTAL PYTHON SCRIPT RUNNER *** S-EXPRESSION DSP DSL KERNEL *** INSTRUMENT-GRADE METRICS ***
+            *** WELCOME TO REI SIGNALLAB 2.1 *** TYPED CANONICAL NODE CATALOG (.rei-signal 2.1) *** KAHN TOPOLOGICAL GRAPH ENGINE *** RESTRICTED EXPERIMENTAL PYTHON LAB *** S-EXPRESSION DSP DSL KERNEL ***
           </marquee>
         </div>
 
-        {/* 5. Telemetry Metrics Section */}
+        {/* Telemetry Metrics Section */}
         <div className="p-0.5">
           <SignalMetrics metrics={dsp?.metrics} />
         </div>
 
         <hr className="hr-groove" />
 
-        {/* 6. Main Workspace Split Stage */}
+        {/* Main Workspace Split Stage */}
         <div className="flex flex-col lg:flex-row gap-2.5 items-start p-0.5">
 
-          {/* Left Main Instrument Stage */}
           <div className="flex-1 flex flex-col gap-2 w-full">
-
-            {/* Navigation Tabs Bar */}
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="win98-tabs">
-                <button
-                  onClick={() => setActiveView('dual')}
-                  className={`win98-tab ${activeView === 'dual' ? 'active' : ''}`}
-                >
-                  Oscilloscope + Spectrum
-                </button>
-                <button
-                  onClick={() => setActiveView('graph')}
-                  className={`win98-tab flex items-center gap-1 ${activeView === 'graph' ? 'active' : ''}`}
-                >
-                  <Layers size={12} className="text-[#0000FF]" /> Signal Flow Studio <span className="badge-blink">v2.0</span>
-                </button>
-                <button
-                  onClick={() => setActiveView('python')}
-                  className={`win98-tab flex items-center gap-1 ${activeView === 'python' ? 'active' : ''}`}
-                >
-                  <Code size={12} className="text-[#0000FF]" /> Python Lab
-                </button>
-                <button
-                  onClick={() => setActiveView('waterfall')}
-                  className={`win98-tab ${activeView === 'waterfall' ? 'active' : ''}`}
-                >
-                  2D Waterfall
-                </button>
-                <button
-                  onClick={() => setActiveView('lisp')}
-                  className={`win98-tab ${activeView === 'lisp' ? 'active' : ''}`}
-                >
-                  S-Expression DSL Kernel
-                </button>
-              </div>
-
+            <div className="flex justify-end">
               <AudioEngine generatorConfig={genCfg} filterConfig={filterCfg} />
             </div>
 
