@@ -13,22 +13,14 @@ export const safeFetchJson = async (endpoint, options = {}) => {
 
   try {
     const res = await fetch(url, options);
-    const contentType = res.headers.get('content-type') || '';
-    
-    if (!contentType.includes('application/json')) {
-      const text = await res.text();
-      if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
-        throw new Error('API returned HTML page instead of JSON. Ensure FastAPI server is running on port 8000.');
-      }
-      try {
-        return JSON.parse(text);
-      } catch {
-        throw new Error('Server returned non-JSON response.');
-      }
+    const text = await res.text();
+
+    if (!text || text.trim().startsWith('<') || text.trim().toLowerCase().startsWith('<!doctype')) {
+      throw new Error('Server returned HTML instead of JSON');
     }
 
-    return await res.json();
+    return JSON.parse(text);
   } catch (err) {
-    throw err;
+    throw new Error(err.message || 'API Fetch Error');
   }
 };
