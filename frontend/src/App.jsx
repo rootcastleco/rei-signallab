@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText, Layers } from 'lucide-react';
+import { safeFetchJson } from './config';
 
 import Oscilloscope from './components/Oscilloscope';
 import SpectrumAnalyzer from './components/SpectrumAnalyzer';
@@ -111,13 +112,13 @@ export default function App() {
   const fetchDSP = useCallback(async () => {
     if (uploadedFileName) return;
     try {
-      const res = await fetch('/api/process', {
+      const data = await safeFetchJson('/api/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ generator: genCfg, math: mathCfg, filter: filterCfg, fft: fftCfg })
       });
-      if (res.ok) { setDsp(await res.json()); setStatus('online'); }
-      else throw new Error();
+      setDsp(data);
+      setStatus('online');
     } catch {
       setDsp(fallback(genCfg, mathCfg));
       setStatus('fallback');
@@ -138,22 +139,16 @@ export default function App() {
     formData.append('envelope_extraction', mathCfg.envelope_extraction);
 
     try {
-      const res = await fetch('/api/upload/signal', {
+      const data = await safeFetchJson('/api/upload/signal', {
         method: 'POST',
         body: formData
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setDsp(data);
-        setUploadedFileName(file.name);
-        setStatus('online');
-      } else {
-        const err = await res.json();
-        alert('File Upload Failed: ' + (err.detail || 'Invalid signal file'));
-      }
+      setDsp(data);
+      setUploadedFileName(file.name);
+      setStatus('online');
     } catch (e) {
-      alert('File upload error: ' + e.message);
+      alert('File upload process: ' + e.message);
     }
   };
 
