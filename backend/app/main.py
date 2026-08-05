@@ -141,6 +141,9 @@ def execute_graph_pipeline(req: GraphExecutionRequest):
             "results": results,
             "project": engine.export_project()
         }
+    except ValueError as val_err:
+        logger.warning(f"Graph validation failed: {str(val_err)}")
+        raise HTTPException(status_code=422, detail=f"Graph Validation Error: {str(val_err)}")
     except Exception as e:
         logger.error(f"Error executing graph pipeline: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Graph runtime error: {str(e)}")

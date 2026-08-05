@@ -2,9 +2,9 @@
 
 # REI SignalLab 2.0
 
-### Typed Node-Based Signal Flow Studio, Hardened Python Sandbox, Instrument-Grade DSP Engine & S-Expression DSL Kernel
+### Typed Node-Based Signal Flow Studio, Restricted Experimental Python Script Runner, Instrument-Grade DSP Engine & S-Expression DSL Kernel
 
-*Inspired by **Mitov SignalLab**, engineered with **Typed Node Signal Flow Studio (`.rei-signal`)**, **Hardened Python Code Sandbox**, **Fail-Closed DSP Precision Engine**, and **S-Expression DSP DSL Kernel**.*
+*Inspired by **Mitov SignalLab**, engineered with **Typed Node Signal Flow Studio (`.rei-signal`)**, **Restricted Experimental Python Script Runner**, **Fail-Closed DSP Precision Engine**, and **S-Expression DSP DSL Kernel**.*
 
 [![Live App on Firebase](https://img.shields.io/badge/Live%20App-signallab--3305b.web.app-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://signallab-3305b.web.app)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
@@ -32,7 +32,7 @@
 
 **REI SignalLab 2.0** is an instrument-grade laboratory suite for **Digital Signal Processing (DSP)**, spectral analysis, visual signal flow modeling, and Python signal code simulation. Drawing inspiration from **Mitov SignalLab**, it empowers engineers, researchers, and audio developers to synthesize, filter, measure, script, and visually compose complex signal topologies in real time via an interactive Web UI or through REST APIs.
 
-The application combines a high-speed **FastAPI & SciPy** computation core, a **Typed Node-Based Signal Flow Studio (`.rei-signal`)**, a **Hardened Python Scripting Sandbox**, a server-side **Matplotlib Plot Rendering API**, an HTML5 Canvas 60 FPS oscilloscope hardware renderer, signal file upload (`.wav`, `.csv`, `.txt`, `.json`), and real-time WebAudio DAC synthesis.
+The application combines a high-speed **FastAPI & SciPy** computation core, a **Typed Node-Based Signal Flow Studio (`.rei-signal`)**, a **Restricted Experimental Python Script Runner**, a server-side **Matplotlib Plot Rendering API**, an HTML5 Canvas 60 FPS oscilloscope hardware renderer, signal file upload (`.wav`, `.csv`, `.txt`, `.json`), and real-time WebAudio DAC synthesis.
 
 ---
 
@@ -47,7 +47,7 @@ The application combines a high-speed **FastAPI & SciPy** computation core, a **
 ### 3. Typed Signal Flow Studio (.rei-signal) Visual Canvas
 ![Signal Flow Studio Canvas](docs/images/node_flow_studio.png)
 
-### 4. Hardened Python DSP Code Sandbox & Matplotlib Plot Result
+### 4. Restricted Experimental Python DSP Code Sandbox & Matplotlib Plot Result
 ![Python DSP Code Sandbox](docs/images/python_lab_preview.png)
 
 ---
@@ -60,13 +60,14 @@ The application combines a high-speed **FastAPI & SciPy** computation core, a **
   - **Transforms / Filters**: `DCRemove`, `BiquadFilter`, `HilbertEnvelope`
   - **Analyzers**: `FFTAnalyzer`, `SpectrumAnalyzer`
   - **Outputs / Sinks**: `ScopeSink`, `CSVWriter`
-- **Strict Port Type Validation**: Graph ports are strictly typed (`Signal<float32>`, `SpectrumFrame`, `Scalar`) to reject invalid connections at graph validation time.
+- **Kahn's Topological Order & Cycle Detection**: Graph execution is topologically ordered using Kahn's Algorithm. Cycles are detected and rejected (`HTTP 422 GRAPH_CYCLE_DETECTED`).
+- **Strict Port Type Validation**: Graph ports are strictly typed (`Signal<float32>`, `SpectrumFrame`, `Scalar`). Mismatched wiring (e.g. `SpectrumFrame → Signal<float32>`) is rejected (`HTTP 422 GRAPH_PORT_TYPE_MISMATCH`).
 - **Reproducible Experiment Format (`.rei-signal`)**: Export & import versioned JSON project definitions (`formatVersion: "2.0"`).
 
-### 2. Hardened Python DSP Script Sandbox
-- Execution environment protected by restricted `__builtins__`, safe module importer, and 5MB stdout output quotas (`POST /api/python/execute`).
-- Presets for Chirp frequency sweeps, Synthetic Cardiac ECG simulations, and AM/FM Quadrature Modulators.
-- Terminal stdout execution logger and embedded base64 PNG plot viewer.
+### 2. Data Trust Boundary Separation
+- **`[ API VERIFIED ]`**: Verified FastAPI/SciPy backend computed metrics.
+- **`[ LOCAL BROWSER DSP ]`**: Real-time browser-side JavaScript/WebAudio computed FFT & RMS metrics.
+- **`[ DEMO MODE ]`**: Displays mandatory warning banner: `⚠️ SIMULATED DEMO DATA - NOT FOR INSTRUMENT MEASUREMENT`.
 
 ### 3. Instrument-Grade Fail-Closed DSP Engine
 - **No Silent Fallbacks**: If a filter design fails due to unstable poles, the engine throws an explicit error rather than silently returning unfiltered raw data.
@@ -80,7 +81,7 @@ The application combines a high-speed **FastAPI & SciPy** computation core, a **
 | :--- | :--- | :--- |
 | `GET` | `/` | Health check & 2.0 feature manifest |
 | `POST` | `/api/graph/execute` | Executes typed Node-Based Signal Flow Graph (.rei-signal project) |
-| `POST` | `/api/python/execute` | Executes user Python DSP scripts inside hardened sandbox |
+| `POST` | `/api/python/execute` | Executes user Python DSP scripts inside restricted runner |
 | `POST` | `/api/upload/signal` | Uploads `.wav`, `.csv`, `.txt`, `.json` signal files for DSP processing |
 | `POST` | `/api/process` | Full signal processing pipeline (Time, FFT, Metrics, Spectrogram) |
 | `POST` | `/api/render/plot` | Matplotlib PNG plot from JSON request |

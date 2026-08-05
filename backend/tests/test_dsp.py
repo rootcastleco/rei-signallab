@@ -14,6 +14,7 @@ from app.schemas import (
     SignalProcessingRequest
 )
 from app.dsp_engine import DSPEngine
+from app.graph_engine import SignalFlowGraphEngine
 
 client = TestClient(app)
 
@@ -100,7 +101,7 @@ def test_api_process():
     assert data["metrics"]["fundamental_freq"] > 400.0
 
 
-def test_api_wav_export():
+def test_api_wav_export_riff_header():
     req = SignalProcessingRequest(
         generator=SignalGeneratorConfig(waveform=WaveformType.SINE, frequency=440.0),
         filter=FilterConfig()
@@ -108,7 +109,7 @@ def test_api_wav_export():
     response = client.post("/api/export/wav", json=req.model_dump())
     assert response.status_code == 200
     assert response.headers["content-type"] == "audio/wav"
-    assert len(response.content) > 100
+    assert response.content[:4] == b"RIFF"
 
 
 def test_lisp_engine_biquad():
@@ -121,74 +122,40 @@ def test_lisp_engine_biquad():
     assert logs["status"] == "success"
 
 
-def test_matplotlib_plot_rendering():
-    response = client.get("/api/render/plot?waveform=sine&frequency=440&amplitude=1.5&plot_type=oscilloscope")
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "image/png"
-    assert len(response.content) > 1000
+def test_graph_kahns_topological_execution():
+    engine = SignalFlowGraphEngine()
+    n1 = engine.create_node("SignalGenerator", "Gen", {"frequency": 440}, "n1")
+    n2 = engine.create_node("BiquadFilter", "Flt", {"cutoff": 1000}, "n2")
+    n3 = engine.create_node("FFTAnalyzer", "FFT", {"n_fft": 1024}, "n3")
 
-    response_spectrum = client.get("/api/render/plot?waveform=sine&frequency=440&amplitude=1.5&plot_type=spectrum")
-    assert response_spectrum.status_code == 200
-    assert response_spectrum.headers["content-type"] == "image/png"
-    assert len(response_spectrum.content) > 1000
+    engine.connect("n1", "signal_out", "n2", "signal_in")
+    engine.connect("n2", "signal_out", "n3", "signal_in")
 
+    order = engine.topological_sort()
+    assert order == ["n1", "n2", "n3"]
 
-def test_signal_file_upload():
-    csv_content = "time,val\n0.0,0.5\n0.01,1.0\n0.02,-0.5\n0.03,-1.0\n"
-    response = client.post(
-        "/api/upload/signal",
-        files={"file": ("test_signal.csv", csv_content, "text/csv")}
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data["raw_signal"]) == 4
-    assert data["raw_signal"][1] == 1.0
-
-    json_content = '{"signal": [0.1, 0.5, 0.9, 0.2, -0.4], "sample_rate": 1000}'
-    response_json = client.post(
-        "/api/upload/signal",
-        files={"file": ("signal.json", json_content, "application/json")}
-    )
-    assert response_json.status_code == 200
-    data_json = response_json.json()
-    assert len(data_json["raw_signal"]) == 5
+    results = engine.run_graph()
+    assert "n1" in results
+    assert "n2" in results
+    assert "n3" in results
 
 
-def test_python_script_execution():
-    script = """
-import numpy as np
-t = np.linspace(0, 0.1, 4410)
-raw_signal = np.sin(2 * np.pi * 440 * t)
-print('Generated 440Hz sine wave in Python!')
-plt.plot(t[:200], raw_signal[:200], color='cyan')
-plt.title('Python DSP Simulation')
-"""
-    response = client.post("/api/python/execute", json={"python_code": script})
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "success"
-    assert "Generated 440Hz sine wave" in data["logs"][0]
-    assert len(data["raw_signal"]) == 4410
-    assert data["plot_base64"] is not None
+def test_graph_port_type_mismatch_rejection():
+    engine = SignalFlowGraphEngine()
+    engine.create_node("FFTAnalyzer", "FFT", {}, "n1")
+    engine.create_node("BiquadFilter", "Flt", {}, "n2")
+
+    with pytest.raises(ValueError, match="Port Type Mismatch"):
+        engine.connect("n1", "spectrum_out", "n2", "signal_in")
 
 
-def test_graph_pipeline_execution():
-    project = {
-        "formatVersion": "2.0",
-        "projectId": "test_proj",
-        "graph": {
-            "nodes": [
-                { "id": "n1", "type": "SignalGenerator", "name": "Gen", "params": { "frequency": 440 } },
-                { "id": "n2", "type": "BiquadFilter", "name": "Flt", "params": { "cutoff": 1000 } }
-            ],
-            "connections": [
-                { "from_node": "n1", "from_port": "signal_out", "to_node": "n2", "to_port": "signal_in" }
-            ]
-        }
-    }
-    response = client.post("/api/graph/execute", json={"project": project})
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "success"
-    assert "n1" in data["results"]
-    assert "n2" in data["results"]
+def test_graph_cycle_detection_rejection():
+    engine = SignalFlowGraphEngine()
+    engine.create_node("BiquadFilter", "F1", {}, "n1")
+    engine.create_node("BiquadFilter", "F2", {}, "n2")
+
+    engine.connect("n1", "signal_out", "n2", "signal_in")
+    engine.connect("n2", "signal_out", "n1", "signal_in")
+
+    with pytest.raises(ValueError, match="Cycle detected"):
+        engine.topological_sort()

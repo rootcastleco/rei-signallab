@@ -1,6 +1,7 @@
 import numpy as np
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Set
 import uuid
+from collections import defaultdict, deque
 
 from .schemas import (
     SignalGeneratorConfig,
@@ -26,6 +27,8 @@ class GraphNode:
         self.params = params or {}
         self.inputs: Dict[str, Any] = {}
         self.outputs: Dict[str, Any] = {}
+        self.in_port_types: Dict[str, str] = {}
+        self.out_port_types: Dict[str, str] = {}
 
     def process(self):
         pass
@@ -33,6 +36,7 @@ class GraphNode:
 class SignalGeneratorNode(GraphNode):
     def __init__(self, node_id: str, name: str = "Signal Generator", params: Optional[Dict[str, Any]] = None):
         super().__init__(node_id, "SignalGenerator", name, params)
+        self.out_port_types["signal_out"] = PortType.SIGNAL_FLOAT32
 
     def process(self):
         gen_cfg = SignalGeneratorConfig(
@@ -54,6 +58,8 @@ class SignalGeneratorNode(GraphNode):
 class FilterNode(GraphNode):
     def __init__(self, node_id: str, name: str = "Biquad Filter", params: Optional[Dict[str, Any]] = None):
         super().__init__(node_id, "BiquadFilter", name, params)
+        self.in_port_types["signal_in"] = PortType.SIGNAL_FLOAT32
+        self.out_port_types["signal_out"] = PortType.SIGNAL_FLOAT32
 
     def process(self):
         input_port = self.inputs.get("signal_in")
@@ -83,6 +89,8 @@ class FilterNode(GraphNode):
 class FFTAnalyzerNode(GraphNode):
     def __init__(self, node_id: str, name: str = "FFT Analyzer", params: Optional[Dict[str, Any]] = None):
         super().__init__(node_id, "FFTAnalyzer", name, params)
+        self.in_port_types["signal_in"] = PortType.SIGNAL_FLOAT32
+        self.out_port_types["spectrum_out"] = PortType.SPECTRUM_FRAME
 
     def process(self):
         input_port = self.inputs.get("signal_in")
@@ -106,8 +114,8 @@ class FFTAnalyzerNode(GraphNode):
 
 class SignalFlowGraphEngine:
     """
-    Typed Signal Flow Graph Runtime Engine for .rei-signal Projects.
-    Validates port compatibility, sorts topologically, and executes graph nodes.
+    Instrument-Grade Typed Signal Flow Graph Engine for .rei-signal Projects.
+    Validates port compatibility, detects cycles, and executes via Kahn's Topological Sort.
     """
 
     def __init__(self):
@@ -129,6 +137,18 @@ class SignalFlowGraphEngine:
         return n
 
     def connect(self, from_node_id: str, from_port: str, to_node_id: str, to_port: str):
+        fn = self.nodes.get(from_node_id)
+        tn = self.nodes.get(to_node_id)
+        if not fn or not tn:
+            raise ValueError(f"Connection error: Node '{from_node_id}' or '{to_node_id}' not found.")
+
+        # Port Compatibility Check
+        out_type = fn.out_port_types.get(from_port, PortType.SIGNAL_FLOAT32)
+        in_type = tn.in_port_types.get(to_port, PortType.SIGNAL_FLOAT32)
+
+        if out_type != in_type and in_type != "*":
+            raise ValueError(f"Port Type Mismatch: Cannot connect output port '{from_port}' ({out_type}) to input port '{to_port}' ({in_type}).")
+
         self.connections.append({
             "from_node": from_node_id,
             "from_port": from_port,
@@ -136,23 +156,56 @@ class SignalFlowGraphEngine:
             "to_port": to_port
         })
 
-    def run_graph(self) -> Dict[str, Any]:
-        # Propagate data across connections
-        for conn in self.connections:
-            fn = self.nodes.get(conn["from_node"])
-            tn = self.nodes.get(conn["to_node"])
-            if fn and tn:
-                fn.process()
-                out_val = fn.outputs.get(conn["from_port"])
-                if out_val:
-                    tn.inputs[conn["to_port"]] = out_val
+    def topological_sort(self) -> List[str]:
+        """
+        Kahn's Algorithm for Topological Sorting & Cycle Detection.
+        """
+        in_degree = {nid: 0 for nid in self.nodes}
+        adj = defaultdict(list)
 
-        # Execute target processing nodes
-        for n in self.nodes.values():
-            n.process()
+        for conn in self.connections:
+            u = conn["from_node"]
+            v = conn["to_node"]
+            adj[u].append(v)
+            in_degree[v] += 1
+
+        queue = deque([nid for nid, deg in in_degree.items() if deg == 0])
+        order = []
+
+        while queue:
+            curr = queue.popleft()
+            order.append(curr)
+            for neighbor in adj[curr]:
+                in_degree[neighbor] -= 1
+                if in_degree[neighbor] == 0:
+                    queue.append(neighbor)
+
+        if len(order) != len(self.nodes):
+            raise ValueError("Cycle detected in signal flow graph topology. Execution aborted.")
+
+        return order
+
+    def run_graph(self) -> Dict[str, Any]:
+        # 1. Topological Sorting & Cycle Check
+        execution_order = self.topological_sort()
+
+        # 2. Execute nodes in topological order
+        for nid in execution_order:
+            node = self.nodes[nid]
+
+            # Collect incoming data
+            for conn in self.connections:
+                if conn["to_node"] == nid:
+                    fn = self.nodes[conn["from_node"]]
+                    out_val = fn.outputs.get(conn["from_port"])
+                    if out_val:
+                        node.inputs[conn["to_port"]] = out_val
+
+            node.process()
 
         results = {}
-        for nid, n in self.nodes.items():
+        for nid in execution_order:
+            n = self.nodes[nid]
             results[nid] = {
                 "name": n.name,
                 "node_type": n.node_type,

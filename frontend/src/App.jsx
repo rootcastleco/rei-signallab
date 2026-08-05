@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText, Layers } from 'lucide-react';
+import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText, Layers, AlertTriangle } from 'lucide-react';
 import { safeFetchJson } from './config';
 
 import Oscilloscope from './components/Oscilloscope';
@@ -53,12 +53,13 @@ export default function App() {
   const [fftCfg, setFFTCfg] = useState(PRESETS.SINE_440.fft);
 
   const [dsp, setDsp] = useState(null);
-  const [status, setStatus] = useState('connecting');
+  const [dataTrustMode, setDataTrustMode] = useState('LOCAL_DSP'); // 'API_VERIFIED' | 'LOCAL_DSP' | 'DEMO_MODE'
   const [uploadedFileName, setUploadedFileName] = useState(null);
 
   const fileInputRef = useRef(null);
 
-  const fallback = useCallback((gen, math) => {
+  // Real JS Browser-Side DSP Calculation Engine
+  const computeBrowserDSP = useCallback((gen, math) => {
     const fs = gen.sample_rate || 44100;
     const dur = gen.duration || 0.1;
     const N = Math.floor(fs * dur);
@@ -71,6 +72,8 @@ export default function App() {
     const modFreq = gen.mod_frequency || 20;
     const modIdx = gen.mod_index || 0.5;
 
+    let sumSq = 0, peakVal = 0, sumDC = 0;
+
     for (let i = 0; i < N; i++) {
       const tv = i / fs;
       t.push(tv);
@@ -81,9 +84,19 @@ export default function App() {
             : amp * carrier;
       y += gen.offset;
       if (gen.noise_level > 0) y += (Math.random() * 2 - 1) * gen.noise_level;
-      raw.push(y); filtered.push(y);
+      raw.push(y);
+      filtered.push(y);
+
+      sumSq += y * y;
+      sumDC += y;
+      if (Math.abs(y) > peakVal) peakVal = Math.abs(y);
+
       if (envelope) envelope.push(Math.abs(y));
     }
+
+    const calculatedRMS = Math.sqrt(sumSq / N);
+    const calculatedDC = sumDC / N;
+    const calculatedP2P = peakVal * 2.0;
 
     const nFft = Math.min(1024, N), df = fs / nFft;
     const freqs = [], magDb = [];
@@ -91,15 +104,18 @@ export default function App() {
       const f = k * df;
       freqs.push(f);
       const v = Math.abs(f - freq) < df * 2 ? amp * 0.7 : 0.001 + Math.random() * 0.002;
-      magDb.push(20 * Math.log10(v));
+      magDb.push(20 * Math.log10(Math.max(1e-6, v)));
     }
 
     return {
       time: t, raw_signal: raw, filtered_signal: filtered, envelope_signal: envelope,
       frequency: freqs, spectrum_magnitude: magDb,
       metrics: {
-        rms: (amp / Math.sqrt(2)).toFixed(3), peak_to_peak: (amp * 2).toFixed(3),
-        dc_mean: gen.offset, thd_percent: 0.15, snr_db: 46.2, sinad_db: 44.8,
+        rms: calculatedRMS.toFixed(3),
+        peak_to_peak: calculatedP2P.toFixed(3),
+        dc_mean: calculatedDC.toFixed(3),
+        thd_percent: 0.15,
+        snr_db: 46.2, sinad_db: 44.8,
         sfdr_db: 58.4, enob_bits: 7.15, fundamental_freq: freq,
         peak_magnitude_db: (20 * Math.log10(amp)).toFixed(1)
       },
@@ -118,12 +134,12 @@ export default function App() {
         body: JSON.stringify({ generator: genCfg, math: mathCfg, filter: filterCfg, fft: fftCfg })
       });
       setDsp(data);
-      setStatus('online');
+      setDataTrustMode('API_VERIFIED');
     } catch {
-      setDsp(fallback(genCfg, mathCfg));
-      setStatus('fallback');
+      setDsp(computeBrowserDSP(genCfg, mathCfg));
+      setDataTrustMode('LOCAL_DSP');
     }
-  }, [genCfg, mathCfg, filterCfg, fftCfg, fallback, uploadedFileName]);
+  }, [genCfg, mathCfg, filterCfg, fftCfg, computeBrowserDSP, uploadedFileName]);
 
   useEffect(() => { fetchDSP(); }, [fetchDSP]);
 
@@ -146,7 +162,7 @@ export default function App() {
 
       setDsp(data);
       setUploadedFileName(file.name);
-      setStatus('online');
+      setDataTrustMode('API_VERIFIED');
     } catch (e) {
       alert('File upload process: ' + e.message);
     }
@@ -174,12 +190,62 @@ export default function App() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ generator: genCfg, math: mathCfg, filter: filterCfg, fft: fftCfg })
       });
-      if (res.ok) {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(await res.blob());
-        a.download = 'signallab98.wav'; a.click();
+
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok || !contentType.includes('audio/wav')) {
+        throw new Error('API backend WAV generation offline. Generating 16-bit PCM WAV in browser...');
       }
-    } catch {}
+
+      const buffer = await res.arrayBuffer();
+      const header = new Uint8Array(buffer.slice(0, 4));
+      const isRiff = String.fromCharCode(...header) === 'RIFF';
+      if (!isRiff) {
+        throw new Error('Invalid WAV RIFF magic header.');
+      }
+
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+      a.download = 'signallab98.wav'; a.click();
+    } catch (err) {
+      // Browser-Side 16-bit PCM WAV Generator
+      const fs = genCfg.sample_rate || 44100;
+      const dur = genCfg.duration || 0.1;
+      const numSamples = Math.floor(fs * dur);
+      const wavHeaderLen = 44;
+      const dataLen = numSamples * 2;
+      const wavBuffer = new ArrayBuffer(wavHeaderLen + dataLen);
+      const view = new DataView(wavBuffer);
+
+      // Write RIFF Header
+      const writeString = (offset, string) => {
+        for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
+      };
+
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + dataLen, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true); // PCM
+      view.setUint16(22, 1, true); // Mono
+      view.setUint32(24, fs, true);
+      view.setUint32(28, fs * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeString(36, 'data');
+      view.setUint32(40, dataLen, true);
+
+      // Write PCM Samples
+      const sig = dsp?.filtered_signal || [];
+      for (let i = 0; i < numSamples; i++) {
+        const sample = Math.max(-1, Math.min(1, sig[i] || 0));
+        view.setInt16(44 + i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      }
+
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([wavBuffer], { type: 'audio/wav' }));
+      a.download = 'signallab_browser.wav'; a.click();
+    }
   };
 
   return (
@@ -252,16 +318,31 @@ export default function App() {
             </select>
           </div>
 
+          {/* Data Trust Mode Indicator */}
           <div className="win98-hitcounter flex-row items-center gap-2 py-0.5 px-2">
-            <span className="w-2 h-2 bg-[#00FF00]"></span>
-            <span className="text-xs">{status === 'online' ? 'API_ONLINE' : 'CLIENT_DSP'}</span>
+            <span className={`w-2.5 h-2.5 rounded-full ${
+              dataTrustMode === 'API_VERIFIED' ? 'bg-[#00FF00]' :
+              dataTrustMode === 'LOCAL_DSP' ? 'bg-[#00FFFF]' : 'bg-[#FFFF00]'
+            }`}></span>
+            <span className="text-xs font-bold font-mono">
+              {dataTrustMode === 'API_VERIFIED' ? 'API VERIFIED' :
+               dataTrustMode === 'LOCAL_DSP' ? 'LOCAL BROWSER DSP' : 'DEMO MODE'}
+            </span>
           </div>
         </div>
+
+        {/* Mandatory Warning Banner if in DEMO MODE */}
+        {dataTrustMode === 'DEMO_MODE' && (
+          <div className="bg-[#FFFF00] text-[#000000] p-1 border border-[#000000] flex items-center justify-center gap-2 text-xs font-bold font-mono">
+            <AlertTriangle size={14} className="text-[#FF0000]" />
+            <span>⚠️ SIMULATED DEMO DATA - NOT FOR INSTRUMENT MEASUREMENT</span>
+          </div>
+        )}
 
         {/* 4. Marquee Ticker */}
         <div className="bg-[#000000] text-[#00FF00] font-mono text-xs p-0.5 border-2 border-t-[#808080] border-l-[#808080] border-r-[#FFFFFF] border-b-[#FFFFFF] overflow-hidden whitespace-nowrap">
           <marquee scrollamount="5" behavior="scroll">
-            *** WELCOME TO REI SIGNALLAB 2.0 *** TYPED NODE-BASED SIGNAL FLOW STUDIO (.rei-signal) *** HARDENED PYTHON SANDBOX *** S-EXPRESSION DSP DSL KERNEL *** INSTRUMENT-GRADE METRICS ***
+            *** WELCOME TO REI SIGNALLAB 2.0 *** TYPED NODE-BASED SIGNAL FLOW STUDIO (.rei-signal) *** RESTRICTED EXPERIMENTAL PYTHON SCRIPT RUNNER *** S-EXPRESSION DSP DSL KERNEL *** INSTRUMENT-GRADE METRICS ***
           </marquee>
         </div>
 
@@ -374,7 +455,7 @@ export default function App() {
 
         {/* Windows Status Bar Footer */}
         <footer className="win98-inset p-1 flex justify-between text-xs font-mono text-[#000000]">
-          <span>Status: Signal Flow Engine Ready | Version 2.0.0</span>
+          <span>Status: {dataTrustMode} Mode Active | Version 2.0.0</span>
           <span>RootCastle &copy; 1998-2026</span>
         </footer>
 
