@@ -198,6 +198,54 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
       for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
       for (let y = 0; y < H; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
 
+      // Dedicated 1X-10X Harmonic Order Spectrum Bar View
+      if (activeTab === 'harmonic') {
+        const harmonics = [
+          { order: '1X', amp: (parseFloat(telemetry.metrics.rms_vel_mm_s) * 0.7).toFixed(2), color: '#00FF00' },
+          { order: '2X', amp: (parseFloat(telemetry.metrics.rms_vel_mm_s) * 0.3).toFixed(2), color: '#FFFF00' },
+          { order: '3X', amp: (parseFloat(telemetry.metrics.rms_vel_mm_s) * 0.15).toFixed(2), color: '#FF9900' },
+          { order: '4X', amp: '0.35', color: '#00FFFF' },
+          { order: '5X', amp: '0.20', color: '#0088FF' },
+          { order: '6X', amp: '0.15', color: '#AA00FF' },
+          { order: '7X', amp: '0.10', color: '#FF00FF' },
+          { order: '8X', amp: '0.08', color: '#FF0055' },
+          { order: '9X', amp: '0.05', color: '#808080' },
+          { order: '10X', amp: '0.03', color: '#555555' }
+        ];
+
+        const barW = (W - 40) / harmonics.length;
+        const maxAmp = 4.0;
+
+        harmonics.forEach((h, idx) => {
+          const x = 30 + idx * barW;
+          const valNum = parseFloat(h.amp);
+          const barH = Math.min(H - 40, (valNum / maxAmp) * (H - 40));
+          const y = H - barH - 20;
+
+          // Draw Bar Gradient Fill
+          ctx.fillStyle = h.color;
+          ctx.fillRect(x + 4, y, barW - 8, barH);
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x + 4, y, barW - 8, barH);
+
+          // Draw Order Label & Value
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = 'bold 10px monospace';
+          ctx.fillText(h.order, x + barW / 2 - 8, H - 6);
+
+          ctx.fillStyle = '#00FF00';
+          ctx.font = 'bold 9px monospace';
+          ctx.fillText(`${h.amp}`, x + barW / 2 - 10, y - 4);
+        });
+
+        ctx.fillStyle = '#00FF00';
+        ctx.font = 'bold 11px monospace';
+        ctx.fillText('1X-10X Harmonic Order Spectrum Bar Analysis (mm/s RMS)', 8, 14);
+        return;
+      }
+
+      // Continuous FFT / Envelope Line Spectrum Render
       const freqs = activeTab === 'envelope' ? telemetry.envelope_freqs : telemetry.frequency;
       const mags = activeTab === 'envelope' ? telemetry.envelope_mag : telemetry.spectrum_magnitude;
       const maxF = freqs[freqs.length - 1] || 1000;
@@ -226,44 +274,6 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
       drawMarker(2 * shaftFreqHz, '2X', '#FFFF00');
       drawMarker(bpfo, 'BPFO', '#00FF00');
       drawMarker(bpfi, 'BPFI', '#FF5555');
-
-      // 3. Render 1X-10X Harmonic Bar Spectrum if activeTab === 'harmonic'
-      if (activeTab === 'harmonic') {
-        const harmonics = [
-          { order: '1X', amp: 3.2, color: '#00FF00' },
-          { order: '2X', amp: 1.4, color: '#FFFF00' },
-          { order: '3X', amp: 0.8, color: '#FF9900' },
-          { order: '4X', amp: 0.35, color: '#00FFFF' },
-          { order: '5X', amp: 0.2, color: '#0088FF' },
-          { order: '6X', amp: 0.15, color: '#AA00FF' },
-          { order: '7X', amp: 0.1, color: '#FF00FF' },
-          { order: '8X', amp: 0.08, color: '#FF0055' },
-          { order: '9X', amp: 0.05, color: '#808080' },
-          { order: '10X', amp: 0.03, color: '#555555' }
-        ];
-
-        const barW = (W - 40) / harmonics.length;
-        const maxAmp = 4.0;
-
-        harmonics.forEach((h, idx) => {
-          const x = 30 + idx * barW;
-          const barH = (h.amp / maxAmp) * (H - 40);
-          const y = H - barH - 20;
-
-          ctx.fillStyle = h.color;
-          ctx.fillRect(x + 4, y, barW - 8, barH);
-          ctx.strokeStyle = '#FFFFFF'; ctx.strokeRect(x + 4, y, barW - 8, barH);
-
-          ctx.fillStyle = '#FFFFFF'; ctx.font = 'bold 10px monospace';
-          ctx.fillText(h.order, x + barW / 2 - 8, H - 6);
-          ctx.fillStyle = '#00FF00'; ctx.font = '9px monospace';
-          ctx.fillText(`${h.amp.toFixed(1)}`, x + 6, y - 4);
-        });
-
-        ctx.fillStyle = '#00FF00'; ctx.font = 'bold 11px monospace';
-        ctx.fillText('1X-10X Harmonic Order Spectrum Bar Analysis (mm/s RMS)', 8, 14);
-        return;
-      }
 
       ctx.fillStyle = '#00FF00'; ctx.font = 'bold 11px monospace';
       ctx.fillText(activeTab === 'envelope' ? 'Hilbert Bearing Envelope Spectrum (Demodulated)' : 'Vibration FFT Spectrum (g RMS)', 8, 14);
