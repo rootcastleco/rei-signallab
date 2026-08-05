@@ -14,7 +14,7 @@
 [![React 18](https://img.shields.io/badge/React-18.2-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
-[Topics](#repository-topics) • [Overview](#overview) • [Features](#key-features) • [Matplotlib API](#matplotlib-backend-plot-rendering-api) • [Lisp Kernel](#machine-level-common-lisp-dsp-engine) • [API Spec](#api-endpoints) • [Quick Start](#quick-start)
+[Topics](#repository-topics) | [Overview](#overview) | [Features](#key-features) | [Matplotlib API](#matplotlib-backend-plot-rendering-api) | [Lisp Kernel](#machine-level-common-lisp-dsp-engine) | [API Spec](#api-endpoints-summary) | [Quick Start](#quick-start)
 
 </div>
 
@@ -26,14 +26,6 @@
 
 ---
 
-## Interface Overview
-
-![REI SignalLab Interface Overview](docs/images/signallab_hero.jpg)
-
-*REI SignalLab dual-stage laboratory interface displaying time-domain oscilloscope traces, frequency spectrum analysis, real-time telemetry, and technical sidebar controls.*
-
----
-
 ## Overview
 
 **REI SignalLab** is a laboratory suite for **Digital Signal Processing (DSP)**, spectral analysis, and interactive signal flow modeling. Drawing inspiration from **Mitov SignalLab**, it empowers engineers, researchers, and audio developers to synthesize, filter, measure, and analyze complex signal topologies in real time via an interactive Web UI or through REST APIs.
@@ -42,9 +34,37 @@ The application combines a high-speed **FastAPI & SciPy** computation core, a se
 
 ---
 
-## Key Features
+## Matplotlib Backend Plot Rendering API
 
-![CRT Oscilloscope Preview](docs/images/oscilloscope_preview.jpg)
+REI SignalLab includes a server-side Matplotlib rendering backend that generates publication-quality PNG plot images directly through HTTP endpoints. These are **real plots rendered by the running API**, not mockups.
+
+### Oscilloscope Time-Domain Plot
+
+Rendered via `GET /api/render/plot?waveform=sine&frequency=1000&amplitude=1.5&plot_type=oscilloscope`
+
+![Oscilloscope Time Domain Plot - 1kHz Sine Wave](docs/images/plot_oscilloscope.png)
+
+### FFT Spectrum Analyzer Plot
+
+Rendered via `GET /api/render/plot?waveform=sine&frequency=1000&amplitude=1.5&plot_type=spectrum`
+
+![FFT Spectrum Analyzer Plot - 1kHz Sine](docs/images/plot_spectrum.png)
+
+### AM Modulated Signal (Carrier 1kHz, Modulator 80Hz)
+
+Rendered via `POST /api/render/plot` with AM modulation and Hilbert envelope extraction enabled.
+
+![AM Modulated Signal with Hilbert Envelope](docs/images/plot_am_modulation.png)
+
+### FM Modulation Spectrum
+
+Rendered via `POST /api/render/plot` with FM modulation showing characteristic sideband structure.
+
+![FM Modulation Spectrum](docs/images/plot_fm_spectrum.png)
+
+---
+
+## Key Features
 
 ### 1. Dual-Channel CRT Oscilloscope & XY Lissajous Plot
 - **60 FPS Hardware Acceleration**: HTML5 Canvas engine rendering ultra-smooth signal trajectories with CRT phosphor persistence simulation.
@@ -52,62 +72,85 @@ The application combines a high-speed **FastAPI & SciPy** computation core, a se
   - **Time Domain**: CH1 Raw signal (Cyan) vs. CH2 Filtered signal (Emerald) with Hilbert Envelope overlay.
   - **XY Lissajous Plot**: Real-time 2D Phase Space Trajectory plot visualizing phase relationships between CH1 and CH2.
 - **Telemetry Controls**: Variable timebase (`0.2ms - 10ms/div`), voltage scaling (`0.1V - 5V/div`), trigger mode level indicator.
-- **Precision Crosshair Cursor**: Interactive coordinate readout measuring delta time ($\Delta T$) and peak voltage ($\Delta V$).
+- **Precision Crosshair Cursor**: Interactive coordinate readout measuring delta time and peak voltage.
 
 ### 2. Spectrum Analyzer & Peak Hold Envelope
-- **Real & Complex FFT**: High-resolution Fast Fourier Transforms ($256$ to $4096$ points).
-- **Peak Hold Max Envelope**: Yellow memory line tracking maximum FFT spectrum values over time.
+- **Real & Complex FFT**: High-resolution Fast Fourier Transforms (256 to 4096 points).
+- **Peak Hold Max Envelope**: Amber memory line tracking maximum FFT spectrum values over time.
 - **Dual Axis Scaling**: Switch seamlessly between **Linear (Hz)** and **Logarithmic** frequency axes.
 - **Studio Telemetry**: Instant calculation of Total Harmonic Distortion (**THD %**), Signal-to-Noise Ratio (**SNR dB**), **SINAD (dB)**, **SFDR (dB)**, and **ENOB (bits)**.
 
-### 3. Matplotlib Server-Side Plot Rendering API
-- **Programmatic Image Generation**: Allows developers to request high-resolution PNG signal plots directly from the API for automated reports, documentation, or CLI tools.
-- **Endpoints**: `POST /api/render/plot` and `GET /api/render/plot`.
+### 3. Signal Synthesis Engine
+- **Waveform Types**: Sine, Square, Triangle, Sawtooth, White Noise, Pink Noise, Chirp Sweep, ECG Cardiac, Pulse, Multitone.
+- **Modulation Engine**: AM (Amplitude Modulation), FM (Frequency Modulation), PM (Phase Modulation).
+- **Modulation formulas**:
+  - AM: $y(t) = A (1 + m \cdot \text{mod}(t)) \cdot \text{carrier}(t)$
+  - FM: $y(t) = A \cdot \sin(2\pi f_c t + m \cdot \sin(2\pi f_m t))$
+  - PM: $y(t) = A \cdot \sin(2\pi f_c t + m \cdot \cos(2\pi f_m t))$
 
-### 4. Machine-Level Common Lisp DSP Engine
-- **S-Expression DSP Compilation**: Low-level Common Lisp macros executed at hardware vector speeds.
-- **Pre-Compiled Macros**:
-  - `(biquad-filter-simd signal b0 b1 b2 a1 a2)`: Direct Form II Transposed IIR Biquad Filter.
-  - `(lisp-quantize-buffer signal bits)`: N-Bit Vector Signal Quantizer.
-  - `(apply-kaiser-window signal beta)`: Kaiser Window Tapering.
+### 4. Digital Filter Library
+- **IIR Filters**: Butterworth, Chebyshev Type I, Chebyshev Type II, Elliptic, Bessel.
+- **FIR Filters**: Windowed FIR with configurable window functions.
+- **Non-Linear**: Median filter.
+- **Filter Types**: LowPass, HighPass, BandPass, BandStop.
 
-### 5. AM / FM / PM Modulation Engine
-- **AM (Amplitude Modulation)**: $y(t) = A (1 + m \cdot \text{mod}(t)) \cdot \text{carrier}(t)$
-- **FM (Frequency Modulation)**: $y(t) = A \cdot \sin(2\pi f_c t + m \cdot \sin(2\pi f_m t))$
-- **PM (Phase Modulation)**: $y(t) = A \cdot \sin(2\pi f_c t + m \cdot \cos(2\pi f_m t))$
+### 5. Math & Quantizer Module
+- **Hilbert Transform Envelope Extraction**: Analytic signal envelope demodulation.
+- **Bit Depth Quantization**: Simulate ADC quantization at 4-bit, 8-bit, 16-bit precision.
+- **DC Removal**: Mean subtraction for AC-coupled analysis.
+
+### 6. 2D Spectrogram Waterfall
+- Rolling time-frequency surface with selectable colormaps: Viridis, Plasma, Thermal, Jet, Turbo.
+
+### 7. WebAudio DAC Synthesis
+- Browser-native real-time audio output using the Web Audio API with configurable waveform playback.
+
+### 8. Data Export
+- **CSV Export**: Download time-domain signal data as comma-separated values.
+- **WAV Export**: Generate 16-bit PCM WAV audio files from the processed signal chain.
 
 ---
 
-## Matplotlib Backend Plot Rendering API
+## Matplotlib API Usage
 
-REI SignalLab includes a server-side Matplotlib rendering backend that generates publication-quality PNG plot images directly through HTTP endpoints.
-
-### Quick Embed Example (cURL):
+### Quick Embed via cURL
 
 ```bash
-# Fetch Oscilloscope Plot PNG via GET
-curl -X GET "http://127.0.0.1:8000/api/render/plot?waveform=sine&frequency=440&amplitude=1.5&plot_type=oscilloscope" \
-     --output oscilloscope_plot.png
+# Oscilloscope PNG
+curl "http://127.0.0.1:8000/api/render/plot?waveform=sine&frequency=440&amplitude=1.5&plot_type=oscilloscope" \
+     --output oscilloscope.png
 
-# Fetch Spectrum Plot PNG via GET
-curl -X GET "http://127.0.0.1:8000/api/render/plot?waveform=sine&frequency=440&amplitude=1.5&plot_type=spectrum" \
-     --output spectrum_plot.png
+# Spectrum PNG
+curl "http://127.0.0.1:8000/api/render/plot?waveform=sine&frequency=440&amplitude=1.5&plot_type=spectrum" \
+     --output spectrum.png
 ```
 
-### Python API Integration Example:
+### Python Integration
 
 ```python
 import requests
 
-url = "http://127.0.0.1:8000/api/render/plot"
+# Simple GET request
+response = requests.get(
+    "http://127.0.0.1:8000/api/render/plot",
+    params={"waveform": "sine", "frequency": 1000, "amplitude": 2.0, "plot_type": "oscilloscope"}
+)
+with open("plot.png", "wb") as f:
+    f.write(response.content)
+
+# Advanced POST with filter and modulation
 payload = {
     "generator": {
         "waveform": "sine",
         "frequency": 1000.0,
         "amplitude": 2.0,
         "sample_rate": 44100,
-        "duration": 0.1
+        "duration": 0.1,
+        "modulation_type": "am",
+        "mod_frequency": 50,
+        "mod_index": 0.8
     },
+    "math": {"envelope_extraction": True},
     "filter": {
         "enabled": True,
         "filter_type": "lowpass",
@@ -118,8 +161,12 @@ payload = {
     "fft": {"n_fft": 2048, "window": "hanning", "log_scale": True}
 }
 
-response = requests.post(url, json=payload, params={"plot_type": "oscilloscope"})
-with open("signal_plot.png", "wb") as f:
+response = requests.post(
+    "http://127.0.0.1:8000/api/render/plot",
+    json=payload,
+    params={"plot_type": "oscilloscope"}
+)
+with open("am_signal.png", "wb") as f:
     f.write(response.content)
 ```
 
@@ -149,6 +196,14 @@ The Common Lisp DSP Engine (`backend/lisp/dsp_kernel.lisp`) processes unboxed `d
         (setf (aref out i) y)))))
 ```
 
+### Available S-Expression Macros
+
+| Macro | Description |
+| :--- | :--- |
+| `(biquad-filter-simd signal b0 b1 b2 a1 a2)` | Direct Form II Transposed IIR Biquad Filter |
+| `(lisp-quantize-buffer signal bits)` | N-Bit Vector Signal Quantizer |
+| `(apply-kaiser-window signal beta)` | Kaiser Window Tapering Function |
+
 ---
 
 ## Architecture & Dataflow
@@ -156,23 +211,23 @@ The Common Lisp DSP Engine (`backend/lisp/dsp_kernel.lisp`) processes unboxed `d
 ```
                              ┌─────────────────────────────────────────────────────────┐
                              │               REI SignalLab Web Interface               │
-                             │  (React 18 + Vite + Apple Glassmorphism + Canvas 2D)   │
+                             │  (React 18 + Vite + HTML5 Canvas + WebAudio DAC)       │
                              └────────────────────────────┬────────────────────────────┘
                                                           │
                                            HTTP REST / WebSocket Stream
                                                           │
-                                                          ▼
+                                                          v
                              ┌─────────────────────────────────────────────────────────┐
                              │                FastAPI DSP Engine Server                │
                              │     (SciPy + Matplotlib Plot Renderer + Lisp Engine)    │
                              └────────────────────────────┬────────────────────────────┘
                                                           │
                  ┌────────────────────────────────────────┼────────────────────────────────────────┐
-                 ▼                                        ▼                                        ▼
+                 v                                        v                                        v
    ┌───────────────────────────┐            ┌───────────────────────────┐            ┌───────────────────────────┐
    │    Signal Synthesis       │            │  Matplotlib PNG Plot API  │            │  Common Lisp SIMD Engine  │
-   │  • Sine / Square / Noise  │            │  • GET /api/render/plot   │            │  • (biquad-filter-simd)   │
-   │  • AM / FM / PM Modulation│            │  • POST /api/render/plot  │            │  • (lisp-quantize-buffer) │
+   │  Sine / Square / Noise    │            │  GET /api/render/plot     │            │  (biquad-filter-simd)     │
+   │  AM / FM / PM Modulation  │            │  POST /api/render/plot    │            │  (lisp-quantize-buffer)   │
    └───────────────────────────┘            └───────────────────────────┘            └───────────────────────────┘
 ```
 
@@ -180,20 +235,38 @@ The Common Lisp DSP Engine (`backend/lisp/dsp_kernel.lisp`) processes unboxed `d
 
 ## Mathematical & DSP Specifications
 
-### 1. Fast Fourier Transform (FFT)
+### Fast Fourier Transform (FFT)
+
 $$X[k] = \sum_{n=0}^{N-1} x[n] \cdot w[n] \cdot e^{-j \frac{2\pi}{N} k n}$$
 
-### 2. Total Harmonic Distortion (THD)
+### Total Harmonic Distortion (THD)
+
 $$\text{THD} (\%) = \frac{\sqrt{V_2^2 + V_3^2 + V_4^2 + V_5^2}}{V_1} \times 100\%$$
 
-### 3. Signal-to-Noise Ratio (SNR) & ENOB
+### Signal-to-Noise Ratio (SNR) & Effective Number of Bits (ENOB)
+
 $$\text{SNR}_{\text{dB}} = 10 \log_{10} \left( \frac{P_{\text{signal}}}{P_{\text{noise}}} \right), \quad \text{ENOB} = \frac{\text{SINAD}_{\text{dB}} - 1.76}{6.02}$$
+
+---
+
+## API Endpoints Summary
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/` | Health check and feature list |
+| `POST` | `/api/process` | Full signal processing (Time, FFT, Metrics, Spectrogram) |
+| `POST` | `/api/render/plot` | Matplotlib PNG plot from JSON body (`?plot_type=oscilloscope` or `spectrum`) |
+| `GET` | `/api/render/plot` | URL query parameter Matplotlib PNG plot renderer |
+| `POST` | `/api/lisp/process` | Execute Common Lisp S-expression DSP macros on signal vectors |
+| `POST` | `/api/export/wav` | Generate 16-bit PCM WAV downloadable audio buffer |
+| `WS` | `/ws/stream` | Real-time WebSocket streaming buffer endpoint |
 
 ---
 
 ## Quick Start
 
 ### Prerequisites
+
 - Python 3.11+
 - Node.js 18+ and npm
 
@@ -203,8 +276,18 @@ $$\text{SNR}_{\text{dB}} = 10 \log_{10} \left( \frac{P_{\text{signal}}}{P_{\text
 git clone https://github.com/rootcastleco/rei-signallab.git
 cd rei-signallab/backend
 pip install -r requirements.txt
-$env:PYTHONPATH="backend"; py -m pytest backend/tests
-py -m uvicorn app.main:app --reload --port 8000
+```
+
+Run tests:
+
+```bash
+PYTHONPATH=backend pytest backend/tests
+```
+
+Start the server:
+
+```bash
+PYTHONPATH=backend uvicorn app.main:app --port 8000
 ```
 
 ### 2. Frontend Web UI Setup
@@ -215,20 +298,15 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open [http://localhost:3000](http://localhost:3000).
 
----
+### 3. Generate Matplotlib Documentation Plots
 
-## API Endpoints Summary
+```bash
+python generate_docs_plots.py
+```
 
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `POST` | `/api/process` | Full signal processing calculation (Time, FFT, Metrics, Spectrogram) |
-| `POST` | `/api/render/plot` | Renders high-res Matplotlib PNG plot from JSON body payload |
-| `GET` | `/api/render/plot` | URL-based query parameter Matplotlib PNG plot renderer |
-| `POST` | `/api/lisp/process` | Executes Common Lisp S-expression DSP macros on signal vectors |
-| `POST` | `/api/export/wav` | Generates 16-bit PCM WAV downloadable audio buffer |
-| `WS` | `/ws/stream` | Real-time WebSocket streaming buffer endpoint |
+This script hits the running API and saves real PNG plots to `docs/images/`.
 
 ---
 
