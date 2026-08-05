@@ -38,13 +38,16 @@ The application combines a high-speed **FastAPI & SciPy** computation core, a **
 
 ## Application Screenshots
 
-### 1. Dual CRT Oscilloscope & Spectrum Analyzer Workspace
-![REI SignalLab 2.0 Workspace](docs/images/signallab_ui_overview.png)
+### 1. REI SignalLab 2.0 Application Main Interface
+![REI SignalLab 2.0 GUI Screenshot](docs/images/signallab_real_app_screenshot.png)
 
-### 2. Typed Signal Flow Studio (.rei-signal) Visual Canvas
+### 2. Dual CRT Oscilloscope & Spectrum Analyzer Workspace
+![REI SignalLab 2.0 Workspace Overview](docs/images/signallab_ui_overview.png)
+
+### 3. Typed Signal Flow Studio (.rei-signal) Visual Canvas
 ![Signal Flow Studio Canvas](docs/images/node_flow_studio.png)
 
-### 3. Hardened Python DSP Code Sandbox & Matplotlib Plot Result
+### 4. Hardened Python DSP Code Sandbox & Matplotlib Plot Result
 ![Python DSP Code Sandbox](docs/images/python_lab_preview.png)
 
 ---
