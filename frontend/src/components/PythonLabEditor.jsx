@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Code, Terminal, Image, Download, Trash2, PlusCircle, Sparkles } from 'lucide-react';
+import { Play, Code, Terminal, Image, Download, Trash2, PlusCircle } from 'lucide-react';
 
 const PYTHON_PRESETS = [
   {
@@ -158,7 +158,6 @@ export default function PythonLabEditor({ onPythonProcessed }) {
   const [isExecuting, setIsExecuting] = useState(false);
 
   const lineCount = code.split('\n').length;
-  const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1).join('\n');
 
   const runPythonScript = async () => {
     setIsExecuting(true);
@@ -283,25 +282,19 @@ export default function PythonLabEditor({ onPythonProcessed }) {
       {/* Editor & Output Columns */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
 
-        {/* Python Code Notepad Editor with Line Numbers */}
+        {/* Python Code Notepad Editor */}
         <div className="flex flex-col gap-1">
           <div className="flex justify-between text-xs font-mono font-bold text-[#0000FF]">
             <span>python_script.py [Notepad]</span>
-            <span>Lines: {lineCount}</span>
+            <span>Total Lines: {lineCount}</span>
           </div>
 
-          <div className="win98-inset flex bg-[#FFFFCC] font-mono text-xs overflow-hidden">
-            {/* Line Number Gutter */}
-            <pre className="bg-[#E8E8A8] text-[#808080] p-2 pr-3 text-right select-none border-r border-[#808080] font-mono leading-relaxed">
-              {lineNumbers}
-            </pre>
-
-            {/* Textarea */}
+          <div className="win98-inset bg-[#FFFFCC] font-mono text-xs overflow-hidden">
             <textarea
               value={code}
               onChange={(e) => setCode(e.target.value)}
               rows={16}
-              className="w-full bg-transparent text-[#000000] font-mono text-xs p-2 leading-relaxed resize-none focus:outline-none border-none"
+              className="w-full bg-[#FFFFCC] text-[#000000] font-mono text-xs p-2 leading-relaxed resize-none focus:outline-none border-none"
             />
           </div>
         </div>
