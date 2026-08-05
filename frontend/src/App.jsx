@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio } from 'lucide-react';
+import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, Terminal } from 'lucide-react';
 
 import Oscilloscope from './components/Oscilloscope';
 import SpectrumAnalyzer from './components/SpectrumAnalyzer';
@@ -8,6 +8,7 @@ import ControlPanel from './components/ControlPanel';
 import AudioEngine from './components/AudioEngine';
 import SignalMetrics from './components/SignalMetrics';
 import LispPluginEditor from './components/LispPluginEditor';
+import PythonLabEditor from './components/PythonLabEditor';
 
 const PRESETS = {
   SINE_440: {
@@ -107,7 +108,7 @@ export default function App() {
   }, []);
 
   const fetchDSP = useCallback(async () => {
-    if (uploadedFileName) return; // Retain uploaded file signal until preset changed
+    if (uploadedFileName) return;
     try {
       const res = await fetch('/api/process', {
         method: 'POST',
@@ -198,7 +199,7 @@ export default function App() {
       />
 
       {/* ── Header ──────────────────────────── */}
-      <header className="panel" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justify: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+      <header className="panel" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-sm)', background: 'var(--bg-card)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Activity size={16} color="var(--ch1)" />
@@ -206,9 +207,9 @@ export default function App() {
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 8 }}>
               REI SignalLab
-              <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, padding: '2px 6px', borderRadius: 4, background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--ch1)' }}>v1.4</span>
+              <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, padding: '2px 6px', borderRadius: 4, background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--ch1)' }}>v1.5</span>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-2)' }}>Digital Signal Processing & Signal Upload Engine</div>
+            <div style={{ fontSize: 11, color: 'var(--text-2)' }}>Digital Signal Processing, Python Code Sandbox & Signal Upload Engine</div>
           </div>
         </div>
 
@@ -251,10 +252,13 @@ export default function App() {
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
 
           {/* View tabs */}
-          <div style={{ display: 'flex', alignItems: 'center', justify: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div className="tab-bar">
               <button onClick={() => setActiveView('dual')} className={`tab-btn ${activeView === 'dual' ? 'active' : ''}`}>
                 <Activity size={13} /> Scope + FFT
+              </button>
+              <button onClick={() => setActiveView('python')} className={`tab-btn ${activeView === 'python' ? 'active' : ''}`}>
+                <Code size={13} color="#38BDF8" /> Python Lab
               </button>
               <button onClick={() => setActiveView('waterfall')} className={`tab-btn ${activeView === 'waterfall' ? 'active' : ''}`}>
                 <Waves size={13} /> Waterfall
@@ -272,6 +276,10 @@ export default function App() {
               <Oscilloscope timeData={dsp?.time} rawSignal={dsp?.raw_signal} filteredSignal={dsp?.filtered_signal} envelopeSignal={dsp?.envelope_signal} sampleRate={genCfg.sample_rate} />
               <SpectrumAnalyzer frequencyData={dsp?.frequency} magnitudeData={dsp?.spectrum_magnitude} metrics={dsp?.metrics} />
             </div>
+          )}
+
+          {activeView === 'python' && (
+            <PythonLabEditor onPythonProcessed={(pythonData) => setDsp(pythonData)} />
           )}
 
           {activeView === 'waterfall' && (
@@ -294,7 +302,7 @@ export default function App() {
       {/* ── Footer ──────────────────────────── */}
       <footer className="panel" style={{ padding: '8px 14px', display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)' }}>
         <span>REI SignalLab -- RootCastle 2026</span>
-        <span>FastAPI + SciPy + Matplotlib | React 18 + Canvas</span>
+        <span>FastAPI + SciPy + Matplotlib + Python Sandbox | React 18 + Canvas</span>
       </footer>
     </div>
   );

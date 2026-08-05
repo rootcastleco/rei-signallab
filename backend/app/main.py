@@ -23,14 +23,15 @@ from .schemas import (
 )
 from .dsp_engine import DSPEngine
 from .lisp_engine import LispDSPEngine
+from .python_engine import PythonDSPEngine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("signallab_api")
 
 app = FastAPI(
     title="REI SignalLab API with Matplotlib & Common Lisp Engine",
-    description="High-Performance Digital Signal Processing, Server-Side Matplotlib Plot Rendering, Signal File Upload, and Common Lisp Plugin Engine",
-    version="1.4.0"
+    description="High-Performance Digital Signal Processing, Python Script Sandbox, Server-Side Matplotlib Plot Rendering, Signal File Upload, and Common Lisp Plugin Engine",
+    version="1.5.0"
 )
 
 app.add_middleware(
@@ -46,6 +47,11 @@ class LispProcessingRequest(BaseModel):
     lisp_code: str = Field(default="(biquad-filter-simd signal 0.1 0.2 0.1 -0.5 0.25)")
     generator: SignalGeneratorConfig
     fft: FFTConfig = Field(default_factory=FFTConfig)
+
+
+class PythonScriptRequest(BaseModel):
+    python_code: str = Field(..., description="Python DSP simulation script code")
+
 
 
 @app.get("/")
@@ -266,6 +272,36 @@ def render_plot_get(
         return Response(content=png_bytes, media_type="image/png")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Matplotlib GET rendering failed: {str(e)}")
+
+
+@app.post("/api/python/execute")
+def process_python_script(req: PythonScriptRequest):
+    """
+    POST Endpoint: Executes user-written Python DSP scripts for custom signal simulation experiments,
+    returns captured stdout console logs, Matplotlib base64 plot image, and processed signal vectors.
+    """
+    try:
+        result = PythonDSPEngine.execute_python_script(req.python_code)
+        raw_sig = np.array(result.get("raw_signal", []), dtype=np.float64)
+        fs = 44100
+
+        if len(raw_sig) > 0:
+            fft_cfg = FFTConfig()
+            freqs, mag_linear, phase = DSPEngine.compute_fft(raw_sig, fs, fft_cfg.model_copy(update={"log_scale": False}))
+            _, mag_db, _ = DSPEngine.compute_fft(raw_sig, fs, fft_cfg)
+            metrics = DSPEngine.compute_metrics(raw_sig, freqs, mag_linear, fs)
+            spec_freqs, spec_times, spec_matrix = DSPEngine.compute_spectrogram(raw_sig, fs)
+            result["metrics"] = metrics.model_dump()
+            result["frequency"] = freqs.tolist()
+            result["spectrum_magnitude"] = mag_db.tolist()
+            result["spectrogram_matrix"] = spec_matrix.tolist()
+            result["spectrogram_times"] = spec_times.tolist()
+            result["spectrogram_frequencies"] = spec_freqs.tolist()
+
+        return result
+    except Exception as e:
+        logger.error(f"Error executing Python script: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Python execution failed: {str(e)}")
 
 
 @app.post("/api/lisp/process", response_model=SignalProcessingResponse)

@@ -160,4 +160,23 @@ def test_signal_file_upload():
     assert len(data_json["raw_signal"]) == 5
 
 
+def test_python_script_execution():
+    script = """
+import numpy as np
+t = np.linspace(0, 0.1, 4410)
+raw_signal = np.sin(2 * np.pi * 440 * t)
+print('Generated 440Hz sine wave in Python!')
+plt.plot(t[:200], raw_signal[:200], color='cyan')
+plt.title('Python DSP Simulation')
+"""
+    response = client.post("/api/python/execute", json={"python_code": script})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert "Generated 440Hz sine wave" in data["logs"][0]
+    assert len(data["raw_signal"]) == 4410
+    assert data["plot_base64"] is not None
+
+
+
 
