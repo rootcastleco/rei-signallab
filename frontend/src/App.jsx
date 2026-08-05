@@ -1,15 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Activity,
-  BarChart2,
-  Waves,
-  Download,
-  FileSpreadsheet,
-  Cpu,
-  Play,
-  Volume2,
-  VolumeX
-} from 'lucide-react';
+import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu } from 'lucide-react';
 
 import Oscilloscope from './components/Oscilloscope';
 import SpectrumAnalyzer from './components/SpectrumAnalyzer';
@@ -21,28 +11,28 @@ import LispPluginEditor from './components/LispPluginEditor';
 
 const PRESETS = {
   SINE_440: {
-    name: 'Sine Wave (440Hz Audio Pitch)',
+    name: 'Sine 440 Hz',
     generator: { waveform: 'sine', frequency: 440, amplitude: 1.0, phase: 0, offset: 0, noise_level: 0, sample_rate: 44100, duration: 0.1, modulation_type: 'none' },
     math: { envelope_extraction: false, bit_depth: null, dc_remove: false, gain_db: 0 },
     filter: { enabled: false, filter_type: 'lowpass', filter_design: 'butterworth', cutoff: 1000, order: 4 },
     fft: { n_fft: 1024, window: 'hanning', log_scale: true }
   },
   AM_RADIO: {
-    name: 'AM Modulated Radio Signal',
+    name: 'AM Modulation',
     generator: { waveform: 'sine', frequency: 1000, amplitude: 1.5, phase: 0, offset: 0, noise_level: 0.05, sample_rate: 44100, duration: 0.1, modulation_type: 'am', mod_frequency: 50, mod_index: 0.8 },
     math: { envelope_extraction: true, bit_depth: null, dc_remove: false, gain_db: 0 },
     filter: { enabled: false, filter_type: 'lowpass', filter_design: 'butterworth', cutoff: 2000, order: 4 },
     fft: { n_fft: 2048, window: 'hanning', log_scale: true }
   },
   FILTERED_NOISE: {
-    name: 'Filtered Noise (LowPass 800Hz)',
+    name: 'Filtered Noise',
     generator: { waveform: 'noise', frequency: 1000, amplitude: 1.0, phase: 0, offset: 0, noise_level: 0, sample_rate: 44100, duration: 0.1, modulation_type: 'none' },
     math: { envelope_extraction: false, bit_depth: null, dc_remove: false, gain_db: 0 },
     filter: { enabled: true, filter_type: 'lowpass', filter_design: 'butterworth', cutoff: 800, order: 4 },
     fft: { n_fft: 1024, window: 'hamming', log_scale: true }
   },
   ECG_HEART: {
-    name: 'ECG Heartbeat Telemetry',
+    name: 'ECG Telemetry',
     generator: { waveform: 'ecg', frequency: 1.2, amplitude: 2.0, phase: 0, offset: 0, noise_level: 0.05, sample_rate: 44100, duration: 2.0, modulation_type: 'none' },
     math: { envelope_extraction: false, bit_depth: null, dc_remove: true, gain_db: 0 },
     filter: { enabled: true, filter_type: 'lowpass', filter_design: 'fir_window', cutoff: 40, order: 4 },
@@ -51,91 +41,60 @@ const PRESETS = {
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('scope');
+  const [activeView, setActiveView] = useState('dual');
   const [presetKey, setPresetKey] = useState('SINE_440');
 
-  const [generatorConfig, setGeneratorConfig] = useState(PRESETS.SINE_440.generator);
-  const [mathConfig, setMathConfig] = useState(PRESETS.SINE_440.math);
-  const [filterConfig, setFilterConfig] = useState(PRESETS.SINE_440.filter);
-  const [fftConfig, setFFTConfig] = useState(PRESETS.SINE_440.fft);
+  const [genCfg, setGenCfg] = useState(PRESETS.SINE_440.generator);
+  const [mathCfg, setMathCfg] = useState(PRESETS.SINE_440.math);
+  const [filterCfg, setFilterCfg] = useState(PRESETS.SINE_440.filter);
+  const [fftCfg, setFFTCfg] = useState(PRESETS.SINE_440.fft);
 
-  const [dspData, setDspData] = useState(null);
-  const [backendStatus, setBackendStatus] = useState('connecting');
+  const [dsp, setDsp] = useState(null);
+  const [status, setStatus] = useState('connecting');
 
-  const computeClientFallbackDSP = useCallback((gen, math, flt, fft) => {
+  const fallback = useCallback((gen, math) => {
     const fs = gen.sample_rate || 44100;
     const dur = gen.duration || 0.1;
     const N = Math.floor(fs * dur);
-    const t = [];
-    const raw = [];
-    const filtered = [];
+    const t = [], raw = [], filtered = [];
     const envelope = math.envelope_extraction ? [] : null;
 
-    const freq = gen.frequency;
-    const amp = gen.amplitude;
-    const phaseRad = (gen.phase * Math.PI) / 180.0;
+    const freq = gen.frequency, amp = gen.amplitude;
+    const phaseRad = (gen.phase * Math.PI) / 180;
     const modType = gen.modulation_type || 'none';
     const modFreq = gen.mod_frequency || 20;
     const modIdx = gen.mod_index || 0.5;
 
     for (let i = 0; i < N; i++) {
-      const timeVal = i / fs;
-      t.push(timeVal);
-      let y = 0;
-
-      const carrier = Math.sin(2 * Math.PI * freq * timeVal + phaseRad);
-      const modSig = Math.sin(2 * Math.PI * modFreq * timeVal);
-
-      if (modType === 'am') {
-        y = amp * (1.0 + modIdx * modSig) * carrier;
-      } else if (modType === 'fm') {
-        y = amp * Math.sin(2 * Math.PI * freq * timeVal + modIdx * modSig + phaseRad);
-      } else {
-        y = amp * carrier;
-      }
-
+      const tv = i / fs;
+      t.push(tv);
+      const carrier = Math.sin(2 * Math.PI * freq * tv + phaseRad);
+      const modSig = Math.sin(2 * Math.PI * modFreq * tv);
+      let y = modType === 'am' ? amp * (1 + modIdx * modSig) * carrier
+            : modType === 'fm' ? amp * Math.sin(2 * Math.PI * freq * tv + modIdx * modSig + phaseRad)
+            : amp * carrier;
       y += gen.offset;
-      if (gen.noise_level > 0) {
-        y += (Math.random() * 2 - 1) * gen.noise_level;
-      }
-
-      raw.push(y);
-      filtered.push(y);
-      if (envelope) {
-        envelope.push(Math.abs(y));
-      }
+      if (gen.noise_level > 0) y += (Math.random() * 2 - 1) * gen.noise_level;
+      raw.push(y); filtered.push(y);
+      if (envelope) envelope.push(Math.abs(y));
     }
 
-    const nFft = Math.min(fft.n_fft || 1024, N);
-    const freqs = [];
-    const magDb = [];
-    const df = fs / nFft;
-
+    const nFft = Math.min(1024, N), df = fs / nFft;
+    const freqs = [], magDb = [];
     for (let k = 0; k < nFft / 2; k++) {
       const f = k * df;
       freqs.push(f);
-      const isNearPeak = Math.abs(f - freq) < df * 2;
-      const valV = isNearPeak ? amp * 0.7 : 0.001 + Math.random() * 0.002;
-      magDb.push(20 * Math.log10(valV));
+      const v = Math.abs(f - freq) < df * 2 ? amp * 0.7 : 0.001 + Math.random() * 0.002;
+      magDb.push(20 * Math.log10(v));
     }
 
     return {
-      time: t,
-      raw_signal: raw,
-      filtered_signal: filtered,
-      envelope_signal: envelope,
-      frequency: freqs,
-      spectrum_magnitude: magDb,
+      time: t, raw_signal: raw, filtered_signal: filtered, envelope_signal: envelope,
+      frequency: freqs, spectrum_magnitude: magDb,
       metrics: {
-        rms: (amp / Math.sqrt(2)).toFixed(3),
-        peak_to_peak: (amp * 2).toFixed(3),
-        dc_mean: gen.offset,
-        thd_percent: 0.15,
-        snr_db: 46.2,
-        sinad_db: 44.8,
-        sfdr_db: 58.4,
-        enob_bits: 7.15,
-        fundamental_freq: freq,
+        rms: (amp / Math.sqrt(2)).toFixed(3), peak_to_peak: (amp * 2).toFixed(3),
+        dc_mean: gen.offset, thd_percent: 0.15, snr_db: 46.2, sinad_db: 44.8,
+        sfdr_db: 58.4, enob_bits: 7.15, fundamental_freq: freq,
         peak_magnitude_db: (20 * Math.log10(amp)).toFixed(1)
       },
       spectrogram_matrix: [magDb, magDb, magDb],
@@ -149,224 +108,137 @@ export default function App() {
       const res = await fetch('/api/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          generator: generatorConfig,
-          math: mathConfig,
-          filter: filterConfig,
-          fft: fftConfig
-        })
+        body: JSON.stringify({ generator: genCfg, math: mathCfg, filter: filterCfg, fft: fftCfg })
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        setDspData(data);
-        setBackendStatus('online');
-      } else {
-        throw new Error('Backend process error');
-      }
-    } catch (err) {
-      const fallbackData = computeClientFallbackDSP(generatorConfig, mathConfig, filterConfig, fftConfig);
-      setDspData(fallbackData);
-      setBackendStatus('fallback');
+      if (res.ok) { setDsp(await res.json()); setStatus('online'); }
+      else throw new Error();
+    } catch {
+      setDsp(fallback(genCfg, mathCfg));
+      setStatus('fallback');
     }
-  }, [generatorConfig, mathConfig, filterConfig, fftConfig, computeClientFallbackDSP]);
+  }, [genCfg, mathCfg, filterCfg, fftCfg, fallback]);
 
-  useEffect(() => {
-    fetchDSP();
-  }, [fetchDSP]);
+  useEffect(() => { fetchDSP(); }, [fetchDSP]);
 
-  const handlePresetSelect = (key) => {
+  const loadPreset = (key) => {
     setPresetKey(key);
     const p = PRESETS[key];
-    if (p) {
-      setGeneratorConfig(p.generator);
-      setMathConfig(p.math);
-      setFilterConfig(p.filter);
-      setFFTConfig(p.fft);
-    }
+    if (p) { setGenCfg(p.generator); setMathCfg(p.math); setFilterCfg(p.filter); setFFTCfg(p.fft); }
   };
 
   const exportCSV = () => {
-    if (!dspData) return;
-    let csv = 'Time(s),RawSignal(V),FilteredSignal(V)\n';
-    for (let i = 0; i < dspData.time.length; i++) {
-      csv += `${dspData.time[i]},${dspData.raw_signal[i]},${dspData.filtered_signal[i]}\n`;
-    }
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
+    if (!dsp) return;
+    let csv = 'Time(s),Raw(V),Filtered(V)\n';
+    for (let i = 0; i < dsp.time.length; i++) csv += `${dsp.time[i]},${dsp.raw_signal[i]},${dsp.filtered_signal[i]}\n`;
     const a = document.createElement('a');
-    a.href = url;
-    a.download = 'signallab_data.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'signallab.csv'; a.click();
   };
 
   const exportWAV = async () => {
     try {
       const res = await fetch('/api/export/wav', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          generator: generatorConfig,
-          math: mathConfig,
-          filter: filterConfig,
-          fft: fftConfig
-        })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generator: genCfg, math: mathCfg, filter: filterCfg, fft: fftCfg })
       });
       if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = 'signallab_export.wav';
-        a.click();
-        URL.revokeObjectURL(url);
-      } else {
-        alert('Backend WAV export unavailable');
+        a.href = URL.createObjectURL(await res.blob());
+        a.download = 'signallab.wav'; a.click();
       }
-    } catch (e) {
-      alert('WAV export error: ' + e.message);
-    }
+    } catch {}
   };
 
   return (
-    <div className="min-h-screen p-4 max-w-[1500px] mx-auto flex flex-col gap-4">
-      {/* 1. TOP STREAMLINED HEADER */}
-      <header className="studio-panel px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded bg-[#21262D] border border-[#30363D] flex items-center justify-center">
-            <Activity className="w-4 h-4 text-sky-400" />
+    <div style={{ minHeight: '100vh', padding: '16px', maxWidth: 1520, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+      {/* ── Header ──────────────────────────── */}
+      <header className="panel" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-sm)', background: 'var(--bg-card)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Activity size={16} color="var(--ch1)" />
           </div>
           <div>
-            <h1 className="text-sm font-semibold tracking-tight text-[#F0F6FC] flex items-center gap-2">
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 8 }}>
               REI SignalLab
-            </h1>
-            <p className="text-[11px] text-[#8B949E]">Digital Signal Processing Suite</p>
+              <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, padding: '2px 6px', borderRadius: 4, background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--ch1)' }}>v1.3</span>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-2)' }}>Digital Signal Processing & Common Lisp Engine</div>
           </div>
         </div>
 
-        {/* Streamlined Preset & Export Controls */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 bg-[#0D1117] border border-[#30363D] rounded px-2.5 py-1 text-xs">
-            <span className="text-[#8B949E] font-mono">Preset:</span>
-            <select
-              value={presetKey}
-              onChange={(e) => handlePresetSelect(e.target.value)}
-              className="bg-transparent text-xs text-[#F0F6FC] font-mono focus:outline-none cursor-pointer"
-            >
-              {Object.entries(PRESETS).map(([key, p]) => (
-                <option key={key} value={key} className="bg-[#161B22] text-[#F0F6FC]">
-                  {p.name}
-                </option>
-              ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div className="panel-inset" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)' }}>PRESET</span>
+            <select value={presetKey} onChange={e => loadPreset(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-1)', fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}>
+              {Object.entries(PRESETS).map(([k, p]) => <option key={k} value={k} style={{ background: 'var(--bg-panel)' }}>{p.name}</option>)}
             </select>
           </div>
 
-          <button onClick={exportCSV} className="btn-secondary text-xs flex items-center gap-1">
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" /> CSV
-          </button>
+          <button className="btn" onClick={exportCSV}><FileSpreadsheet size={13} color="var(--ch2)" /> CSV</button>
+          <button className="btn" onClick={exportWAV}><Download size={13} color="var(--ch1)" /> WAV</button>
 
-          <button onClick={exportWAV} className="btn-secondary text-xs flex items-center gap-1">
-            <Download className="w-3.5 h-3.5 text-sky-400" /> WAV
-          </button>
+          <div className="panel-inset" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-2)' }}>
+            <span className={`status-dot ${status === 'online' ? 'online' : 'fallback'}`}></span>
+            {status === 'online' ? 'API ONLINE' : 'CLIENT DSP'}
+          </div>
         </div>
       </header>
 
-      {/* 2. MAIN 2-COLUMN LAYOUT */}
-      <div className="flex flex-col lg:flex-row gap-4 items-start">
-        
-        {/* LEFT COLUMN: DISPLAY STAGE & TELEMETRY */}
-        <div className="flex-1 flex flex-col gap-3 w-full">
-          
-          {/* Streamlined Tab Navigation */}
-          <div className="flex items-center justify-between border-b border-[#30363D] pb-1.5">
-            <div className="studio-tabs">
-              <button
-                onClick={() => setActiveTab('scope')}
-                className={`studio-tab-item flex items-center gap-1.5 ${activeTab === 'scope' ? 'active' : ''}`}
-              >
-                <Activity className="w-3.5 h-3.5 text-sky-400" /> Oscilloscope
-              </button>
+      {/* ── Metrics ─────────────────────────── */}
+      <SignalMetrics metrics={dsp?.metrics} />
 
-              <button
-                onClick={() => setActiveTab('spectrum')}
-                className={`studio-tab-item flex items-center gap-1.5 ${activeTab === 'spectrum' ? 'active' : ''}`}
-              >
-                <BarChart2 className="w-3.5 h-3.5 text-purple-400" /> Spectrum Analyzer
-              </button>
+      {/* ── Main Layout ────────────────────── */}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
-              <button
-                onClick={() => setActiveTab('waterfall')}
-                className={`studio-tab-item flex items-center gap-1.5 ${activeTab === 'waterfall' ? 'active' : ''}`}
-              >
-                <Waves className="w-3.5 h-3.5 text-emerald-400" /> Waterfall
-              </button>
+        {/* Left: Display Stage */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-              <button
-                onClick={() => setActiveTab('lisp')}
-                className={`studio-tab-item flex items-center gap-1.5 ${activeTab === 'lisp' ? 'active' : ''}`}
-              >
-                <Cpu className="w-3.5 h-3.5 text-amber-400" /> Lisp Plugin
+          {/* View tabs */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div className="tab-bar">
+              <button onClick={() => setActiveView('dual')} className={`tab-btn ${activeView === 'dual' ? 'active' : ''}`}>
+                <Activity size={13} /> Scope + FFT
+              </button>
+              <button onClick={() => setActiveView('waterfall')} className={`tab-btn ${activeView === 'waterfall' ? 'active' : ''}`}>
+                <Waves size={13} /> Waterfall
+              </button>
+              <button onClick={() => setActiveView('lisp')} className={`tab-btn ${activeView === 'lisp' ? 'active' : ''}`}>
+                <Cpu size={13} /> Lisp Plugin
               </button>
             </div>
-
-            <AudioEngine generatorConfig={generatorConfig} filterConfig={filterConfig} />
+            <AudioEngine generatorConfig={genCfg} filterConfig={filterCfg} />
           </div>
 
-          {/* Display Canvases */}
-          {activeTab === 'scope' && (
-            <Oscilloscope
-              timeData={dspData?.time}
-              rawSignal={dspData?.raw_signal}
-              filteredSignal={dspData?.filtered_signal}
-              envelopeSignal={dspData?.envelope_signal}
-              sampleRate={generatorConfig.sample_rate}
-            />
+          {/* Display Panes */}
+          {activeView === 'dual' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <Oscilloscope timeData={dsp?.time} rawSignal={dsp?.raw_signal} filteredSignal={dsp?.filtered_signal} envelopeSignal={dsp?.envelope_signal} sampleRate={genCfg.sample_rate} />
+              <SpectrumAnalyzer frequencyData={dsp?.frequency} magnitudeData={dsp?.spectrum_magnitude} metrics={dsp?.metrics} />
+            </div>
           )}
 
-          {activeTab === 'spectrum' && (
-            <SpectrumAnalyzer
-              frequencyData={dspData?.frequency}
-              magnitudeData={dspData?.spectrum_magnitude}
-              metrics={dspData?.metrics}
-            />
+          {activeView === 'waterfall' && (
+            <WaterfallSpectrogram spectrogramMatrix={dsp?.spectrogram_matrix} frequencies={dsp?.spectrogram_frequencies} times={dsp?.spectrogram_times} />
           )}
 
-          {activeTab === 'waterfall' && (
-            <WaterfallSpectrogram
-              spectrogramMatrix={dspData?.spectrogram_matrix}
-              frequencies={dspData?.spectrogram_frequencies}
-              times={dspData?.spectrogram_times}
-            />
+          {activeView === 'lisp' && (
+            <LispPluginEditor generatorConfig={genCfg} fftConfig={fftCfg} onLispProcessed={d => setDsp(d)} />
           )}
-
-          {activeTab === 'lisp' && (
-            <LispPluginEditor
-              generatorConfig={generatorConfig}
-              fftConfig={fftConfig}
-              onLispProcessed={(lispData) => setDspData(lispData)}
-            />
-          )}
-
-          {/* Telemetry Telemetry Bar directly under Canvas */}
-          <SignalMetrics metrics={dspData?.metrics} />
         </div>
 
-        {/* RIGHT COLUMN: STREAMLINED CONTROL SIDEBAR */}
+        {/* Right: Controls */}
         <ControlPanel
-          generatorConfig={generatorConfig}
-          setGeneratorConfig={setGeneratorConfig}
-          mathConfig={mathConfig}
-          setMathConfig={setMathConfig}
-          filterConfig={filterConfig}
-          setFilterConfig={setFilterConfig}
+          generatorConfig={genCfg} setGeneratorConfig={setGenCfg}
+          mathConfig={mathCfg} setMathConfig={setMathCfg}
+          filterConfig={filterCfg} setFilterConfig={setFilterCfg}
         />
       </div>
 
-      {/* FOOTER */}
-      <footer className="studio-panel px-3 py-2 flex items-center justify-between text-xs text-[#8B949E] font-mono">
-        <span>REI SignalLab &copy; 2026 - Streamlined DSP Instrumentation Suite</span>
-        <span>Python FastAPI + SciPy | React 18</span>
+      {/* ── Footer ──────────────────────────── */}
+      <footer className="panel" style={{ padding: '8px 14px', display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)' }}>
+        <span>REI SignalLab -- RootCastle 2026</span>
+        <span>FastAPI + SciPy + Matplotlib | React 18 + Canvas</span>
       </footer>
     </div>
   );

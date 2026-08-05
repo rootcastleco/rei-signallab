@@ -1,183 +1,337 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg-main: #0D1117;
-  --bg-panel: #161B22;
-  --bg-card: #21262D;
-  --border-color: #30363D;
-  --border-subtle: #21262D;
-  
-  --color-ch1: #38BDF8;      /* Precise Sky Blue */
-  --color-ch2: #34D399;      /* Crisp Mint Green */
-  --color-fft: #A78BFA;      /* Clear Violet */
-  --color-peak: #FBBF24;     /* Crisp Amber */
-  --color-alert: #F87171;    /* Sharp Red */
-  
-  --text-primary: #F0F6FC;
-  --text-secondary: #8B949E;
-  --text-muted: #6E7681;
-  
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  --bg-main: #08090c;
+  --bg-panel: #111318;
+  --bg-card: #181c24;
+  --bg-inset: #0c0e12;
+  --border-color: #232830;
+  --border-focus: #3b82f6;
+
+  --ch1: #3b82f6;
+  --ch2: #10b981;
+  --fft: #8b5cf6;
+  --peak: #f59e0b;
+  --alert: #ef4444;
+
+  --text-1: #eaf0f6;
+  --text-2: #7c8594;
+  --text-3: #4b5260;
+
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+
+  --radius: 8px;
+  --radius-sm: 5px;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 13px; }
 
 body {
-  background-color: var(--bg-main);
-  color: var(--text-primary);
+  background: var(--bg-main);
+  color: var(--text-1);
   font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Professional Panel Layouts - No AI Slop Blur/Glow */
-.studio-panel {
-  background-color: var(--bg-panel);
+/* ── Panels ──────────────────────────────────── */
+.panel {
+  background: var(--bg-panel);
   border: 1px solid var(--border-color);
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius);
 }
 
-.studio-card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 4px;
-}
-
-.studio-card:hover {
-  border-color: #484F58;
-}
-
-/* Crisp Segmented Tabs */
-.studio-tabs {
-  display: inline-flex;
-  background-color: #010409;
-  border-radius: 6px;
-  padding: 2px;
+.panel-inset {
+  background: var(--bg-inset);
   border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
 }
 
-.studio-tab-item {
-  padding: 4px 12px;
-  font-size: 12px;
+/* ── Metric Cards ────────────────────────────── */
+.metric-card {
+  background: linear-gradient(135deg, #111318 0%, #161a22 100%);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px; height: 100%;
+  border-radius: 3px 0 0 3px;
+}
+
+.metric-card.blue::before { background: var(--ch1); }
+.metric-card.green::before { background: var(--ch2); }
+.metric-card.violet::before { background: var(--fft); }
+.metric-card.amber::before { background: var(--peak); }
+.metric-card.red::before { background: var(--alert); }
+.metric-card.pink::before { background: #ec4899; }
+.metric-card.indigo::before { background: #6366f1; }
+.metric-card.cyan::before { background: #06b6d4; }
+
+.metric-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
   font-weight: 500;
-  color: var(--text-secondary);
-  border-radius: 4px;
-  border: none;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.metric-value {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-1);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.metric-unit {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-3);
+  margin-left: 3px;
+}
+
+/* ── Tabs ────────────────────────────────────── */
+.tab-bar {
+  display: flex;
+  gap: 1px;
+  background: #0c0e12;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 3px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 6px 14px;
+  font-size: 11.5px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  color: var(--text-2);
   background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background-color 0.1s ease, color 0.1s ease;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
-.studio-tab-item:hover {
-  color: var(--text-primary);
-  background-color: rgba(255, 255, 255, 0.04);
+.tab-btn:hover { color: var(--text-1); background: rgba(255,255,255,0.03); }
+
+.tab-btn.active {
+  color: #fff;
+  background: var(--bg-card);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
 }
 
-.studio-tab-item.active {
-  background-color: #21262D;
-  color: #FFFFFF;
+/* ── Canvas Display ──────────────────────────── */
+.scope-display {
+  background: #000;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.scope-display canvas {
+  display: block;
+  width: 100%;
+  cursor: crosshair;
+}
+
+.scope-overlay {
+  position: absolute;
+  top: 8px; right: 10px;
+  display: flex; gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: rgba(8,9,12,0.85);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+}
+
+/* ── Form Controls ───────────────────────────── */
+select, input[type="number"], input[type="text"] {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-color);
+  color: var(--text-1);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+select:focus, input:focus { border-color: var(--border-focus); }
+
+select:disabled, input:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Range sliders */
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 20px;
+  background: transparent;
+}
+input[type="range"]:focus { outline: none; }
+
+input[type="range"]::-webkit-slider-runnable-track {
+  width: 100%; height: 4px;
+  background: var(--border-color);
+  border-radius: 2px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 16px; width: 16px;
+  border-radius: 50%;
+  background: var(--text-1);
+  border: 2px solid var(--bg-main);
+  margin-top: -6px;
+  cursor: grab;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.06);
+  transition: box-shadow 0.15s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 5px rgba(59,130,246,0.2);
+}
+input[type="range"]::-webkit-slider-thumb:active { cursor: grabbing; }
+
+/* Checkboxes */
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  width: 36px; height: 20px;
+  background: var(--border-color);
+  border-radius: 10px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border: none;
+  outline: none;
+}
+input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--text-2);
+  transition: all 0.15s ease;
+}
+input[type="checkbox"]:checked {
+  background: var(--ch1);
+}
+input[type="checkbox"]:checked::after {
+  left: 19px;
+  background: #fff;
+}
+
+/* ── Buttons ─────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  font-size: 11.5px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+}
+.btn:hover { color: var(--text-1); background: #1e222c; border-color: #3a3f4a; }
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--ch1);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.btn-primary:hover { background: #2563eb; }
+
+/* ── Control Group ───────────────────────────── */
+.ctrl-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ctrl-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ctrl-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ctrl-value {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
   font-weight: 600;
 }
 
-/* Clean Range Controls */
-input[type=range] {
-  -webkit-appearance: none;
-  width: 100%;
-  background: transparent;
-}
-
-input[type=range]:focus {
-  outline: none;
-}
-
-input[type=range]::-webkit-slider-runnable-track {
-  width: 100%;
-  height: 4px;
-  cursor: pointer;
-  background: #30363D;
-  border-radius: 2px;
-}
-
-input[type=range]::-webkit-slider-thumb {
-  height: 14px;
-  width: 14px;
+/* ── Status dot ──────────────────────────────── */
+.status-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
   border-radius: 50%;
-  background: #C9D1D9;
-  border: 1px solid #30363D;
-  cursor: pointer;
-  -webkit-appearance: none;
-  margin-top: -5px;
+  animation: pulse-dot 2s infinite;
+}
+.status-dot.online { background: var(--ch2); }
+.status-dot.fallback { background: var(--peak); }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
-input[type=range]::-webkit-slider-thumb:hover {
-  background: #FFFFFF;
-}
-
-/* Oscilloscope Canvas - Clean Black Technical CRT */
-.oscilloscope-canvas {
-  background-color: #000000;
-  border-radius: 4px;
-  border: 1px solid var(--border-color);
-}
-
-.telemetry-font {
-  font-family: var(--font-mono);
-  font-weight: 500;
-}
-
-/* Standard Technical Inputs */
-select, input[type=number], input[type=text] {
-  background-color: #0D1117;
-  border: 1px solid #30363D;
-  color: #C9D1D9;
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-}
-
-select:focus, input[type=number]:focus, input[type=text]:focus {
-  outline: none;
-  border-color: #58A6FF;
-}
-
-/* Technical Buttons */
-.btn-primary {
-  background-color: #238636;
-  color: #FFFFFF;
-  border: 1px solid rgba(240, 246, 252, 0.1);
-  border-radius: 5px;
-  padding: 4px 12px;
-  font-weight: 500;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background-color 0.1s ease;
-}
-
-.btn-primary:hover {
-  background-color: #2EA043;
-}
-
-.btn-secondary {
-  background-color: #21262D;
-  color: #C9D1D9;
-  border: 1px solid #30363D;
-  border-radius: 5px;
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.1s ease;
-}
-
-.btn-secondary:hover {
-  background-color: #30363D;
-  color: #FFFFFF;
-}
+/* ── Scrollbar ───────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
