@@ -619,5 +619,103 @@ def _init_registry():
         documentation="Time-frequency 2D waterfall spectrogram display sink."
     ))
 
+    # 11. Vibration Analysis Workbench Nodes
+    NodeRegistry.register(NodeSpec(
+        type="vibration.sensor_calibration",
+        category="Vibration Analysis",
+        display_name="IEPE & MEMS Sensor Calibration",
+        aliases=["SLVibCalibrate"],
+        input_ports=[PortSpec(name="raw_input", data_type=CanonicalPortType.SIGNAL_REAL64, description="Raw ADC Voltage Signal")],
+        output_ports=[PortSpec(name="calibrated_signal", data_type=CanonicalPortType.SIGNAL_REAL64, description="Calibrated Engineering Unit Signal")],
+        parameter_schema={"sensitivity": {"type": "number", "default": 100.0}, "bias": {"type": "number", "default": 0.0}, "target_unit": {"type": "string", "enum": ["g", "m/s²", "mm/s"], "default": "g"}},
+        documentation="Calibrates IEPE accelerometers, MEMS, and proximity probes."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="vibration.acceleration_to_velocity",
+        category="Vibration Analysis",
+        display_name="Acceleration to Velocity Integration",
+        aliases=["SLAccToVel"],
+        input_ports=[PortSpec(name="acceleration_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Acceleration Signal (m/s² or g)")],
+        output_ports=[PortSpec(name="velocity_out", data_type=CanonicalPortType.SIGNAL_REAL64, description="Velocity Signal (mm/s RMS)")],
+        parameter_schema={"high_pass_cutoff_hz": {"type": "number", "default": 10.0}},
+        documentation="Frequency-domain high-pass regularized integration without low-frequency drift."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="vibration.velocity_to_displacement",
+        category="Vibration Analysis",
+        display_name="Velocity to Displacement Integration",
+        aliases=["SLVelToDisp"],
+        input_ports=[PortSpec(name="velocity_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Velocity Signal (mm/s)")],
+        output_ports=[PortSpec(name="displacement_out", data_type=CanonicalPortType.SIGNAL_REAL64, description="Displacement Signal (μm)")],
+        parameter_schema={"high_pass_cutoff_hz": {"type": "number", "default": 10.0}},
+        documentation="Frequency-domain integration from velocity to displacement."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="vibration.bearing_frequencies",
+        category="Vibration Analysis",
+        display_name="Bearing Defect Frequency Evaluator (BPFO/BPFI)",
+        aliases=["SLBearingFreqs"],
+        output_ports=[
+            PortSpec(name="bearing_freqs", data_type=CanonicalPortType.STRUCTURED_FRAME, description="Bearing Frequencies Object"),
+            PortSpec(name="bpfo_hz", data_type=CanonicalPortType.SCALAR_REAL64, description="Ball Pass Freq Outer Race (Hz)"),
+            PortSpec(name="bpfi_hz", data_type=CanonicalPortType.SCALAR_REAL64, description="Ball Pass Freq Inner Race (Hz)"),
+            PortSpec(name="bsf_hz", data_type=CanonicalPortType.SCALAR_REAL64, description="Ball Spin Freq (Hz)"),
+            PortSpec(name="ftf_hz", data_type=CanonicalPortType.SCALAR_REAL64, description="Fundamental Train Freq (Hz)")
+        ],
+        parameter_schema={
+            "rpm": {"type": "number", "default": 1480.0},
+            "num_elements": {"type": "integer", "default": 8},
+            "ball_diameter_mm": {"type": "number", "default": 7.9},
+            "pitch_diameter_mm": {"type": "number", "default": 38.5},
+            "contact_angle_deg": {"type": "number", "default": 0.0}
+        },
+        documentation="Calculates BPFO, BPFI, BSF, and FTF kinematic bearing defect frequencies."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="vibration.envelope_analysis",
+        category="Vibration Analysis",
+        display_name="Hilbert Bearing Envelope Demodulation",
+        aliases=["SLEnvelopeAnalysis"],
+        input_ports=[PortSpec(name="signal_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Vibration Signal")],
+        output_ports=[PortSpec(name="envelope_spectrum", data_type=CanonicalPortType.SPECTRUM_FRAME, description="Demodulated Envelope Spectrum")],
+        parameter_schema={"low_cutoff_hz": {"type": "number", "default": 500.0}, "high_cutoff_hz": {"type": "number", "default": 5000.0}},
+        documentation="Bandpass filtering + Hilbert envelope spectrum for early bearing fault detection."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="vibration.balance.single_plane",
+        category="Vibration Analysis",
+        display_name="Single-Plane Vector Rotor Balancing",
+        aliases=["SLSinglePlaneBalance"],
+        output_ports=[
+            PortSpec(name="balance_result", data_type=CanonicalPortType.STRUCTURED_FRAME, description="Full Balance Solution"),
+            PortSpec(name="correction_mass", data_type=CanonicalPortType.SCALAR_REAL64, description="Correction Mass (g)"),
+            PortSpec(name="correction_angle", data_type=CanonicalPortType.SCALAR_REAL64, description="Correction Angle (Degrees)")
+        ],
+        parameter_schema={
+            "initial_vibration_amp": {"type": "number", "default": 4.8},
+            "initial_vibration_phase_deg": {"type": "number", "default": 72.0},
+            "trial_weight_mass": {"type": "number", "default": 10.0},
+            "trial_weight_angle_deg": {"type": "number", "default": 0.0},
+            "trial_vibration_amp": {"type": "number", "default": 7.2},
+            "trial_vibration_phase_deg": {"type": "number", "default": 128.0}
+        },
+        documentation="Solves single-plane influence coefficient complex vector balance equation."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="vibration.fault_classifier",
+        category="Vibration Analysis",
+        display_name="Rule-Based Machine Fault Classifier",
+        aliases=["SLFaultClassifier"],
+        output_ports=[PortSpec(name="diagnostics", data_type=CanonicalPortType.STRUCTURED_FRAME, description="Diagnostic Evidence List")],
+        parameter_schema={"rpm": {"type": "number", "default": 1480.0}, "rms_vel_mm_s": {"type": "number", "default": 3.5}},
+        documentation="Evaluates spectral evidence for Unbalance, Misalignment, Looseness, and Bearing Defect."
+    ))
+
 # Execute Registry Initialization
 _init_registry()

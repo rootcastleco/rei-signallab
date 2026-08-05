@@ -10,6 +10,11 @@ from .meters import RMSMeterNode
 from .timing import WatchdogNode, FrequencyMeterNode, CounterNode
 from .transforms import FFTNode, InverseRealFFTNode, DFTNode, DCTNode, GoertzelNode, HaarNode
 from .visualization import ScopeNode, WaterfallNode
+from .vibration import (
+    SensorCalibrationNode, AccelerationToVelocityNode, VelocityToDisplacementNode,
+    OverallRMSNode, PeakNode, CrestFactorNode, KurtosisNode,
+    BearingFrequenciesNode, EnvelopeAnalysisNode, SinglePlaneBalancingNode, FaultClassifierNode
+)
 
 class NodeFactory:
     """
@@ -76,7 +81,20 @@ class NodeFactory:
 
         # Visualization
         "visualization.scope": ScopeNode,
-        "visualization.waterfall": WaterfallNode
+        "visualization.waterfall": WaterfallNode,
+
+        # Vibration Analysis
+        "vibration.sensor_calibration": SensorCalibrationNode,
+        "vibration.acceleration_to_velocity": AccelerationToVelocityNode,
+        "vibration.velocity_to_displacement": VelocityToDisplacementNode,
+        "vibration.overall_rms": OverallRMSNode,
+        "vibration.peak": PeakNode,
+        "vibration.crest_factor": CrestFactorNode,
+        "vibration.kurtosis": KurtosisNode,
+        "vibration.bearing_frequencies": BearingFrequenciesNode,
+        "vibration.envelope_analysis": EnvelopeAnalysisNode,
+        "vibration.balance.single_plane": SinglePlaneBalancingNode,
+        "vibration.fault_classifier": FaultClassifierNode
     }
 
     @classmethod

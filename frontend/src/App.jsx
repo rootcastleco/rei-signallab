@@ -11,6 +11,7 @@ import SignalMetrics from './components/SignalMetrics';
 import LispPluginEditor from './components/LispPluginEditor';
 import PythonLabEditor from './components/PythonLabEditor';
 import NodeGraphStudio from './components/NodeGraphStudio';
+import VibrationWorkbench from './components/VibrationWorkbench';
 
 const PRESETS = {
   SINE_440: {
@@ -288,6 +289,12 @@ export default function App() {
         <div className="win98-outset p-1.5 flex items-center justify-between flex-wrap gap-2 bg-[#C0C0C0] border-b-2 border-[#000000]">
           <div className="win98-tabs flex-wrap">
             <button
+              onClick={() => setActiveView('vibration')}
+              className={`win98-tab font-bold text-xs flex items-center gap-1 ${activeView === 'vibration' ? 'active font-black text-[#000080] bg-[#FFFFCC]' : ''}`}
+            >
+              <Gauge size={14} className="text-[#0000FF]" /> ⚙️ Vibration Workbench
+            </button>
+            <button
               onClick={() => setActiveView('dual')}
               className={`win98-tab font-bold text-xs ${activeView === 'dual' ? 'active font-black text-[#000080]' : ''}`}
             >
@@ -411,6 +418,10 @@ export default function App() {
                   metrics={dsp?.metrics}
                 />
               </div>
+            )}
+
+            {activeView === 'vibration' && (
+              <VibrationWorkbench onVibrationProcessed={(vibData) => setDsp(vibData)} />
             )}
 
             {activeView === 'graph' && (
