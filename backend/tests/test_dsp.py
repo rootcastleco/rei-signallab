@@ -137,3 +137,27 @@ def test_matplotlib_plot_rendering():
     assert len(response_spectrum.content) > 1000
 
 
+def test_signal_file_upload():
+    # Test uploading CSV signal file
+    csv_content = "time,val\n0.0,0.5\n0.01,1.0\n0.02,-0.5\n0.03,-1.0\n"
+    response = client.post(
+        "/api/upload/signal",
+        files={"file": ("test_signal.csv", csv_content, "text/csv")}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["raw_signal"]) == 4
+    assert data["raw_signal"][1] == 1.0
+
+    # Test uploading JSON signal file
+    json_content = '{"signal": [0.1, 0.5, 0.9, 0.2, -0.4], "sample_rate": 1000}'
+    response_json = client.post(
+        "/api/upload/signal",
+        files={"file": ("signal.json", json_content, "application/json")}
+    )
+    assert response_json.status_code == 200
+    data_json = response_json.json()
+    assert len(data_json["raw_signal"]) == 5
+
+
+

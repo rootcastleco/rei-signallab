@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Query
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Query, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel, Field
@@ -8,6 +8,7 @@ import wave
 import asyncio
 import json
 import logging
+import csv
 
 from .schemas import (
     SignalProcessingRequest,
@@ -15,6 +16,7 @@ from .schemas import (
     FFTConfig,
     SignalGeneratorConfig,
     FilterConfig,
+    MathQuantizerConfig,
     WaveformType,
     FilterType,
     FilterDesign
@@ -27,8 +29,8 @@ logger = logging.getLogger("signallab_api")
 
 app = FastAPI(
     title="REI SignalLab API with Matplotlib & Common Lisp Engine",
-    description="High-Performance Digital Signal Processing, Server-Side Matplotlib Plot Rendering, and Common Lisp Plugin Engine",
-    version="1.3.0"
+    description="High-Performance Digital Signal Processing, Server-Side Matplotlib Plot Rendering, Signal File Upload, and Common Lisp Plugin Engine",
+    version="1.4.0"
 )
 
 app.add_middleware(
@@ -51,8 +53,9 @@ def get_root():
     return {
         "app": "REI SignalLab DSP Engine",
         "status": "online",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "features": [
+            "Signal File Upload (.wav, .csv, .txt, .json)",
             "Matplotlib Server-Side PNG/SVG API Plot Renderer",
             "Machine-Level Common Lisp DSP Plugin Engine",
             "Signal Generation (Sine, Square, Triangle, Noise, Pink Noise, Chirp, ECG, Multitone, Pulse)",
@@ -97,6 +100,113 @@ def process_signal(req: SignalProcessingRequest):
     except Exception as e:
         logger.error(f"Error in process_signal: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"DSP computation error: {str(e)}")
+
+
+@app.post("/api/upload/signal", response_model=SignalProcessingResponse)
+async def upload_signal_file(
+    file: UploadFile = File(...),
+    filter_enabled: bool = Form(False),
+    filter_cutoff: float = Form(1000.0),
+    filter_type: str = Form("lowpass"),
+    envelope_extraction: bool = Form(False)
+):
+    """
+    POST Endpoint: Uploads a signal file (.wav, .csv, .txt, .json), parses audio/data vectors,
+    runs DSP filter/math/FFT pipeline, and returns full laboratory signal metrics response.
+    """
+    try:
+        content = await file.read()
+        filename = file.filename.lower()
+        fs = 44100
+        raw_sig = np.array([], dtype=np.float64)
+
+        if filename.endswith(".wav"):
+            with wave.open(io.BytesIO(content), "rb") as wf:
+                fs = wf.getframerate()
+                n_frames = wf.getnframes()
+                audio_bytes = wf.readframes(n_frames)
+                sampwidth = wf.getsampwidth()
+                
+                if sampwidth == 2:
+                    raw_sig = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float64) / 32768.0
+                elif sampwidth == 1:
+                    raw_sig = (np.frombuffer(audio_bytes, dtype=np.uint8).astype(np.float64) - 128.0) / 128.0
+                elif sampwidth == 4:
+                    raw_sig = np.frombuffer(audio_bytes, dtype=np.int32).astype(np.float64) / 2147483648.0
+                else:
+                    raw_sig = np.frombuffer(audio_bytes, dtype=np.float32).astype(np.float64)
+
+                if wf.getnchannels() > 1:
+                    raw_sig = raw_sig.reshape(-1, wf.getnchannels()).mean(axis=1)
+
+        elif filename.endswith(".json"):
+            data = json.loads(content.decode("utf-8"))
+            if isinstance(data, list):
+                raw_sig = np.array(data, dtype=np.float64)
+            elif isinstance(data, dict):
+                raw_sig = np.array(data.get("signal", data.get("data", [])), dtype=np.float64)
+                fs = int(data.get("sample_rate", 44100))
+
+        elif filename.endswith(".csv") or filename.endswith(".txt"):
+            text = content.decode("utf-8", errors="ignore")
+            lines = text.strip().splitlines()
+            values = []
+            for line in lines:
+                parts = [p.strip() for p in line.replace("\t", ",").split(",") if p.strip()]
+                if not parts or parts[0].isalpha():
+                    continue
+                try:
+                    val = float(parts[-1])
+                    values.append(val)
+                except ValueError:
+                    continue
+            raw_sig = np.array(values, dtype=np.float64)
+
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file format. Please upload .wav, .csv, .txt, or .json")
+
+        if len(raw_sig) == 0:
+            raise HTTPException(status_code=400, detail="No numerical signal data found in uploaded file")
+
+        # Limit long signals for fast web rendering
+        if len(raw_sig) > 16384:
+            raw_sig = raw_sig[:16384]
+
+        num_samples = len(raw_sig)
+        t = np.linspace(0, num_samples / fs, num_samples, endpoint=False)
+
+        math_cfg = MathQuantizerConfig(envelope_extraction=envelope_extraction)
+        flt_cfg = FilterConfig(enabled=filter_enabled, cutoff=filter_cutoff, filter_type=FilterType(filter_type))
+        fft_cfg = FFTConfig()
+
+        quantized_sig, envelope_sig = DSPEngine.apply_math_quantizer(raw_sig, math_cfg)
+        filtered_sig = DSPEngine.apply_filter(quantized_sig, fs, flt_cfg)
+
+        fft_config_linear = fft_cfg.model_copy(update={"log_scale": False})
+        freqs, mag_linear, phase = DSPEngine.compute_fft(filtered_sig, fs, fft_config_linear)
+        _, mag_db, _ = DSPEngine.compute_fft(filtered_sig, fs, fft_cfg)
+
+        metrics = DSPEngine.compute_metrics(filtered_sig, freqs, mag_linear, fs)
+        spec_freqs, spec_times, spec_matrix = DSPEngine.compute_spectrogram(filtered_sig, fs)
+
+        return SignalProcessingResponse(
+            time=t.tolist(),
+            raw_signal=raw_sig.tolist(),
+            filtered_signal=filtered_sig.tolist(),
+            envelope_signal=envelope_sig.tolist() if envelope_sig is not None else None,
+            frequency=freqs.tolist(),
+            spectrum_magnitude=mag_db.tolist(),
+            spectrum_phase=phase.tolist(),
+            metrics=metrics,
+            spectrogram_matrix=spec_matrix.tolist(),
+            spectrogram_times=spec_times.tolist(),
+            spectrogram_frequencies=spec_freqs.tolist()
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing uploaded signal file: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"File parsing error: {str(e)}")
 
 
 @app.post("/api/render/plot")

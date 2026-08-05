@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio } from 'lucide-react';
 
 import Oscilloscope from './components/Oscilloscope';
 import SpectrumAnalyzer from './components/SpectrumAnalyzer';
@@ -51,6 +51,9 @@ export default function App() {
 
   const [dsp, setDsp] = useState(null);
   const [status, setStatus] = useState('connecting');
+  const [uploadedFileName, setUploadedFileName] = useState(null);
+
+  const fileInputRef = useRef(null);
 
   const fallback = useCallback((gen, math) => {
     const fs = gen.sample_rate || 44100;
@@ -104,6 +107,7 @@ export default function App() {
   }, []);
 
   const fetchDSP = useCallback(async () => {
+    if (uploadedFileName) return; // Retain uploaded file signal until preset changed
     try {
       const res = await fetch('/api/process', {
         method: 'POST',
@@ -116,11 +120,43 @@ export default function App() {
       setDsp(fallback(genCfg, mathCfg));
       setStatus('fallback');
     }
-  }, [genCfg, mathCfg, filterCfg, fftCfg, fallback]);
+  }, [genCfg, mathCfg, filterCfg, fftCfg, fallback, uploadedFileName]);
 
   useEffect(() => { fetchDSP(); }, [fetchDSP]);
 
+  const handleFileUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('filter_enabled', filterCfg.enabled);
+    formData.append('filter_cutoff', filterCfg.cutoff);
+    formData.append('filter_type', filterCfg.filter_type);
+    formData.append('envelope_extraction', mathCfg.envelope_extraction);
+
+    try {
+      const res = await fetch('/api/upload/signal', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setDsp(data);
+        setUploadedFileName(file.name);
+        setStatus('online');
+      } else {
+        const err = await res.json();
+        alert('File Upload Failed: ' + (err.detail || 'Invalid signal file'));
+      }
+    } catch (e) {
+      alert('File upload error: ' + e.message);
+    }
+  };
+
   const loadPreset = (key) => {
+    setUploadedFileName(null);
     setPresetKey(key);
     const p = PRESETS[key];
     if (p) { setGenCfg(p.generator); setMathCfg(p.math); setFilterCfg(p.filter); setFFTCfg(p.fft); }
@@ -152,8 +188,17 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', padding: '16px', maxWidth: 1520, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        accept=".wav,.csv,.txt,.json"
+        style={{ display: 'none' }}
+      />
+
       {/* ── Header ──────────────────────────── */}
-      <header className="panel" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+      <header className="panel" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justify: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-sm)', background: 'var(--bg-card)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Activity size={16} color="var(--ch1)" />
@@ -161,19 +206,30 @@ export default function App() {
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 8 }}>
               REI SignalLab
-              <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, padding: '2px 6px', borderRadius: 4, background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--ch1)' }}>v1.3</span>
+              <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, padding: '2px 6px', borderRadius: 4, background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--ch1)' }}>v1.4</span>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-2)' }}>Digital Signal Processing & Common Lisp Engine</div>
+            <div style={{ fontSize: 11, color: 'var(--text-2)' }}>Digital Signal Processing & Signal Upload Engine</div>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {uploadedFileName && (
+            <div className="panel-inset" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', color: '#10b981', fontSize: 11, fontFamily: 'var(--font-mono)' }}>
+              <FileAudio size={13} /> {uploadedFileName}
+            </div>
+          )}
+
           <div className="panel-inset" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px' }}>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)' }}>PRESET</span>
-            <select value={presetKey} onChange={e => loadPreset(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-1)', fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}>
+            <select value={uploadedFileName ? 'upload' : presetKey} onChange={e => { if (e.target.value !== 'upload') loadPreset(e.target.value); }} style={{ background: 'transparent', border: 'none', color: 'var(--text-1)', fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}>
+              {uploadedFileName && <option value="upload" style={{ background: 'var(--bg-panel)' }}>File: {uploadedFileName}</option>}
               {Object.entries(PRESETS).map(([k, p]) => <option key={k} value={k} style={{ background: 'var(--bg-panel)' }}>{p.name}</option>)}
             </select>
           </div>
+
+          <button className="btn" onClick={() => fileInputRef.current?.click()} style={{ color: 'var(--ch1)', borderColor: 'rgba(59,130,246,0.3)' }}>
+            <Upload size={13} /> Upload File (.wav, .csv)
+          </button>
 
           <button className="btn" onClick={exportCSV}><FileSpreadsheet size={13} color="var(--ch2)" /> CSV</button>
           <button className="btn" onClick={exportWAV}><Download size={13} color="var(--ch1)" /> WAV</button>
@@ -195,7 +251,7 @@ export default function App() {
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
 
           {/* View tabs */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justify: 'space-between' }}>
             <div className="tab-bar">
               <button onClick={() => setActiveView('dual')} className={`tab-btn ${activeView === 'dual' ? 'active' : ''}`}>
                 <Activity size={13} /> Scope + FFT

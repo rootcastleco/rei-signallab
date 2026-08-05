@@ -295,12 +295,20 @@ class DSPEngine:
 
     @staticmethod
     def compute_spectrogram(signal_in: np.ndarray, fs: int, nperseg: int = 256) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        nperseg = min(nperseg, len(signal_in))
-        if nperseg < 16:
-            nperseg = 16
-        freqs, times, Sxx = scipy_signal.spectrogram(signal_in, fs=fs, nperseg=nperseg, noverlap=nperseg // 2)
+        N = len(signal_in)
+        if N < 16:
+            signal_in = np.pad(signal_in, (0, 16 - N), mode='constant')
+            N = len(signal_in)
+
+        nperseg = min(nperseg, N)
+        noverlap = max(0, nperseg // 2)
+        if noverlap >= nperseg:
+            noverlap = max(0, nperseg - 1)
+
+        freqs, times, Sxx = scipy_signal.spectrogram(signal_in, fs=fs, nperseg=nperseg, noverlap=noverlap)
         Sxx_db = 10.0 * np.log10(np.maximum(Sxx, 1e-12))
         return freqs, times, Sxx_db
+
 
     # =========================================================================
     # MATPLOTLIB BACKEND PNG PLOT RENDERING METHODS FOR API USERS
