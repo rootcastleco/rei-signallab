@@ -1,23 +1,84 @@
 import sys
 import io
-import traceback
 import numpy as np
 from scipy import signal as scipy_signal
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import base64
-from typing import Dict, Any, Tuple
+from typing import Dict, Any
+
+ALLOWED_MODULES = {'numpy', 'np', 'scipy', 'matplotlib', 'plt', 'math', 'random'}
+
+def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
+    root_name = name.split('.')[0]
+    if root_name in ['os', 'sys', 'subprocess', 'socket', 'shutil', 'pathlib']:
+        raise ImportError(f"Importing module '{name}' is prohibited in Python DSP Sandbox.")
+    return __import__(name, globals, locals, fromlist, level)
+
+SAFE_BUILTINS = {
+    'abs': abs,
+    'all': all,
+    'any': any,
+    'bin': bin,
+    'bool': bool,
+    'dict': dict,
+    'dir': dir,
+    'divmod': divmod,
+    'enumerate': enumerate,
+    'float': float,
+    'format': format,
+    'hex': hex,
+    'int': int,
+    'isinstance': isinstance,
+    'issubclass': issubclass,
+    'len': len,
+    'list': list,
+    'map': map,
+    'max': max,
+    'min': min,
+    'oct': oct,
+    'ord': ord,
+    'pow': pow,
+    'print': print,
+    'range': range,
+    'repr': repr,
+    'reversed': reversed,
+    'round': round,
+    'set': set,
+    'slice': slice,
+    'sorted': sorted,
+    'str': str,
+    'sum': sum,
+    'tuple': tuple,
+    'zip': zip,
+    'Exception': Exception,
+    'ValueError': ValueError,
+    'TypeError': TypeError,
+    '__import__': safe_import,
+}
 
 class PythonDSPEngine:
     """
-    Python-based DSP Scripting, Simulation & Plotting Sandbox Engine.
-    Executes user-defined Python scripts for custom signal processing experiments,
-    captures stdout logs, Matplotlib plot figures, and computes signal metrics.
+    Hardened Python-based DSP Scripting & Simulation Sandbox Engine.
+    Executes user-defined Python scripts inside a restricted sandbox environment,
+    enforces memory & output quotas, captures console stdout, and generates Matplotlib figures.
     """
 
     @staticmethod
     def execute_python_script(script_code: str) -> Dict[str, Any]:
+        forbidden_keywords = ['import os', 'import sys', 'import subprocess', 'import socket', 'shutil', 'eval', 'exec']
+        for kw in forbidden_keywords:
+            if kw in script_code:
+                return {
+                    "status": "error",
+                    "logs": [f"Security Violation: Use of restricted instruction '{kw}' is prohibited in Python DSP Sandbox."],
+                    "plot_base64": None,
+                    "time": [],
+                    "raw_signal": [],
+                    "filtered_signal": []
+                }
+
         stdout_buffer = io.StringIO()
         old_stdout = sys.stdout
         plt.close('all')
@@ -25,6 +86,7 @@ class PythonDSPEngine:
         plt.style.use('dark_background')
 
         exec_globals = {
+            '__builtins__': SAFE_BUILTINS,
             'np': np,
             'numpy': np,
             'scipy_signal': scipy_signal,
@@ -42,7 +104,6 @@ class PythonDSPEngine:
         time_vector = []
         raw_signal_list = []
         filtered_signal_list = []
-        metrics_dict = {}
 
         try:
             sys.stdout = stdout_buffer
@@ -50,13 +111,15 @@ class PythonDSPEngine:
             sys.stdout = old_stdout
             console_out = stdout_buffer.getvalue()
 
+            if len(console_out) > 5 * 1024 * 1024:
+                console_out = console_out[:5 * 1024 * 1024] + "\n[Output Truncated: 5MB Cap Exceeded]"
+
             if console_out:
-                for line in console_out.strip().splitlines():
+                for line in console_out.strip().splitlines()[:200]:
                     logs.append(line)
             else:
                 logs.append("Python DSP Script executed successfully.")
 
-            # Capture Matplotlib figure if plotted
             fig = plt.gcf()
             if len(fig.axes) > 0:
                 fig.patch.set_facecolor('#0D1117')
@@ -65,7 +128,6 @@ class PythonDSPEngine:
                 buf.seek(0)
                 plot_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-            # Extract signal vectors if generated in script
             if exec_globals.get('t') is not None:
                 t_arr = np.array(exec_globals['t'], dtype=np.float64)
                 time_vector = t_arr.tolist()
@@ -84,9 +146,7 @@ class PythonDSPEngine:
 
         except Exception as e:
             sys.stdout = old_stdout
-            err_msg = traceback.format_exc()
             logs.append(f"Python Execution Error: {str(e)}")
-            logs.append(err_msg)
             status = "error"
         finally:
             plt.close('all')

@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import csv
+from typing import Dict, Any, List
 
 from .schemas import (
     SignalProcessingRequest,
@@ -24,14 +25,15 @@ from .schemas import (
 from .dsp_engine import DSPEngine
 from .lisp_engine import LispDSPEngine
 from .python_engine import PythonDSPEngine
+from .graph_engine import SignalFlowGraphEngine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("signallab_api")
 
 app = FastAPI(
-    title="REI SignalLab API with Matplotlib & Common Lisp Engine",
-    description="High-Performance Digital Signal Processing, Python Script Sandbox, Server-Side Matplotlib Plot Rendering, Signal File Upload, and Common Lisp Plugin Engine",
-    version="1.5.0"
+    title="REI SignalLab 2.0 API with Signal Flow Studio Engine",
+    description="Instrument-Grade Digital Signal Processing, Typed Node-Based Signal Flow Studio, Hardened Python Sandbox, Server-Side Matplotlib Plot Rendering, Signal File Upload, and S-Expression DSP DSL Kernel",
+    version="2.0.0"
 )
 
 app.add_middleware(
@@ -53,22 +55,23 @@ class PythonScriptRequest(BaseModel):
     python_code: str = Field(..., description="Python DSP simulation script code")
 
 
+class GraphExecutionRequest(BaseModel):
+    project: Dict[str, Any] = Field(..., description=".rei-signal project definition")
+
 
 @app.get("/")
 def get_root():
     return {
-        "app": "REI SignalLab DSP Engine",
+        "app": "REI SignalLab 2.0 DSP Engine",
         "status": "online",
-        "version": "1.4.0",
+        "version": "2.0.0",
         "features": [
+            "Typed Node-Based Signal Flow Studio (.rei-signal)",
+            "Hardened Python Script Sandbox & Quotas",
+            "Instrument-Grade Fail-Closed DSP Engine",
+            "S-Expression DSP DSL Kernel",
             "Signal File Upload (.wav, .csv, .txt, .json)",
             "Matplotlib Server-Side PNG/SVG API Plot Renderer",
-            "Machine-Level Common Lisp DSP Plugin Engine",
-            "Signal Generation (Sine, Square, Triangle, Noise, Pink Noise, Chirp, ECG, Multitone, Pulse)",
-            "Modulation Engine (AM, FM, PM)",
-            "Math & Quantizer (Hilbert Envelope, Bit Depth Simulation)",
-            "Digital Filters (Butterworth, Chebyshev, Elliptic, Bessel, Median, FIR)",
-            "FFT & Spectrogram Waterfall Analysis",
             "Studio Telemetry (THD, SNR, SINAD, SFDR, ENOB)",
             "Real-time WebSocket Streaming"
         ]
@@ -108,6 +111,41 @@ def process_signal(req: SignalProcessingRequest):
         raise HTTPException(status_code=500, detail=f"DSP computation error: {str(e)}")
 
 
+@app.post("/api/graph/execute")
+def execute_graph_pipeline(req: GraphExecutionRequest):
+    """
+    POST Endpoint: Executes a typed Node-Based Signal Flow Graph (.rei-signal project).
+    """
+    try:
+        project = req.project
+        graph_data = project.get("graph", {})
+        nodes_list = graph_data.get("nodes", [])
+        conns_list = graph_data.get("connections", [])
+
+        engine = SignalFlowGraphEngine()
+        for nd in nodes_list:
+            engine.create_node(
+                node_type=nd.get("type", "SignalGenerator"),
+                name=nd.get("name", "Node"),
+                params=nd.get("params", {}),
+                node_id=nd.get("id")
+            )
+
+        for c in conns_list:
+            engine.connect(c["from_node"], c["from_port"], c["to_node"], c["to_port"])
+
+        results = engine.run_graph()
+        return {
+            "status": "success",
+            "version": "2.0.0",
+            "results": results,
+            "project": engine.export_project()
+        }
+    except Exception as e:
+        logger.error(f"Error executing graph pipeline: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Graph runtime error: {str(e)}")
+
+
 @app.post("/api/upload/signal", response_model=SignalProcessingResponse)
 async def upload_signal_file(
     file: UploadFile = File(...),
@@ -116,10 +154,6 @@ async def upload_signal_file(
     filter_type: str = Form("lowpass"),
     envelope_extraction: bool = Form(False)
 ):
-    """
-    POST Endpoint: Uploads a signal file (.wav, .csv, .txt, .json), parses audio/data vectors,
-    runs DSP filter/math/FFT pipeline, and returns full laboratory signal metrics response.
-    """
     try:
         content = await file.read()
         filename = file.filename.lower()
@@ -174,7 +208,6 @@ async def upload_signal_file(
         if len(raw_sig) == 0:
             raise HTTPException(status_code=400, detail="No numerical signal data found in uploaded file")
 
-        # Limit long signals for fast web rendering
         if len(raw_sig) > 16384:
             raw_sig = raw_sig[:16384]
 
@@ -217,9 +250,6 @@ async def upload_signal_file(
 
 @app.post("/api/render/plot")
 def render_plot_post(req: SignalProcessingRequest, plot_type: str = Query("oscilloscope", enum=["oscilloscope", "spectrum"])):
-    """
-    POST Endpoint: Renders a high-resolution Matplotlib PNG plot for API clients.
-    """
     try:
         t, raw_sig = DSPEngine.generate_signal(req.generator)
         fs = req.generator.sample_rate
@@ -248,10 +278,6 @@ def render_plot_get(
     filter_cutoff: float = Query(1000.0, ge=1.0, le=96000.0),
     plot_type: str = Query("oscilloscope", enum=["oscilloscope", "spectrum"])
 ):
-    """
-    GET Endpoint: Quick URL-based Matplotlib PNG plot rendering for embeddable API usage.
-    Example: GET /api/render/plot?waveform=sine&frequency=440&amplitude=1.5
-    """
     try:
         gen = SignalGeneratorConfig(waveform=waveform, frequency=frequency, amplitude=amplitude)
         flt = FilterConfig(enabled=filter_enabled, cutoff=filter_cutoff)
@@ -276,10 +302,6 @@ def render_plot_get(
 
 @app.post("/api/python/execute")
 def process_python_script(req: PythonScriptRequest):
-    """
-    POST Endpoint: Executes user-written Python DSP scripts for custom signal simulation experiments,
-    returns captured stdout console logs, Matplotlib base64 plot image, and processed signal vectors.
-    """
     try:
         result = PythonDSPEngine.execute_python_script(req.python_code)
         raw_sig = np.array(result.get("raw_signal", []), dtype=np.float64)
@@ -332,7 +354,7 @@ def process_lisp_plugin(req: LispProcessingRequest):
         )
     except Exception as e:
         logger.error(f"Error executing Lisp plugin: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Lisp DSP Kernel error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"S-Expression DSP DSL error: {str(e)}")
 
 
 @app.post("/api/export/wav")

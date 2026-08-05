@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText } from 'lucide-react';
+import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText, Layers } from 'lucide-react';
 
 import Oscilloscope from './components/Oscilloscope';
 import SpectrumAnalyzer from './components/SpectrumAnalyzer';
@@ -9,6 +9,7 @@ import AudioEngine from './components/AudioEngine';
 import SignalMetrics from './components/SignalMetrics';
 import LispPluginEditor from './components/LispPluginEditor';
 import PythonLabEditor from './components/PythonLabEditor';
+import NodeGraphStudio from './components/NodeGraphStudio';
 
 const PRESETS = {
   SINE_440: {
@@ -189,7 +190,6 @@ export default function App() {
   return (
     <div className="min-h-screen p-2.5 max-w-[1550px] mx-auto flex flex-col gap-2">
 
-      {/* Hidden File Input */}
       <input
         type="file"
         ref={fileInputRef}
@@ -198,14 +198,13 @@ export default function App() {
         style={{ display: 'none' }}
       />
 
-      {/* ── WINDOWS 98 MAIN APPLICATION WINDOW FRAME ──────────────────────────── */}
       <div className="win98-outset-deep flex flex-col gap-1 p-1">
 
         {/* 1. Title Bar */}
         <div className="win98-titlebar">
           <div className="flex items-center gap-2">
-            <span className="bg-[#FFFF00] text-[#000000] px-1 font-bold text-xs">98</span>
-            <span>REI_SignalLab_98.exe - [DSP Signal Analysis Suite & Python Sandbox]</span>
+            <span className="bg-[#FFFF00] text-[#000000] px-1 font-bold text-xs">v2.0</span>
+            <span>REI_SignalLab_2.0.exe - [Typed Signal Flow Studio & Instrument-Grade DSP Suite]</span>
           </div>
           <div className="flex gap-1">
             <div className="win98-btn-box">_</div>
@@ -214,7 +213,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* 2. Flat System Menu Bar */}
+        {/* 2. System Menu Bar */}
         <div className="flex items-center justify-between bg-[#C0C0C0] px-2 py-0.5 border-b border-[#808080] text-xs font-bold">
           <div className="flex gap-3">
             <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">File</span>
@@ -225,8 +224,8 @@ export default function App() {
             <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">Help</span>
           </div>
           <div className="flex items-center gap-2 font-mono text-[11px]">
-            <span className="badge-blink">NEW!</span>
-            <span className="text-[#0000FF] font-bold">VISITORS: 0004291</span>
+            <span className="badge-blink">v2.0 RELEASE</span>
+            <span className="text-[#0000FF] font-bold">VISITORS: 0004820</span>
           </div>
         </div>
 
@@ -264,10 +263,10 @@ export default function App() {
           </div>
         </div>
 
-        {/* 4. Marquee Scrolling Ticker */}
+        {/* 4. Marquee Ticker */}
         <div className="bg-[#000000] text-[#00FF00] font-mono text-xs p-0.5 border-2 border-t-[#808080] border-l-[#808080] border-r-[#FFFFFF] border-b-[#FFFFFF] overflow-hidden whitespace-nowrap">
           <marquee scrollamount="5" behavior="scroll">
-            *** WELCOME TO REI SIGNALLAB 98 *** FASTAPI + SCIPY + MATPLOTLIB API RENDERER *** MACHINE-LEVEL COMMON LISP SIMD ENGINE ACTIVE *** PYTHON SCRIPTING SANDBOX READY ***
+            *** WELCOME TO REI SIGNALLAB 2.0 *** TYPED NODE-BASED SIGNAL FLOW STUDIO (.rei-signal) *** HARDENED PYTHON SANDBOX *** S-EXPRESSION DSP DSL KERNEL *** INSTRUMENT-GRADE METRICS ***
           </marquee>
         </div>
 
@@ -294,10 +293,16 @@ export default function App() {
                   Oscilloscope + Spectrum
                 </button>
                 <button
+                  onClick={() => setActiveView('graph')}
+                  className={`win98-tab flex items-center gap-1 ${activeView === 'graph' ? 'active' : ''}`}
+                >
+                  <Layers size={12} className="text-[#0000FF]" /> Signal Flow Studio <span className="badge-blink">v2.0</span>
+                </button>
+                <button
                   onClick={() => setActiveView('python')}
                   className={`win98-tab flex items-center gap-1 ${activeView === 'python' ? 'active' : ''}`}
                 >
-                  <Code size={12} className="text-[#0000FF]" /> Python Lab <span className="badge-blink">NEW!</span>
+                  <Code size={12} className="text-[#0000FF]" /> Python Lab
                 </button>
                 <button
                   onClick={() => setActiveView('waterfall')}
@@ -309,7 +314,7 @@ export default function App() {
                   onClick={() => setActiveView('lisp')}
                   className={`win98-tab ${activeView === 'lisp' ? 'active' : ''}`}
                 >
-                  Common Lisp Engine
+                  S-Expression DSL Kernel
                 </button>
               </div>
 
@@ -332,6 +337,10 @@ export default function App() {
                   metrics={dsp?.metrics}
                 />
               </div>
+            )}
+
+            {activeView === 'graph' && (
+              <NodeGraphStudio onGraphExecuted={(data) => console.log(data)} />
             )}
 
             {activeView === 'python' && (
@@ -365,12 +374,12 @@ export default function App() {
 
         {/* Construction Stripes Accent Bar */}
         <div className="bg-construction h-4 w-full border border-[#000000] flex items-center justify-center text-[9px] font-bold tracking-widest text-[#000000]">
-          UNDER CONSTRUCTION -- REI SIGNALLAB 98 -- POWERED BY ROOTCASTLE
+          REI SIGNALLAB 2.0 -- TYPED SIGNAL FLOW STUDIO -- POWERED BY ROOTCASTLE
         </div>
 
         {/* Windows Status Bar Footer */}
         <footer className="win98-inset p-1 flex justify-between text-xs font-mono text-[#000000]">
-          <span>Status: Ready | Press F1 for Help</span>
+          <span>Status: Signal Flow Engine Ready | Version 2.0.0</span>
           <span>RootCastle &copy; 1998-2026</span>
         </footer>
 

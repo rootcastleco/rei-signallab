@@ -1,7 +1,7 @@
 import numpy as np
 from scipy import signal as scipy_signal
 import matplotlib
-matplotlib.use('Agg')  # Non-interactive headless backend
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import io
 from typing import Tuple, Optional
@@ -24,9 +24,9 @@ logger = logging.getLogger("dsp_engine")
 
 class DSPEngine:
     """
-    Advanced Digital Signal Processing (DSP) & Matplotlib Rendering Engine.
+    Instrument-Grade Digital Signal Processing (DSP) & Matplotlib Rendering Engine.
     Provides signal synthesis, AM/FM/PM modulation, Hilbert envelope detection,
-    bit quantization, IIR/FIR/Elliptic/Bessel filtering, FFT spectral analysis,
+    bit quantization, fail-closed IIR/FIR/Elliptic/Bessel filtering, FFT spectral analysis,
     and server-side Matplotlib PNG plot rendering API endpoints.
     """
 
@@ -141,6 +141,10 @@ class DSPEngine:
 
     @staticmethod
     def apply_filter(signal_in: np.ndarray, fs: int, config: FilterConfig) -> np.ndarray:
+        """
+        Applies IIR/FIR filter to input signal.
+        Enforces Fail-Closed DSP execution: Raises ValueError if filter design produces unstable poles.
+        """
         if not config.enabled or len(signal_in) < 10:
             return signal_in.copy()
 
@@ -186,10 +190,15 @@ class DSPEngine:
                 b, a = scipy_signal.butter(order, norm_c, btype=f_type)
                 filtered = scipy_signal.filtfilt(b, a, signal_in)
 
-            return np.nan_to_num(filtered, nan=0.0)
+            filtered_clean = np.nan_to_num(filtered, nan=0.0)
+            if np.all(filtered_clean == 0) and not np.all(signal_in == 0):
+                raise ValueError("Filter output unstable or zeroed out.")
+
+            return filtered_clean
+
         except Exception as err:
-            logger.warning(f"Filter fallback: {err}")
-            return signal_in.copy()
+            logger.error(f"Fail-Closed Filter Execution Failed: {err}")
+            raise ValueError(f"Filter execution failed: {err}")
 
     @staticmethod
     def get_window_function(window_type: WindowType, n: int, kaiser_beta: float = 14.0) -> np.ndarray:
@@ -316,7 +325,6 @@ class DSPEngine:
 
     @staticmethod
     def render_matplotlib_oscilloscope(t: np.ndarray, raw_sig: np.ndarray, filtered_sig: np.ndarray, envelope_sig: Optional[np.ndarray] = None) -> bytes:
-        """Renders high-resolution server-side PNG plot of Oscilloscope signal trajectories."""
         plt.style.use('dark_background')
         fig, ax = plt.subplots(figsize=(10, 4.5), dpi=120)
         fig.patch.set_facecolor('#0D1117')
@@ -343,7 +351,6 @@ class DSPEngine:
 
     @staticmethod
     def render_matplotlib_spectrum(freqs: np.ndarray, mag_db: np.ndarray, metrics: SignalMetrics) -> bytes:
-        """Renders high-resolution server-side PNG plot of FFT Frequency Spectrum."""
         plt.style.use('dark_background')
         fig, ax = plt.subplots(figsize=(10, 4.5), dpi=120)
         fig.patch.set_facecolor('#0D1117')

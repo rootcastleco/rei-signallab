@@ -22,7 +22,8 @@ def test_root_endpoint():
     response = client.get("/")
     assert response.status_code == 200
     data = response.json()
-    assert data["app"] == "REI SignalLab DSP Engine"
+    assert data["app"] == "REI SignalLab 2.0 DSP Engine"
+    assert data["version"] == "2.0.0"
 
 
 def test_signal_generator_sine():
@@ -31,7 +32,6 @@ def test_signal_generator_sine():
     
     assert len(t) == len(y)
     assert len(y) == 4410
-    # Peak amplitude check
     assert pytest.approx(np.max(y), abs=0.1) == 2.0
     assert pytest.approx(np.min(y), abs=0.1) == -2.0
 
@@ -46,7 +46,6 @@ def test_signal_generator_all_waveforms():
 
 
 def test_lowpass_filter():
-    # 440 Hz signal + 5000 Hz high frequency noise
     fs = 44100
     t = np.linspace(0, 0.1, int(fs * 0.1), endpoint=False)
     signal_440 = np.sin(2 * np.pi * 440 * t)
@@ -62,14 +61,12 @@ def test_lowpass_filter():
     )
     filtered = DSPEngine.apply_filter(composite, fs, flt_config)
 
-    # Calculate FFT of filtered signal to verify 5000 Hz component is attenuated
     fft_config = FFTConfig(n_fft=1024, log_scale=False)
     freqs, mag, _ = DSPEngine.compute_fft(filtered, fs, fft_config)
 
     idx_440 = np.argmin(np.abs(freqs - 440))
     idx_5000 = np.argmin(np.abs(freqs - 5000))
 
-    # Magnitude at 440 Hz should be significantly greater than at 5000 Hz
     assert mag[idx_440] > 10 * mag[idx_5000]
 
 
@@ -84,7 +81,6 @@ def test_fft_precision():
     peak_idx = np.argmax(mag)
     detected_freq = freqs[peak_idx]
     
-    # Frequency detection accuracy within FFT bin resolution (~21.5 Hz resolution)
     assert pytest.approx(detected_freq, abs=25.0) == target_freq
 
 
@@ -138,7 +134,6 @@ def test_matplotlib_plot_rendering():
 
 
 def test_signal_file_upload():
-    # Test uploading CSV signal file
     csv_content = "time,val\n0.0,0.5\n0.01,1.0\n0.02,-0.5\n0.03,-1.0\n"
     response = client.post(
         "/api/upload/signal",
@@ -149,7 +144,6 @@ def test_signal_file_upload():
     assert len(data["raw_signal"]) == 4
     assert data["raw_signal"][1] == 1.0
 
-    # Test uploading JSON signal file
     json_content = '{"signal": [0.1, 0.5, 0.9, 0.2, -0.4], "sample_rate": 1000}'
     response_json = client.post(
         "/api/upload/signal",
@@ -178,5 +172,23 @@ plt.title('Python DSP Simulation')
     assert data["plot_base64"] is not None
 
 
-
-
+def test_graph_pipeline_execution():
+    project = {
+        "formatVersion": "2.0",
+        "projectId": "test_proj",
+        "graph": {
+            "nodes": [
+                { "id": "n1", "type": "SignalGenerator", "name": "Gen", "params": { "frequency": 440 } },
+                { "id": "n2", "type": "BiquadFilter", "name": "Flt", "params": { "cutoff": 1000 } }
+            ],
+            "connections": [
+                { "from_node": "n1", "from_port": "signal_out", "to_node": "n2", "to_port": "signal_in" }
+            ]
+        }
+    }
+    response = client.post("/api/graph/execute", json={"project": project})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert "n1" in data["results"]
+    assert "n2" in data["results"]
