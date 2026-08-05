@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { Activity, Compass, Crosshair } from 'lucide-react';
 
 export default function Oscilloscope({ timeData, rawSignal, filteredSignal, envelopeSignal, sampleRate }) {
   const canvasRef = useRef(null);
@@ -7,6 +8,7 @@ export default function Oscilloscope({ timeData, rawSignal, filteredSignal, enve
   const [voltsDiv, setVoltsDiv] = useState(1);
   const [showCh1, setShowCh1] = useState(true);
   const [showCh2, setShowCh2] = useState(true);
+  const [cursorPos, setCursorPos] = useState(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -15,21 +17,18 @@ export default function Oscilloscope({ timeData, rawSignal, filteredSignal, enve
     const W = canvas.width;
     const H = canvas.height;
 
-    // Pitch Black CRT Screen
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, W, H);
 
-    // 90s Green CRT Grid Lines (10 cols, 8 rows)
     const cols = 10, rows = 8;
     const cw = W / cols, ch = H / rows;
 
-    ctx.strokeStyle = '#003300';
+    ctx.strokeStyle = '#181C24';
     ctx.lineWidth = 1;
     for (let i = 1; i < cols; i++) { ctx.beginPath(); ctx.moveTo(i*cw, 0); ctx.lineTo(i*cw, H); ctx.stroke(); }
     for (let j = 1; j < rows; j++) { ctx.beginPath(); ctx.moveTo(0, j*ch); ctx.lineTo(W, j*ch); ctx.stroke(); }
 
-    // Center CRT Axes
-    ctx.strokeStyle = '#006600';
+    ctx.strokeStyle = '#2D3748';
     ctx.setLineDash([2, 2]);
     ctx.beginPath();
     ctx.moveTo(0, H/2); ctx.lineTo(W, H/2);
@@ -39,8 +38,8 @@ export default function Oscilloscope({ timeData, rawSignal, filteredSignal, enve
 
     if (displayMode === 'xy') {
       if (!rawSignal || !filteredSignal || rawSignal.length === 0) return;
-      ctx.strokeStyle = '#00FF00';
-      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = '#3B82F6';
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
       const n = Math.min(rawSignal.length, filteredSignal.length);
       for (let i = 0; i < n; i++) {
@@ -73,73 +72,110 @@ export default function Oscilloscope({ timeData, rawSignal, filteredSignal, enve
       ctx.stroke();
     };
 
-    // CH1 Raw (Bright Cyan), CH2 Filtered (Lime Green), Envelope (Yellow)
-    if (showCh1 && rawSignal) drawTrace(rawSignal, '#00FFFF', 1.8);
-    if (showCh2 && filteredSignal) drawTrace(filteredSignal, '#00FF00', 2.0);
-    if (envelopeSignal) drawTrace(envelopeSignal, '#FFFF00', 1.2);
+    if (showCh1 && rawSignal) drawTrace(rawSignal, '#3B82F6', 1.8);
+    if (showCh2 && filteredSignal) drawTrace(filteredSignal, '#10B981', 2.0);
+    if (envelopeSignal) drawTrace(envelopeSignal, '#F59E0B', 1.2);
 
-  }, [timeData, rawSignal, filteredSignal, envelopeSignal, displayMode, timeDiv, voltsDiv, showCh1, showCh2, sampleRate]);
+    if (cursorPos) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.moveTo(cursorPos.x, 0); ctx.lineTo(cursorPos.x, H);
+      ctx.moveTo(0, cursorPos.y); ctx.lineTo(W, cursorPos.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const vVal = ((H/2 - cursorPos.y) / ch) * voltsDiv;
+      const tVal = (cursorPos.x / W) * totalMs;
+
+      ctx.fillStyle = 'rgba(12, 14, 18, 0.9)';
+      ctx.fillRect(cursorPos.x + 8, cursorPos.y - 24, 130, 20);
+      ctx.fillStyle = '#EAF0F6';
+      ctx.font = '500 10px "JetBrains Mono"';
+      ctx.fillText(`T:${tVal.toFixed(2)}ms  V:${vVal.toFixed(2)}V`, cursorPos.x + 12, cursorPos.y - 10);
+    }
+
+  }, [timeData, rawSignal, filteredSignal, envelopeSignal, displayMode, timeDiv, voltsDiv, showCh1, showCh2, cursorPos, sampleRate]);
 
   return (
-    <div className="win95-outset p-2 flex flex-col gap-2">
-      {/* Title Bar */}
-      <div className="win95-titlebar">
-        <span>Oscilloscope_CRT_98.exe</span>
-        <div className="flex gap-1">
-          <div className="win95-btn-box">_</div>
-          <div className="win95-btn-box">□</div>
-          <div className="win95-btn-box">✕</div>
-        </div>
-      </div>
-
-      {/* Control Bar */}
-      <div className="flex items-center justify-between flex-wrap gap-2 py-1 border-b border-[#808080]">
-        <div className="flex gap-1">
-          <button onClick={() => setDisplayMode('time')} className={`win95-btn text-xs ${displayMode === 'time' ? 'bg-[#FFFFFF]' : ''}`}>
-            TIME_DOMAIN
-          </button>
-          <button onClick={() => setDisplayMode('xy')} className={`win95-btn text-xs ${displayMode === 'xy' ? 'bg-[#FFFFFF]' : ''}`}>
-            XY_LISSAJOUS
-          </button>
+    <div className="studio-panel p-3 flex flex-col gap-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#232830] pb-2">
+        <div className="flex items-center gap-2">
+          <Activity className="w-4 h-4 text-sky-400" />
+          <span className="font-semibold text-xs text-[#EAF0F6]">OSCILLOSCOPE & XY PHASE INSTRUMENT</span>
         </div>
 
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowCh1(!showCh1)} className={`win95-btn text-xs ${showCh1 ? 'text-[#0000FF]' : ''}`}>
-            CH1 (CYAN)
-          </button>
-          <button onClick={() => setShowCh2(!showCh2)} className={`win95-btn text-xs ${showCh2 ? 'text-[#00AA00]' : ''}`}>
-            CH2 (GREEN)
-          </button>
-        </div>
+          <div className="studio-tabs">
+            <button
+              onClick={() => setDisplayMode('time')}
+              className={`studio-tab ${displayMode === 'time' ? 'active' : ''}`}
+            >
+              Time Domain
+            </button>
+            <button
+              onClick={() => setDisplayMode('xy')}
+              className={`studio-tab ${displayMode === 'xy' ? 'active' : ''}`}
+            >
+              <Compass className="w-3 h-3 text-sky-400" /> XY Plot
+            </button>
+          </div>
 
-        <div className="flex items-center gap-2 font-mono text-xs">
-          <span>TB:</span>
-          <select value={timeDiv} onChange={(e) => setTimeDiv(parseFloat(e.target.value))}>
-            <option value="0.2">0.2ms</option>
-            <option value="0.5">0.5ms</option>
-            <option value="1">1.0ms</option>
-            <option value="2">2.0ms</option>
-            <option value="5">5.0ms</option>
-            <option value="10">10.0ms</option>
-          </select>
+          <button
+            onClick={() => setShowCh1(!showCh1)}
+            className={`btn text-xs ${showCh1 ? 'text-sky-400 border-sky-500/40 bg-sky-500/10' : ''}`}
+          >
+            CH1 Raw
+          </button>
 
-          <span>V/DIV:</span>
-          <select value={voltsDiv} onChange={(e) => setVoltsDiv(parseFloat(e.target.value))}>
-            <option value="0.1">0.1V</option>
-            <option value="0.2">0.2V</option>
-            <option value="0.5">0.5V</option>
-            <option value="1">1.0V</option>
-            <option value="2">2.0V</option>
-            <option value="5">5.0V</option>
-          </select>
+          <button
+            onClick={() => setShowCh2(!showCh2)}
+            className={`btn text-xs ${showCh2 ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10' : ''}`}
+          >
+            CH2 Filtered
+          </button>
+
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <span className="text-[#7C8594]">Time/Div:</span>
+            <select value={timeDiv} onChange={(e) => setTimeDiv(parseFloat(e.target.value))}>
+              <option value="0.2">0.2 ms</option>
+              <option value="0.5">0.5 ms</option>
+              <option value="1">1.0 ms</option>
+              <option value="2">2.0 ms</option>
+              <option value="5">5.0 ms</option>
+              <option value="10">10.0 ms</option>
+            </select>
+
+            <span className="text-[#7C8594] ml-1">Volts/Div:</span>
+            <select value={voltsDiv} onChange={(e) => setVoltsDiv(parseFloat(e.target.value))}>
+              <option value="0.1">0.1 V</option>
+              <option value="0.2">0.2 V</option>
+              <option value="0.5">0.5 V</option>
+              <option value="1">1.0 V</option>
+              <option value="2">2.0 V</option>
+              <option value="5">5.0 V</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Sunken CRT Display */}
-      <div className="win95-crt-screen p-1 relative">
-        <canvas ref={canvasRef} width={800} height={360} className="w-full h-[360px] block cursor-crosshair" />
-        <div className="absolute top-2 right-2 bg-[#000000]/80 border border-[#00FF00] px-2 py-0.5 text-[10px] font-mono text-[#00FF00]">
-          CH1: {voltsDiv}V | CH2: {voltsDiv}V | {timeDiv}ms/DIV
+      <div className="relative w-full overflow-hidden rounded bg-black">
+        <canvas
+          ref={canvasRef}
+          width={800}
+          height={360}
+          onMouseMove={(e) => {
+            const rect = canvasRef.current.getBoundingClientRect();
+            setCursorPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+          }}
+          onMouseLeave={() => setCursorPos(null)}
+          className="oscilloscope-canvas w-full h-[360px] cursor-crosshair block"
+        />
+
+        <div className="absolute top-2 right-2 flex items-center gap-3 bg-[#0C0E12]/90 border border-[#232830] rounded px-2.5 py-1 text-[11px] font-mono text-[#7C8594]">
+          <span className="text-sky-400">CH1: {voltsDiv}V/div</span>
+          <span className="text-emerald-400">CH2: {voltsDiv}V/div</span>
+          <span className="text-amber-400">TB: {timeDiv}ms/div</span>
         </div>
       </div>
     </div>

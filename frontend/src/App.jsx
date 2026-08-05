@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText } from 'lucide-react';
+import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code } from 'lucide-react';
 
 import Oscilloscope from './components/Oscilloscope';
 import SpectrumAnalyzer from './components/SpectrumAnalyzer';
@@ -12,28 +12,28 @@ import PythonLabEditor from './components/PythonLabEditor';
 
 const PRESETS = {
   SINE_440: {
-    name: 'Sine 440 Hz',
+    name: 'Sine Wave (440 Hz Pitch)',
     generator: { waveform: 'sine', frequency: 440, amplitude: 1.0, phase: 0, offset: 0, noise_level: 0, sample_rate: 44100, duration: 0.1, modulation_type: 'none' },
     math: { envelope_extraction: false, bit_depth: null, dc_remove: false, gain_db: 0 },
     filter: { enabled: false, filter_type: 'lowpass', filter_design: 'butterworth', cutoff: 1000, order: 4 },
     fft: { n_fft: 1024, window: 'hanning', log_scale: true }
   },
   AM_RADIO: {
-    name: 'AM Modulation',
+    name: 'AM Radio Modulation',
     generator: { waveform: 'sine', frequency: 1000, amplitude: 1.5, phase: 0, offset: 0, noise_level: 0.05, sample_rate: 44100, duration: 0.1, modulation_type: 'am', mod_frequency: 50, mod_index: 0.8 },
     math: { envelope_extraction: true, bit_depth: null, dc_remove: false, gain_db: 0 },
     filter: { enabled: false, filter_type: 'lowpass', filter_design: 'butterworth', cutoff: 2000, order: 4 },
     fft: { n_fft: 2048, window: 'hanning', log_scale: true }
   },
   FILTERED_NOISE: {
-    name: 'Filtered Noise',
+    name: 'Filtered LowPass Noise',
     generator: { waveform: 'noise', frequency: 1000, amplitude: 1.0, phase: 0, offset: 0, noise_level: 0, sample_rate: 44100, duration: 0.1, modulation_type: 'none' },
     math: { envelope_extraction: false, bit_depth: null, dc_remove: false, gain_db: 0 },
     filter: { enabled: true, filter_type: 'lowpass', filter_design: 'butterworth', cutoff: 800, order: 4 },
     fft: { n_fft: 1024, window: 'hamming', log_scale: true }
   },
   ECG_HEART: {
-    name: 'ECG Telemetry',
+    name: 'ECG Cardiac Telemetry',
     generator: { waveform: 'ecg', frequency: 1.2, amplitude: 2.0, phase: 0, offset: 0, noise_level: 0.05, sample_rate: 44100, duration: 2.0, modulation_type: 'none' },
     math: { envelope_extraction: false, bit_depth: null, dc_remove: true, gain_db: 0 },
     filter: { enabled: true, filter_type: 'lowpass', filter_design: 'fir_window', cutoff: 40, order: 4 },
@@ -169,7 +169,7 @@ export default function App() {
     for (let i = 0; i < dsp.time.length; i++) csv += `${dsp.time[i]},${dsp.raw_signal[i]},${dsp.filtered_signal[i]}\n`;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = 'signallab98.csv'; a.click();
+    a.download = 'signallab_data.csv'; a.click();
   };
 
   const exportWAV = async () => {
@@ -181,13 +181,13 @@ export default function App() {
       if (res.ok) {
         const a = document.createElement('a');
         a.href = URL.createObjectURL(await res.blob());
-        a.download = 'signallab98.wav'; a.click();
+        a.download = 'signallab_audio.wav'; a.click();
       }
     } catch {}
   };
 
   return (
-    <div className="min-h-screen p-3 max-w-[1550px] mx-auto flex flex-col gap-3">
+    <div className="min-h-screen p-4 max-w-[1550px] mx-auto flex flex-col gap-4">
 
       {/* Hidden File Input */}
       <input
@@ -198,187 +198,157 @@ export default function App() {
         style={{ display: 'none' }}
       />
 
-      {/* ── WINDOWS 95 MAIN APPLICATION WINDOW FRAME ──────────────────────────── */}
-      <div className="win95-outset-deep flex flex-col gap-1 p-1">
-
-        {/* 1. Window Title Bar */}
-        <div className="win95-titlebar">
-          <div className="flex items-center gap-2">
-            <span className="bg-[#FFFF00] text-[#000000] px-1 font-bold text-xs">98</span>
-            <span>REI_SignalLab_98.exe - [Digital Signal Processing Suite & Python Sandbox]</span>
+      {/* 1. TOP STUDIO HEADER BAR */}
+      <header className="studio-panel px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded bg-[#181C24] border border-[#232830] flex items-center justify-center">
+            <Activity className="w-4.5 h-4.5 text-sky-400" />
           </div>
-          <div className="flex gap-1">
-            <div className="win95-btn-box">_</div>
-            <div className="win95-btn-box">□</div>
-            <div className="win95-btn-box">✕</div>
+          <div>
+            <h1 className="text-sm font-semibold tracking-tight text-[#EAF0F6] flex items-center gap-2">
+              REI SignalLab <span className="text-[10px] font-mono font-normal px-1.5 py-0.5 rounded bg-[#181C24] text-sky-400 border border-[#232830]">v1.5</span>
+            </h1>
+            <p className="text-[11px] text-[#7C8594]">Digital Signal Processing & Python Scripting Suite</p>
           </div>
         </div>
 
-        {/* 2. System Dropdown Menu Bar */}
-        <div className="flex items-center justify-between bg-[#C0C0C0] px-2 py-0.5 border-b border-[#808080] text-xs font-bold">
-          <div className="flex gap-4">
-            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">File</span>
-            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">Edit</span>
-            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">View</span>
-            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">Presets</span>
-            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">Tools</span>
-            <span className="cursor-pointer hover:bg-[#000080] hover:text-[#FFFFFF] px-1">Help</span>
-          </div>
-          <div className="flex items-center gap-2 font-mono text-[11px]">
-            <span className="badge-blink">NEW!</span>
-            <span className="text-[#0000FF] font-bold">VISITORS: 0004291</span>
-          </div>
-        </div>
+        {/* Action Toolbar */}
+        <div className="flex items-center flex-wrap gap-2">
+          {uploadedFileName && (
+            <div className="flex items-center gap-1.5 bg-[#0C0E12] border border-[#232830] rounded px-2.5 py-1 text-xs text-emerald-400 font-mono">
+              <FileAudio className="w-3.5 h-3.5" /> {uploadedFileName}
+            </div>
+          )}
 
-        {/* 3. Structured Command Toolbar Bar */}
-        <div className="win95-outset p-1 flex items-center justify-between flex-wrap gap-2 bg-[#C0C0C0]">
-          
-          {/* File Operations */}
-          <div className="flex items-center gap-1">
-            <button className="win95-btn win95-btn-blue text-xs" onClick={() => fileInputRef.current?.click()}>
-              <FolderOpen size={13} /> Open File (.wav, .csv)
-            </button>
-            <button className="win95-btn text-xs" onClick={exportCSV}>
-              <FileText size={13} className="text-[#00AA00]" /> Export CSV
-            </button>
-            <button className="win95-btn text-xs" onClick={exportWAV}>
-              <Save size={13} className="text-[#0000FF]" /> Export WAV
-            </button>
-          </div>
-
-          {/* Preset Selector */}
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-xs">Preset:</span>
+          <div className="flex items-center gap-1.5 bg-[#0C0E12] border border-[#232830] rounded px-2.5 py-1 text-xs">
+            <span className="text-[#7C8594] font-mono">Preset:</span>
             <select
               value={uploadedFileName ? 'upload' : presetKey}
               onChange={e => { if (e.target.value !== 'upload') loadPreset(e.target.value); }}
-              className="text-xs"
+              className="bg-transparent text-xs text-[#EAF0F6] font-mono focus:outline-none cursor-pointer"
             >
-              {uploadedFileName && <option value="upload">Uploaded File: {uploadedFileName}</option>}
+              {uploadedFileName && <option value="upload" className="bg-[#111318]">File: {uploadedFileName}</option>}
               {Object.entries(PRESETS).map(([k, p]) => (
-                <option key={k} value={k}>{p.name}</option>
+                <option key={k} value={k} className="bg-[#111318]">{p.name}</option>
               ))}
             </select>
           </div>
 
-          {/* Status Counter */}
-          <div className="win95-hitcounter flex-row items-center gap-2 py-0.5 px-2">
-            <span className="w-2 h-2 bg-[#00FF00]"></span>
-            <span className="text-xs">{status === 'online' ? 'API_ONLINE' : 'CLIENT_DSP'}</span>
+          <button className="btn text-xs text-sky-400 border-sky-500/30" onClick={() => fileInputRef.current?.click()}>
+            <Upload className="w-3.5 h-3.5" /> Upload File (.wav, .csv)
+          </button>
+
+          <button className="btn text-xs" onClick={exportCSV}>
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" /> CSV
+          </button>
+
+          <button className="btn text-xs" onClick={exportWAV}>
+            <Download className="w-3.5 h-3.5 text-sky-400" /> WAV Audio
+          </button>
+
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#0C0E12] border border-[#232830] text-[11px] font-mono text-[#7C8594]">
+            <span className={`w-2 h-2 rounded-full ${status === 'online' ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
+            {status === 'online' ? 'FASTAPI ONLINE' : 'CLIENT DSP'}
           </div>
         </div>
+      </header>
 
-        {/* 4. Marquee Announcement Ticker */}
-        <div className="bg-[#000000] text-[#00FF00] font-mono text-xs p-0.5 border-2 border-t-[#808080] border-l-[#808080] border-r-[#FFFFFF] border-b-[#FFFFFF] overflow-hidden whitespace-nowrap">
-          <marquee scrollamount="5" behavior="scroll">
-            *** WELCOME TO REI SIGNALLAB 98 *** FASTAPI + SCIPY + MATPLOTLIB API RENDERER *** MACHINE-LEVEL COMMON LISP SIMD ENGINE ACTIVE *** PYTHON SCRIPTING SANDBOX READY ***
-          </marquee>
-        </div>
+      {/* 2. REAL-TIME SIGNAL TELEMETRY METRICS */}
+      <SignalMetrics metrics={dsp?.metrics} />
 
-        {/* 5. Telemetry Metrics Section */}
-        <div className="p-1">
-          <SignalMetrics metrics={dsp?.metrics} />
-        </div>
+      {/* 3. MAIN WORKSPACE STAGE & CONTROL SIDEBAR */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
 
-        <hr className="hr-groove" />
+        {/* Left Display Stage */}
+        <div className="flex-1 flex flex-col gap-3 w-full">
 
-        {/* 6. Main Workspace Split Stage */}
-        <div className="flex flex-col lg:flex-row gap-3 items-start p-1">
+          {/* Navigation View Tabs */}
+          <div className="flex items-center justify-between border-b border-[#232830] pb-1.5">
+            <div className="studio-tabs">
+              <button
+                onClick={() => setActiveView('dual')}
+                className={`studio-tab ${activeView === 'dual' ? 'active' : ''}`}
+              >
+                <Activity className="w-3.5 h-3.5 text-sky-400" /> Scope + Spectrum
+              </button>
 
-          {/* Left Main Instrument Stage */}
-          <div className="flex-1 flex flex-col gap-2 w-full">
+              <button
+                onClick={() => setActiveView('python')}
+                className={`studio-tab ${activeView === 'python' ? 'active' : ''}`}
+              >
+                <Code className="w-3.5 h-3.5 text-sky-400" /> Python Lab
+              </button>
 
-            {/* Navigation Tabs Bar */}
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="win95-tabs">
-                <button
-                  onClick={() => setActiveView('dual')}
-                  className={`win95-tab ${activeView === 'dual' ? 'active' : ''}`}
-                >
-                  Oscilloscope + Spectrum
-                </button>
-                <button
-                  onClick={() => setActiveView('python')}
-                  className={`win95-tab flex items-center gap-1 ${activeView === 'python' ? 'active' : ''}`}
-                >
-                  <Code size={12} className="text-[#0000FF]" /> Python Lab <span className="badge-blink">NEW!</span>
-                </button>
-                <button
-                  onClick={() => setActiveView('waterfall')}
-                  className={`win95-tab ${activeView === 'waterfall' ? 'active' : ''}`}
-                >
-                  2D Waterfall
-                </button>
-                <button
-                  onClick={() => setActiveView('lisp')}
-                  className={`win95-tab ${activeView === 'lisp' ? 'active' : ''}`}
-                >
-                  Common Lisp Engine
-                </button>
-              </div>
+              <button
+                onClick={() => setActiveView('waterfall')}
+                className={`studio-tab ${activeView === 'waterfall' ? 'active' : ''}`}
+              >
+                <Waves className="w-3.5 h-3.5 text-emerald-400" /> 2D Waterfall
+              </button>
 
-              <AudioEngine generatorConfig={genCfg} filterConfig={filterCfg} />
+              <button
+                onClick={() => setActiveView('lisp')}
+                className={`studio-tab ${activeView === 'lisp' ? 'active' : ''}`}
+              >
+                <Cpu className="w-3.5 h-3.5 text-amber-400" /> Common Lisp
+              </button>
             </div>
 
-            {/* Display Panes */}
-            {activeView === 'dual' && (
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
-                <Oscilloscope
-                  timeData={dsp?.time}
-                  rawSignal={dsp?.raw_signal}
-                  filteredSignal={dsp?.filtered_signal}
-                  envelopeSignal={dsp?.envelope_signal}
-                  sampleRate={genCfg.sample_rate}
-                />
-                <SpectrumAnalyzer
-                  frequencyData={dsp?.frequency}
-                  magnitudeData={dsp?.spectrum_magnitude}
-                  metrics={dsp?.metrics}
-                />
-              </div>
-            )}
-
-            {activeView === 'python' && (
-              <PythonLabEditor onPythonProcessed={(pythonData) => setDsp(pythonData)} />
-            )}
-
-            {activeView === 'waterfall' && (
-              <WaterfallSpectrogram
-                spectrogramMatrix={dsp?.spectrogram_matrix}
-                frequencies={dsp?.spectrogram_frequencies}
-                times={dsp?.spectrogram_times}
-              />
-            )}
-
-            {activeView === 'lisp' && (
-              <LispPluginEditor
-                generatorConfig={genCfg}
-                fftConfig={fftCfg}
-                onLispProcessed={d => setDsp(d)}
-              />
-            )}
+            <AudioEngine generatorConfig={genCfg} filterConfig={filterCfg} />
           </div>
 
-          {/* Right Control Panel Sidebar */}
-          <ControlPanel
-            generatorConfig={genCfg} setGeneratorConfig={setGenCfg}
-            mathConfig={mathCfg} setMathConfig={setMathCfg}
-            filterConfig={filterCfg} setFilterConfig={setFilterCfg}
-          />
+          {/* Display Stage Canvases */}
+          {activeView === 'dual' && (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+              <Oscilloscope
+                timeData={dsp?.time}
+                rawSignal={dsp?.raw_signal}
+                filteredSignal={dsp?.filtered_signal}
+                envelopeSignal={dsp?.envelope_signal}
+                sampleRate={genCfg.sample_rate}
+              />
+              <SpectrumAnalyzer
+                frequencyData={dsp?.frequency}
+                magnitudeData={dsp?.spectrum_magnitude}
+                metrics={dsp?.metrics}
+              />
+            </div>
+          )}
+
+          {activeView === 'python' && (
+            <PythonLabEditor onPythonProcessed={(pythonData) => setDsp(pythonData)} />
+          )}
+
+          {activeView === 'waterfall' && (
+            <WaterfallSpectrogram
+              spectrogramMatrix={dsp?.spectrogram_matrix}
+              frequencies={dsp?.spectrogram_frequencies}
+              times={dsp?.spectrogram_times}
+            />
+          )}
+
+          {activeView === 'lisp' && (
+            <LispPluginEditor
+              generatorConfig={genCfg}
+              fftConfig={fftCfg}
+              onLispProcessed={d => setDsp(d)}
+            />
+          )}
         </div>
 
-        {/* Construction Warning Stripes Accent */}
-        <div className="bg-construction h-4 w-full border border-[#000000] flex items-center justify-center text-[9px] font-bold tracking-widest text-[#000000]">
-          UNDER CONSTRUCTION -- REI SIGNALLAB 98 -- POWERED BY ROOTCASTLE
-        </div>
-
-        {/* Windows Status Bar Footer */}
-        <footer className="win95-inset p-1 flex justify-between text-xs font-mono text-[#000000]">
-          <span>Status: Ready | Press F1 for Help</span>
-          <span>RootCastle &copy; 1998-2026</span>
-        </footer>
-
+        {/* Right Docked Control Sidebar */}
+        <ControlPanel
+          generatorConfig={genCfg} setGeneratorConfig={setGenCfg}
+          mathConfig={mathCfg} setMathConfig={setMathCfg}
+          filterConfig={filterCfg} setFilterConfig={setFilterCfg}
+        />
       </div>
+
+      {/* FOOTER */}
+      <footer className="studio-panel px-4 py-2 flex items-center justify-between text-xs text-[#7C8594] font-mono">
+        <span>REI SignalLab &copy; 2026 - Modern Digital Signal Processing Suite</span>
+        <span>Python FastAPI + SciPy | React 18</span>
+      </footer>
     </div>
   );
 }

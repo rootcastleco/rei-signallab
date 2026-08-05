@@ -1,331 +1,249 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 :root {
-  --win-bg: #C0C0C0;
-  --win-text: #000000;
-  --win-muted: #808080;
-  --win-dark-shadow: #404040;
-  --win-light-highlight: #FFFFFF;
-  
-  --win-navy-start: #000080;
-  --win-navy-end: #1084D0;
-  
-  --win-blue: #0000FF;
-  --win-red: #FF0000;
-  --win-yellow: #FFFF00;
-  --win-green: #00FF00;
-  --win-green-dark: #00AA00;
-  --win-notepad-yellow: #FFFFCC;
-  
-  --font-win-sans: "MS Sans Serif", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  --font-win-head: "Arial Black", Impact, sans-serif;
-  --font-win-mono: "Courier New", "JetBrains Mono", Courier, monospace;
+  --bg-main: #08090C;
+  --bg-panel: #111318;
+  --bg-card: #181C24;
+  --bg-inset: #0C0E12;
+  --border-color: #232830;
+  --border-subtle: #1C2128;
+  --border-focus: #3B82F6;
+
+  --ch1: #3B82F6;
+  --ch2: #10B981;
+  --fft: #8B5CF6;
+  --peak: #F59E0B;
+  --alert: #EF4444;
+
+  --text-primary: #EAF0F6;
+  --text-secondary: #7C8594;
+  --text-muted: #4B5260;
+
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", SFMono-Regular, Consolas, monospace;
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  border-radius: 0px !important; /* STRICT 90s MANDATE: ZERO RADIUS EVERYWHERE */
+  border-radius: 6px;
 }
 
 body {
-  background-color: var(--win-bg);
-  background-image:
-    linear-gradient(45deg, #b8b8b8 25%, transparent 25%),
-    linear-gradient(-45deg, #b8b8b8 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #b8b8b8 75%),
-    linear-gradient(-45deg, transparent 75%, #b8b8b8 75%);
-  background-size: 4px 4px;
-  background-position: 0 0, 0 2px, 2px -2px, -2px 0px;
-  color: var(--win-text);
-  font-family: var(--font-win-sans);
+  background: var(--bg-main);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
   font-size: 13px;
-  line-height: 1.4;
-  -webkit-font-smoothing: none;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* ─────────────────────────────────────────────────────────────
-   WINDOWS 95 3D BEVEL UTILITIES
-   ───────────────────────────────────────────────────────────── */
-
-/* Raised / Outset Window or Button */
-.win95-outset {
-  background-color: #C0C0C0;
-  border: 2px solid;
-  border-color: #FFFFFF #808080 #808080 #FFFFFF;
-  box-shadow: inset -1px -1px 0 #404040, inset 1px 1px 0 #DFDFDF;
+/* Studio Panels */
+.studio-panel {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
-/* Deep Outset Window Frame */
-.win95-outset-deep {
-  background-color: #C0C0C0;
-  border: 2px solid;
-  border-color: #FFFFFF #404040 #404040 #FFFFFF;
-  box-shadow: inset -2px -2px 0 #808080, inset 2px 2px 0 #FFFFFF;
+.studio-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  transition: border-color 0.15s ease;
 }
 
-/* Sunken / Inset Input or Display Screen */
-.win95-inset {
-  background-color: #FFFFFF;
-  border: 2px solid;
-  border-color: #808080 #FFFFFF #FFFFFF #808080;
-  box-shadow: inset 1px 1px 0 #404040, inset -1px -1px 0 #DFDFDF;
+.studio-card:hover {
+  border-color: #384150;
 }
 
-/* Dark Green CRT or Terminal Screen */
-.win95-crt-screen {
-  background-color: #000000;
-  color: #00FF00;
-  border: 2px solid;
-  border-color: #808080 #FFFFFF #FFFFFF #808080;
-  box-shadow: inset 2px 2px 0 #000000, inset -1px -1px 0 #DFDFDF;
-  font-family: var(--font-win-mono);
-}
-
-/* Title Bar Gradient */
-.win95-titlebar {
-  background: linear-gradient(to right, #000080, #1084D0);
-  color: #FFFFFF;
-  font-family: var(--font-win-sans);
-  font-weight: bold;
-  padding: 3px 6px;
+/* Telemetry Metric Card */
+.metric-card {
+  background: linear-gradient(135deg, #111318 0%, #161a22 100%);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px 12px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  user-select: none;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+  overflow: hidden;
 }
 
-.win95-titlebar.inactive {
-  background: #808080;
-  color: #C0C0C0;
+.metric-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px; height: 100%;
 }
 
-/* Window Control Buttons (Min, Max, Close) */
-.win95-btn-box {
+.metric-card.blue::before { background: var(--ch1); }
+.metric-card.green::before { background: var(--ch2); }
+.metric-card.violet::before { background: var(--fft); }
+.metric-card.amber::before { background: var(--peak); }
+.metric-card.red::before { background: var(--alert); }
+.metric-card.pink::before { background: #EC4899; }
+.metric-card.indigo::before { background: #6366F1; }
+.metric-card.cyan::before { background: #06B6D4; }
+
+.metric-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.metric-value {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.metric-unit {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: 3px;
+}
+
+/* Studio Tabs */
+.studio-tabs {
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 14px;
-  background-color: #C0C0C0;
-  border: 1px solid;
-  border-color: #FFFFFF #404040 #404040 #FFFFFF;
-  font-family: var(--font-win-sans);
-  font-size: 9px;
-  font-weight: bold;
-  color: #000000;
-  cursor: pointer;
-  line-height: 1;
+  background-color: var(--bg-inset);
+  padding: 3px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
 }
 
-.win95-btn-box:active {
-  border-color: #404040 #FFFFFF #FFFFFF #404040;
-  padding-top: 1px;
-  padding-left: 1px;
-}
-
-/* 90s Command Buttons */
-.win95-btn {
-  background-color: #C0C0C0;
-  color: #000000;
-  border: 2px solid;
-  border-color: #FFFFFF #808080 #808080 #FFFFFF;
-  box-shadow: inset -1px -1px 0 #404040, inset 1px 1px 0 #DFDFDF;
-  padding: 4px 12px;
-  font-family: var(--font-win-sans);
-  font-weight: bold;
-  font-size: 12px;
+.studio-tab {
+  padding: 6px 14px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 5px;
   cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  text-transform: uppercase;
+}
+
+.studio-tab:hover {
+  color: var(--text-primary);
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.studio-tab.active {
+  background-color: var(--bg-card);
+  color: #FFFFFF;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
   white-space: nowrap;
 }
 
-.win95-btn:hover {
-  background-color: #D0D0D0;
+.btn:hover {
+  color: var(--text-primary);
+  background-color: #1E222C;
+  border-color: #384150;
 }
 
-.win95-btn:active {
-  border-color: #808080 #FFFFFF #FFFFFF #808080;
-  box-shadow: inset 1px 1px 0 #404040, inset -1px -1px 0 #DFDFDF;
-  transform: translate(1px, 1px);
-}
-
-.win95-btn:focus-visible {
-  outline: 2px dotted #000000;
-  outline-offset: -4px;
-}
-
-/* Colored Buttons */
-.win95-btn-blue {
-  background-color: #0000FF;
-  color: #FFFFFF;
-  border-color: #5555FF #000080 #000080 #5555FF;
-}
-.win95-btn-blue:hover { background-color: #3333FF; }
-
-.win95-btn-red {
-  background-color: #FF0000;
-  color: #FFFFFF;
-  border-color: #FF5555 #800000 #800000 #FF5555;
-}
-.win95-btn-red:hover { background-color: #FF3333; }
-
-.win95-btn-green {
-  background-color: #00AA00;
-  color: #FFFFFF;
-  border-color: #55FF55 #005500 #005500 #55FF55;
-}
-.win95-btn-green:hover { background-color: #00CC00; }
-
-/* 90s Tabs */
-.win95-tabs {
-  display: flex;
-  gap: 2px;
-  border-bottom: 2px solid #FFFFFF;
-}
-
-.win95-tab {
-  background-color: #C0C0C0;
-  color: #000000;
-  border: 2px solid;
-  border-color: #FFFFFF #808080 transparent #FFFFFF;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: bold;
-  cursor: pointer;
-  margin-bottom: -2px;
-}
-
-.win95-tab.active {
-  background-color: #C0C0C0;
-  border-bottom: 2px solid #C0C0C0;
-  padding-bottom: 5px;
-  z-index: 10;
-}
-
-/* Hit Counter Telemetry Display */
-.win95-hitcounter {
-  background-color: #000000;
-  border: 2px solid;
-  border-color: #808080 #FFFFFF #FFFFFF #808080;
-  box-shadow: inset 1px 1px 0 #404040;
-  color: #00FF00;
-  font-family: var(--font-win-mono);
-  padding: 4px 8px;
-  display: flex;
-  flex-direction: column;
-}
-
-/* 3D Groove Horizontal Rule */
-.hr-groove {
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 6px;
   border: none;
-  height: 4px;
-  background: linear-gradient(to bottom, #808080 0%, #808080 50%, #FFFFFF 50%, #FFFFFF 100%);
-  margin: 8px 0;
-}
-
-/* Construction Warning Stripes */
-.bg-construction {
-  background: repeating-linear-gradient(
-    45deg,
-    #FFFF00,
-    #FFFF00 10px,
-    #000000 10px,
-    #000000 20px
-  );
+  background-color: var(--ch1);
   color: #FFFFFF;
-}
-
-/* Animated Rainbow Text */
-@keyframes rainbow {
-  0% { color: #FF0000; }
-  17% { color: #FF8000; }
-  33% { color: #FFFF00; }
-  50% { color: #00FF00; }
-  67% { color: #0080FF; }
-  83% { color: #8000FF; }
-  100% { color: #FF0000; }
-}
-
-.text-rainbow {
-  animation: rainbow 4s linear infinite;
-  font-family: var(--font-win-head);
-  text-shadow: 2px 2px 0 #000000;
-}
-
-/* Blinking NEW! Badge */
-@keyframes blink-step {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
-}
-
-.badge-blink {
-  animation: blink-step 1s infinite;
-  background-color: #FF0000;
-  color: #FFFF00;
-  font-weight: bold;
-  padding: 1px 5px;
-  border: 1px solid #000000;
-  font-size: 10px;
-  font-family: var(--font-win-mono);
-}
-
-/* Classic 90s Hyperlink */
-a.win95-link, .win95-link {
-  color: #0000FF;
-  text-decoration: underline;
   cursor: pointer;
-}
-a.win95-link:hover, .win95-link:hover {
-  color: #FF0000;
-}
-a.win95-link:visited {
-  color: #800080;
+  transition: background-color 0.15s ease;
 }
 
-/* Range Inputs */
+.btn-primary:hover {
+  background-color: #2563EB;
+}
+
+/* Inputs & Selects */
+select, input[type=text], input[type=number] {
+  background-color: var(--bg-inset);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+select:focus, input[type=text]:focus, input[type=number]:focus {
+  border-color: var(--border-focus);
+}
+
+/* Sliders */
 input[type=range] {
   -webkit-appearance: none;
-  background: transparent;
   width: 100%;
+  height: 20px;
+  background: transparent;
 }
 
 input[type=range]::-webkit-slider-runnable-track {
   width: 100%;
-  height: 6px;
-  background: #808080;
-  border: 1px solid;
-  border-color: #404040 #FFFFFF #FFFFFF #404040;
+  height: 4px;
+  background: var(--border-color);
+  border-radius: 2px;
 }
 
 input[type=range]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  height: 18px;
-  width: 12px;
-  background: #C0C0C0;
-  border: 2px solid;
-  border-color: #FFFFFF #808080 #808080 #FFFFFF;
-  box-shadow: inset -1px -1px 0 #404040;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  border: 2px solid var(--bg-main);
   margin-top: -6px;
   cursor: pointer;
 }
 
-/* Select & Option inputs */
-select, input[type=text], input[type=number] {
-  background-color: #FFFFFF;
-  color: #000000;
-  border: 2px solid;
-  border-color: #808080 #FFFFFF #FFFFFF #808080;
-  font-family: var(--font-win-mono);
-  font-size: 12px;
-  padding: 3px 6px;
+/* Checkboxes */
+input[type=checkbox] {
+  accent-color: var(--ch1);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 
-select:focus, input[type=text]:focus, input[type=number]:focus {
-  outline: 2px dotted #000000;
+/* Oscilloscope CRT Canvas */
+.oscilloscope-canvas {
+  background-color: #000000;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
 }
