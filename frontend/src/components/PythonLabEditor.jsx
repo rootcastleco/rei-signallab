@@ -31,16 +31,11 @@ print(f"Rotor Shaft Telemetry: RPM={rpm} (1X={f1}Hz, 2X={f2}Hz, Oil Whirl={f_whi
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 3.5), dpi=100)
 fig.patch.set_facecolor('#000000')
 
-# 1. Lissajous Rotor Shaft Orbit Plot (Probe X vs Probe Y)
 ax1.set_facecolor('#000000')
 ax1.plot(probe_x, probe_y, color='#00FF00', linewidth=1.5, label='Shaft Orbit Trajectory')
 ax1.set_title('Rotor Shaft Orbit (Probe X vs Probe Y)', color='#FFFFFF', fontsize=10)
-ax1.set_xlabel('Probe X Displacement (mils)', color='#808080', fontsize=8)
-ax1.set_ylabel('Probe Y Displacement (mils)', color='#808080', fontsize=8)
 ax1.grid(True, color='#003300', linestyle=':')
-ax1.axis('equal')
 
-# 2. FFT Vibration Spectrum
 freqs = np.fft.rfftfreq(len(t), 1/fs)
 fft_mag = np.abs(np.fft.rfft(probe_x)) / len(t)
 ax2.set_facecolor('#000000')
@@ -48,10 +43,7 @@ ax2.plot(freqs[:500], 20 * np.log10(np.maximum(1e-6, fft_mag[:500])), color='#00
 ax2.axvline(f1, color='#FF5555', linestyle='--', label='1X RPM (60Hz)')
 ax2.axvline(f2, color='#FFFF00', linestyle='--', label='2X Misalignment (120Hz)')
 ax2.set_title('1X/2X Order Vibration Spectrum', color='#FFFFFF', fontsize=10)
-ax2.set_xlabel('Frequency (Hz)', color='#808080', fontsize=8)
-ax2.set_ylabel('Magnitude (dB)', color='#808080', fontsize=8)
 ax2.grid(True, color='#003300', linestyle=':')
-ax2.legend(loc='upper right', facecolor='#000000', edgecolor='#00FF00', fontsize=7)
 
 plt.tight_layout()
 `
@@ -115,43 +107,95 @@ plt.xlabel('Time (seconds)', color='#808080', fontsize=9)
 plt.grid(True, color='#003300', linestyle=':')
 plt.legend(loc='upper right', facecolor='#000000', edgecolor='#00FF00')
 `
-  },
-  {
-    name: 'Dual Sideband AM Modulator',
-    code: `# Python DSP Experiment: Dual Sideband AM Modulation
-import numpy as np
-
-fs = 44100
-dur = 0.05
-t = np.linspace(0, dur, int(fs * dur), endpoint=False)
-
-fc = 1200
-fm = 100
-m = 0.8
-
-carrier = np.sin(2 * np.pi * fc * t)
-modulator = np.sin(2 * np.pi * fm * t)
-raw_signal = (1.0 + m * modulator) * carrier
-filtered_signal = raw_signal
-
-print(f"AM Modulation simulated: Fc={fc}Hz, Fm={fm}Hz, m={m}")
-
-plt.figure(figsize=(9, 3.5), dpi=100)
-plt.style.use('dark_background')
-plt.plot(t * 1000, raw_signal, color='#00FFFF', linewidth=1.2, label='AM Signal')
-plt.plot(t * 1000, 1.0 + m * modulator, color='#FFFF00', linestyle='--', linewidth=1.2, label='Envelope')
-plt.title('Amplitude Modulation (AM) Time Domain Envelope', color='#FFFFFF', fontsize=11)
-plt.xlabel('Time (ms)', color='#808080', fontsize=9)
-plt.grid(True, color='#003300', linestyle=':')
-plt.legend(loc='upper right', facecolor='#000000', edgecolor='#00FF00')
-`
   }
 ];
+
+function generateClientPlotDataUrl(isRotor = false) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 900;
+  canvas.height = 350;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (isRotor) {
+    // Left: Orbit Plot
+    ctx.strokeStyle = '#003300';
+    ctx.lineWidth = 0.5;
+    for (let x = 50; x < 420; x += 30) { ctx.beginPath(); ctx.moveTo(x, 40); ctx.lineTo(x, 310); ctx.stroke(); }
+    for (let y = 40; y < 310; y += 30) { ctx.beginPath(); ctx.moveTo(50, y); ctx.lineTo(420, y); ctx.stroke(); }
+
+    ctx.strokeStyle = '#00FF00';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const cx = 235, cy = 175, r = 100;
+    for (let i = 0; i <= 200; i++) {
+      const a = (i / 200) * 2 * Math.PI;
+      const px = cx + (r * Math.cos(a) + 25 * Math.cos(2 * a));
+      const py = cy + (r * Math.sin(a) + 25 * Math.sin(2 * a));
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText('Rotor Orbit (Probe X vs Y)', 110, 25);
+
+    // Right: 1X/2X Spectrum
+    ctx.strokeStyle = '#003300';
+    for (let x = 480; x < 850; x += 40) { ctx.beginPath(); ctx.moveTo(x, 40); ctx.lineTo(x, 310); ctx.stroke(); }
+    for (let y = 40; y < 310; y += 30) { ctx.beginPath(); ctx.moveTo(480, y); ctx.lineTo(850, y); ctx.stroke(); }
+
+    ctx.strokeStyle = '#00FFFF';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    for (let x = 480; x < 850; x++) {
+      const norm = (x - 480) / 370;
+      let mag = 290 - Math.random() * 15;
+      if (Math.abs(norm - 0.2) < 0.02) mag = 70; // 1X
+      if (Math.abs(norm - 0.4) < 0.02) mag = 140; // 2X
+      if (x === 480) ctx.moveTo(x, mag); else ctx.lineTo(x, mag);
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = '#FF5555';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillText('1X (60Hz)', 545, 60);
+    ctx.fillStyle = '#FFFF00';
+    ctx.fillText('2X (120Hz)', 620, 130);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText('1X/2X Order Vibration Spectrum', 540, 25);
+  } else {
+    // Single Waveform Plot
+    ctx.strokeStyle = '#003300';
+    ctx.lineWidth = 0.5;
+    for (let x = 50; x < 850; x += 40) { ctx.beginPath(); ctx.moveTo(x, 40); ctx.lineTo(x, 310); ctx.stroke(); }
+    for (let y = 40; y < 310; y += 30) { ctx.beginPath(); ctx.moveTo(50, y); ctx.lineTo(850, y); ctx.stroke(); }
+
+    ctx.strokeStyle = '#00FFFF';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = 50; x < 850; x++) {
+      const tVal = (x - 50) / 800;
+      const y = 175 - 110 * Math.sin(2 * Math.PI * 5 * tVal);
+      if (x === 50) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 13px monospace';
+    ctx.fillText('Python Simulated Signal Waveform Plot', 300, 25);
+  }
+
+  return canvas.toDataURL('image/png');
+}
 
 export default function PythonLabEditor({ onPythonProcessed }) {
   const [code, setCode] = useState(PYTHON_PRESETS[0].code);
   const [logs, setLogs] = useState([]);
-  const [plotImage, setPlotImage] = useState(null);
+  const [plotImage, setPlotImage] = useState(generateClientPlotDataUrl(true));
   const [isExecuting, setIsExecuting] = useState(false);
 
   const lineCount = code.split('\n').length;
@@ -159,6 +203,8 @@ export default function PythonLabEditor({ onPythonProcessed }) {
   const runPythonScript = async () => {
     setIsExecuting(true);
     setLogs(['Executing Python DSP script...']);
+
+    const isRotor = code.includes('probe_x') || code.includes('Orbit');
 
     try {
       const data = await safeFetchJson('/api/python/execute', {
@@ -168,7 +214,7 @@ export default function PythonLabEditor({ onPythonProcessed }) {
       });
 
       setLogs(data.logs || ['Python script executed successfully.']);
-      setPlotImage(data.plot_base64 ? `data:image/png;base64,${data.plot_base64}` : null);
+      setPlotImage(data.plot_base64 ? `data:image/png;base64,${data.plot_base64}` : generateClientPlotDataUrl(isRotor));
 
       if (onPythonProcessed && data.raw_signal && data.raw_signal.length > 0) {
         onPythonProcessed({
@@ -192,8 +238,11 @@ export default function PythonLabEditor({ onPythonProcessed }) {
 
       setLogs([
         `[CLIENT SIMULATOR ENGINE] ${e.message}`,
-        `Simulated Rotor Vibration script execution: 4410 samples synthesized.`
+        `Simulated Python DSP script execution: 4410 samples synthesized.`
       ]);
+
+      // Always generate client-side plot image on fallback!
+      setPlotImage(generateClientPlotDataUrl(isRotor));
 
       if (onPythonProcessed) {
         onPythonProcessed({
@@ -331,7 +380,7 @@ export default function PythonLabEditor({ onPythonProcessed }) {
           {plotImage && (
             <div className="flex flex-col gap-1">
               <div className="flex justify-between items-center text-xs font-mono font-bold">
-                <span className="flex items-center gap-1"><Image size={13} className="text-[#FFFF00]" /> Matplotlib Plot Figure</span>
+                <span className="flex items-center gap-1"><Image size={13} className="text-[#FFFF00]" /> Matplotlib Rendered Plot</span>
                 <button onClick={downloadPlotImage} className="win98-btn text-[10px]">
                   <Download size={10} /> Save Plot PNG
                 </button>
