@@ -3,53 +3,46 @@ import {
   Activity,
   BarChart2,
   Waves,
-  Network,
   Download,
   FileSpreadsheet,
   Cpu,
-  Layers
+  Play,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 
 import Oscilloscope from './components/Oscilloscope';
 import SpectrumAnalyzer from './components/SpectrumAnalyzer';
 import WaterfallSpectrogram from './components/WaterfallSpectrogram';
-import VisualPipeline from './components/VisualPipeline';
 import ControlPanel from './components/ControlPanel';
 import AudioEngine from './components/AudioEngine';
 import SignalMetrics from './components/SignalMetrics';
 import LispPluginEditor from './components/LispPluginEditor';
 
 const PRESETS = {
-  AM_MODULATED: {
-    name: 'AM Modulation (1kHz Carrier, 50Hz Modulator)',
-    generator: { waveform: 'sine', frequency: 1000, amplitude: 1.5, phase: 0, offset: 0, noise_level: 0, sample_rate: 44100, duration: 0.1, modulation_type: 'am', mod_frequency: 50, mod_index: 0.8 },
+  SINE_440: {
+    name: 'Sine Wave (440Hz Audio Pitch)',
+    generator: { waveform: 'sine', frequency: 440, amplitude: 1.0, phase: 0, offset: 0, noise_level: 0, sample_rate: 44100, duration: 0.1, modulation_type: 'none' },
+    math: { envelope_extraction: false, bit_depth: null, dc_remove: false, gain_db: 0 },
+    filter: { enabled: false, filter_type: 'lowpass', filter_design: 'butterworth', cutoff: 1000, order: 4 },
+    fft: { n_fft: 1024, window: 'hanning', log_scale: true }
+  },
+  AM_RADIO: {
+    name: 'AM Modulated Radio Signal',
+    generator: { waveform: 'sine', frequency: 1000, amplitude: 1.5, phase: 0, offset: 0, noise_level: 0.05, sample_rate: 44100, duration: 0.1, modulation_type: 'am', mod_frequency: 50, mod_index: 0.8 },
     math: { envelope_extraction: true, bit_depth: null, dc_remove: false, gain_db: 0 },
     filter: { enabled: false, filter_type: 'lowpass', filter_design: 'butterworth', cutoff: 2000, order: 4 },
     fft: { n_fft: 2048, window: 'hanning', log_scale: true }
   },
-  FM_MODULATED: {
-    name: 'FM Frequency Modulation Sweep (440Hz Carrier)',
-    generator: { waveform: 'sine', frequency: 440, amplitude: 1.2, phase: 0, offset: 0, noise_level: 0, sample_rate: 44100, duration: 0.1, modulation_type: 'fm', mod_frequency: 30, mod_index: 1.5 },
+  FILTERED_NOISE: {
+    name: 'Filtered Noise (LowPass 800Hz)',
+    generator: { waveform: 'noise', frequency: 1000, amplitude: 1.0, phase: 0, offset: 0, noise_level: 0, sample_rate: 44100, duration: 0.1, modulation_type: 'none' },
     math: { envelope_extraction: false, bit_depth: null, dc_remove: false, gain_db: 0 },
-    filter: { enabled: false, filter_type: 'lowpass', filter_design: 'butterworth', cutoff: 3000, order: 4 },
+    filter: { enabled: true, filter_type: 'lowpass', filter_design: 'butterworth', cutoff: 800, order: 4 },
     fft: { n_fft: 1024, window: 'hamming', log_scale: true }
   },
-  HILBERT_ENVELOPE: {
-    name: 'Hilbert Transform Envelope Demodulator',
-    generator: { waveform: 'sine', frequency: 800, amplitude: 2.0, phase: 0, offset: 0, noise_level: 0.1, sample_rate: 44100, duration: 0.1, modulation_type: 'am', mod_frequency: 20, mod_index: 0.9 },
-    math: { envelope_extraction: true, bit_depth: null, dc_remove: false, gain_db: 0 },
-    filter: { enabled: true, filter_type: 'lowpass', filter_design: 'butterworth', cutoff: 1500, order: 4 },
-    fft: { n_fft: 1024, window: 'blackman', log_scale: true }
-  },
-  BIT_QUANTIZER: {
-    name: '8-bit ADC Quantization Test',
-    generator: { waveform: 'sine', frequency: 440, amplitude: 1.5, phase: 0, offset: 0, noise_level: 0, sample_rate: 44100, duration: 0.1, modulation_type: 'none' },
-    math: { envelope_extraction: false, bit_depth: 8, dc_remove: false, gain_db: 0 },
-    filter: { enabled: false, filter_type: 'lowpass', filter_design: 'butterworth', cutoff: 1000, order: 4 },
-    fft: { n_fft: 2048, window: 'flattop', log_scale: true }
-  },
-  ECG_CARDIAC: {
-    name: 'Synthetic ECG Cardiac Telemetry',
+  ECG_HEART: {
+    name: 'ECG Heartbeat Telemetry',
     generator: { waveform: 'ecg', frequency: 1.2, amplitude: 2.0, phase: 0, offset: 0, noise_level: 0.05, sample_rate: 44100, duration: 2.0, modulation_type: 'none' },
     math: { envelope_extraction: false, bit_depth: null, dc_remove: true, gain_db: 0 },
     filter: { enabled: true, filter_type: 'lowpass', filter_design: 'fir_window', cutoff: 40, order: 4 },
@@ -59,12 +52,12 @@ const PRESETS = {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('scope');
-  const [presetKey, setPresetKey] = useState('AM_MODULATED');
+  const [presetKey, setPresetKey] = useState('SINE_440');
 
-  const [generatorConfig, setGeneratorConfig] = useState(PRESETS.AM_MODULATED.generator);
-  const [mathConfig, setMathConfig] = useState(PRESETS.AM_MODULATED.math);
-  const [filterConfig, setFilterConfig] = useState(PRESETS.AM_MODULATED.filter);
-  const [fftConfig, setFFTConfig] = useState(PRESETS.AM_MODULATED.fft);
+  const [generatorConfig, setGeneratorConfig] = useState(PRESETS.SINE_440.generator);
+  const [mathConfig, setMathConfig] = useState(PRESETS.SINE_440.math);
+  const [filterConfig, setFilterConfig] = useState(PRESETS.SINE_440.filter);
+  const [fftConfig, setFFTConfig] = useState(PRESETS.SINE_440.fft);
 
   const [dspData, setDspData] = useState(null);
   const [backendStatus, setBackendStatus] = useState('connecting');
@@ -237,25 +230,25 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen p-3 md:p-5 max-w-[1600px] mx-auto flex flex-col gap-3">
-      {/* TECHNICAL TOP HEADER BAR */}
-      <header className="studio-panel px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+    <div className="min-h-screen p-4 max-w-[1500px] mx-auto flex flex-col gap-4">
+      {/* 1. TOP STREAMLINED HEADER */}
+      <header className="studio-panel px-4 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded bg-[#21262D] border border-[#30363D] flex items-center justify-center">
             <Activity className="w-4 h-4 text-sky-400" />
           </div>
           <div>
             <h1 className="text-sm font-semibold tracking-tight text-[#F0F6FC] flex items-center gap-2">
-              REI SignalLab <span className="text-[10px] font-mono font-normal px-1.5 py-0.5 rounded bg-[#21262D] text-sky-400 border border-[#30363D]">v1.2.0</span>
+              REI SignalLab
             </h1>
-            <p className="text-[11px] text-[#8B949E]">Digital Signal Processing & Common Lisp Kernel Suite</p>
+            <p className="text-[11px] text-[#8B949E]">Digital Signal Processing Suite</p>
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center flex-wrap gap-2">
+        {/* Streamlined Preset & Export Controls */}
+        <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 bg-[#0D1117] border border-[#30363D] rounded px-2.5 py-1 text-xs">
-            <span className="text-[#8B949E] font-mono">Test Bench:</span>
+            <span className="text-[#8B949E] font-mono">Preset:</span>
             <select
               value={presetKey}
               onChange={(e) => handlePresetSelect(e.target.value)}
@@ -274,122 +267,106 @@ export default function App() {
           </button>
 
           <button onClick={exportWAV} className="btn-secondary text-xs flex items-center gap-1">
-            <Download className="w-3.5 h-3.5 text-sky-400" /> WAV Audio
+            <Download className="w-3.5 h-3.5 text-sky-400" /> WAV
           </button>
-
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#0D1117] border border-[#30363D] text-[11px] font-mono text-[#8B949E]">
-            {backendStatus === 'online' ? (
-              <span className="text-emerald-400 flex items-center gap-1">● FASTAPI ONLINE</span>
-            ) : (
-              <span className="text-amber-400 flex items-center gap-1">● CLIENT DSP</span>
-            )}
-          </div>
         </div>
       </header>
 
-      {/* TECHNICAL TELEMETRY METRICS */}
-      <SignalMetrics metrics={dspData?.metrics} />
+      {/* 2. MAIN 2-COLUMN LAYOUT */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
+        
+        {/* LEFT COLUMN: DISPLAY STAGE & TELEMETRY */}
+        <div className="flex-1 flex flex-col gap-3 w-full">
+          
+          {/* Streamlined Tab Navigation */}
+          <div className="flex items-center justify-between border-b border-[#30363D] pb-1.5">
+            <div className="studio-tabs">
+              <button
+                onClick={() => setActiveTab('scope')}
+                className={`studio-tab-item flex items-center gap-1.5 ${activeTab === 'scope' ? 'active' : ''}`}
+              >
+                <Activity className="w-3.5 h-3.5 text-sky-400" /> Oscilloscope
+              </button>
 
-      {/* WEBAUDIO SYNTHESIZER BAR */}
-      <AudioEngine generatorConfig={generatorConfig} filterConfig={filterConfig} />
+              <button
+                onClick={() => setActiveTab('spectrum')}
+                className={`studio-tab-item flex items-center gap-1.5 ${activeTab === 'spectrum' ? 'active' : ''}`}
+              >
+                <BarChart2 className="w-3.5 h-3.5 text-purple-400" /> Spectrum Analyzer
+              </button>
 
-      {/* WORKSPACE TAB SWITCHER */}
-      <div className="flex items-center justify-between border-b border-[#30363D] pb-1.5">
-        <div className="studio-tabs">
-          <button
-            onClick={() => setActiveTab('scope')}
-            className={`studio-tab-item flex items-center gap-1.5 ${activeTab === 'scope' ? 'active' : ''}`}
-          >
-            <Activity className="w-3.5 h-3.5 text-sky-400" /> Scope & FFT Spectrum
-          </button>
+              <button
+                onClick={() => setActiveTab('waterfall')}
+                className={`studio-tab-item flex items-center gap-1.5 ${activeTab === 'waterfall' ? 'active' : ''}`}
+              >
+                <Waves className="w-3.5 h-3.5 text-emerald-400" /> Waterfall
+              </button>
 
-          <button
-            onClick={() => setActiveTab('waterfall')}
-            className={`studio-tab-item flex items-center gap-1.5 ${activeTab === 'waterfall' ? 'active' : ''}`}
-          >
-            <Waves className="w-3.5 h-3.5 text-emerald-400" /> 2D Spectrogram Waterfall
-          </button>
+              <button
+                onClick={() => setActiveTab('lisp')}
+                className={`studio-tab-item flex items-center gap-1.5 ${activeTab === 'lisp' ? 'active' : ''}`}
+              >
+                <Cpu className="w-3.5 h-3.5 text-amber-400" /> Lisp Plugin
+              </button>
+            </div>
 
-          <button
-            onClick={() => setActiveTab('pipeline')}
-            className={`studio-tab-item flex items-center gap-1.5 ${activeTab === 'pipeline' ? 'active' : ''}`}
-          >
-            <Network className="w-3.5 h-3.5 text-sky-400" /> Component Flow Graph
-          </button>
+            <AudioEngine generatorConfig={generatorConfig} filterConfig={filterConfig} />
+          </div>
 
-          <button
-            onClick={() => setActiveTab('lisp')}
-            className={`studio-tab-item flex items-center gap-1.5 ${activeTab === 'lisp' ? 'active' : ''}`}
-          >
-            <Cpu className="w-3.5 h-3.5 text-amber-400" /> Common Lisp DSP Plugin
-          </button>
+          {/* Display Canvases */}
+          {activeTab === 'scope' && (
+            <Oscilloscope
+              timeData={dspData?.time}
+              rawSignal={dspData?.raw_signal}
+              filteredSignal={dspData?.filtered_signal}
+              envelopeSignal={dspData?.envelope_signal}
+              sampleRate={generatorConfig.sample_rate}
+            />
+          )}
+
+          {activeTab === 'spectrum' && (
+            <SpectrumAnalyzer
+              frequencyData={dspData?.frequency}
+              magnitudeData={dspData?.spectrum_magnitude}
+              metrics={dspData?.metrics}
+            />
+          )}
+
+          {activeTab === 'waterfall' && (
+            <WaterfallSpectrogram
+              spectrogramMatrix={dspData?.spectrogram_matrix}
+              frequencies={dspData?.spectrogram_frequencies}
+              times={dspData?.spectrogram_times}
+            />
+          )}
+
+          {activeTab === 'lisp' && (
+            <LispPluginEditor
+              generatorConfig={generatorConfig}
+              fftConfig={fftConfig}
+              onLispProcessed={(lispData) => setDspData(lispData)}
+            />
+          )}
+
+          {/* Telemetry Telemetry Bar directly under Canvas */}
+          <SignalMetrics metrics={dspData?.metrics} />
         </div>
 
-        <div className="text-xs text-[#8B949E] font-mono hidden md:block">
-          Fs: {generatorConfig.sample_rate} Hz | Dur: {generatorConfig.duration}s
-        </div>
-      </div>
-
-      {/* TAB CONTENT PANES */}
-      {activeTab === 'scope' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <Oscilloscope
-            timeData={dspData?.time}
-            rawSignal={dspData?.raw_signal}
-            filteredSignal={dspData?.filtered_signal}
-            envelopeSignal={dspData?.envelope_signal}
-            sampleRate={generatorConfig.sample_rate}
-          />
-          <SpectrumAnalyzer
-            frequencyData={dspData?.frequency}
-            magnitudeData={dspData?.spectrum_magnitude}
-            metrics={dspData?.metrics}
-          />
-        </div>
-      )}
-
-      {activeTab === 'waterfall' && (
-        <WaterfallSpectrogram
-          spectrogramMatrix={dspData?.spectrogram_matrix}
-          frequencies={dspData?.spectrogram_frequencies}
-          times={dspData?.spectrogram_times}
-        />
-      )}
-
-      {activeTab === 'pipeline' && (
-        <VisualPipeline
+        {/* RIGHT COLUMN: STREAMLINED CONTROL SIDEBAR */}
+        <ControlPanel
           generatorConfig={generatorConfig}
-          filterConfig={filterConfig}
-          fftConfig={fftConfig}
+          setGeneratorConfig={setGeneratorConfig}
           mathConfig={mathConfig}
-          metrics={dspData?.metrics || {}}
+          setMathConfig={setMathConfig}
+          filterConfig={filterConfig}
+          setFilterConfig={setFilterConfig}
         />
-      )}
-
-      {activeTab === 'lisp' && (
-        <LispPluginEditor
-          generatorConfig={generatorConfig}
-          fftConfig={fftConfig}
-          onLispProcessed={(lispData) => setDspData(lispData)}
-        />
-      )}
-
-      {/* TECHNICAL DSP CONTROL PANEL */}
-      <ControlPanel
-        generatorConfig={generatorConfig}
-        setGeneratorConfig={setGeneratorConfig}
-        mathConfig={mathConfig}
-        setMathConfig={setMathConfig}
-        filterConfig={filterConfig}
-        setFilterConfig={setFilterConfig}
-        fftConfig={fftConfig}
-        setFFTConfig={setFFTConfig}
-      />
+      </div>
 
       {/* FOOTER */}
       <footer className="studio-panel px-3 py-2 flex items-center justify-between text-xs text-[#8B949E] font-mono">
-        <span>REI SignalLab &copy; 2026 - Digital Signal Processing Instrumentation Suite</span>
-        <span>Python FastAPI + SciPy | React 18 + HTML5 Canvas</span>
+        <span>REI SignalLab &copy; 2026 - Streamlined DSP Instrumentation Suite</span>
+        <span>Python FastAPI + SciPy | React 18</span>
       </footer>
     </div>
   );
