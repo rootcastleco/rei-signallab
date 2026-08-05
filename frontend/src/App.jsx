@@ -6,10 +6,6 @@ import {
   Network,
   Download,
   FileSpreadsheet,
-  Sparkles,
-  ShieldCheck,
-  Radio,
-  Sliders,
   Cpu,
   Layers
 } from 'lucide-react';
@@ -23,10 +19,9 @@ import AudioEngine from './components/AudioEngine';
 import SignalMetrics from './components/SignalMetrics';
 import LispPluginEditor from './components/LispPluginEditor';
 
-// Studio Laboratory Presets inspired by Mitov SignalLab test benches
 const PRESETS = {
   AM_MODULATED: {
-    name: 'AM Modulation Signal (1kHz Carrier, 50Hz Modulator)',
+    name: 'AM Modulation (1kHz Carrier, 50Hz Modulator)',
     generator: { waveform: 'sine', frequency: 1000, amplitude: 1.5, phase: 0, offset: 0, noise_level: 0, sample_rate: 44100, duration: 0.1, modulation_type: 'am', mod_frequency: 50, mod_index: 0.8 },
     math: { envelope_extraction: true, bit_depth: null, dc_remove: false, gain_db: 0 },
     filter: { enabled: false, filter_type: 'lowpass', filter_design: 'butterworth', cutoff: 2000, order: 4 },
@@ -47,21 +42,14 @@ const PRESETS = {
     fft: { n_fft: 1024, window: 'blackman', log_scale: true }
   },
   BIT_QUANTIZER: {
-    name: '8-bit ADC Quantization & Distortion Test',
+    name: '8-bit ADC Quantization Test',
     generator: { waveform: 'sine', frequency: 440, amplitude: 1.5, phase: 0, offset: 0, noise_level: 0, sample_rate: 44100, duration: 0.1, modulation_type: 'none' },
     math: { envelope_extraction: false, bit_depth: 8, dc_remove: false, gain_db: 0 },
     filter: { enabled: false, filter_type: 'lowpass', filter_design: 'butterworth', cutoff: 1000, order: 4 },
     fft: { n_fft: 2048, window: 'flattop', log_scale: true }
   },
-  ELLIPTIC_BANDPASS: {
-    name: 'Elliptic Cauer Bandpass Filter on Noise',
-    generator: { waveform: 'noise', frequency: 1000, amplitude: 1.0, phase: 0, offset: 0, noise_level: 0, sample_rate: 44100, duration: 0.1, modulation_type: 'none' },
-    math: { envelope_extraction: false, bit_depth: null, dc_remove: false, gain_db: 0 },
-    filter: { enabled: true, filter_type: 'bandpass', filter_design: 'elliptic', cutoff: 500, cutoff2: 1500, order: 4 },
-    fft: { n_fft: 2048, window: 'kaiser', kaiser_beta: 14, log_scale: true }
-  },
   ECG_CARDIAC: {
-    name: 'Synthetic ECG Heartbeat Telemetry Monitor',
+    name: 'Synthetic ECG Cardiac Telemetry',
     generator: { waveform: 'ecg', frequency: 1.2, amplitude: 2.0, phase: 0, offset: 0, noise_level: 0.05, sample_rate: 44100, duration: 2.0, modulation_type: 'none' },
     math: { envelope_extraction: false, bit_depth: null, dc_remove: true, gain_db: 0 },
     filter: { enabled: true, filter_type: 'lowpass', filter_design: 'fir_window', cutoff: 40, order: 4 },
@@ -81,7 +69,6 @@ export default function App() {
   const [dspData, setDspData] = useState(null);
   const [backendStatus, setBackendStatus] = useState('connecting');
 
-  // Client-side fallback DSP synthesis
   const computeClientFallbackDSP = useCallback((gen, math, flt, fft) => {
     const fs = gen.sample_rate || 44100;
     const dur = gen.duration || 0.1;
@@ -250,113 +237,102 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen p-3 md:p-6 max-w-[1600px] mx-auto flex flex-col gap-4">
-      {/* APPLE STUDIO HEADER BAR */}
-      <header className="glass-panel px-5 py-3.5 flex flex-wrap items-center justify-between gap-4">
+    <div className="min-h-screen p-3 md:p-5 max-w-[1600px] mx-auto flex flex-col gap-3">
+      {/* TECHNICAL TOP HEADER BAR */}
+      <header className="studio-panel px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-sky-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-            <Activity className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 rounded bg-[#21262D] border border-[#30363D] flex items-center justify-center">
+            <Activity className="w-4 h-4 text-sky-400" />
           </div>
           <div>
-            <h1 className="text-base font-bold tracking-tight text-white flex items-center gap-2">
-              REI SignalLab <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">STUDIO SUITE 1.1</span>
+            <h1 className="text-sm font-semibold tracking-tight text-[#F0F6FC] flex items-center gap-2">
+              REI SignalLab <span className="text-[10px] font-mono font-normal px-1.5 py-0.5 rounded bg-[#21262D] text-sky-400 border border-[#30363D]">v1.2.0</span>
             </h1>
-            <p className="text-[11px] text-gray-400">Mitov SignalLab High-Speed DSP & Spectral Analysis Engine</p>
+            <p className="text-[11px] text-[#8B949E]">Digital Signal Processing & Common Lisp Kernel Suite</p>
           </div>
         </div>
 
-        {/* Presets & Exporters */}
-        <div className="flex items-center flex-wrap gap-2.5">
-          <div className="flex items-center gap-1.5 bg-black/60 border border-white/15 rounded-lg px-3 py-1">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-xs text-gray-400 font-mono">Test Bench:</span>
+        {/* Action Controls */}
+        <div className="flex items-center flex-wrap gap-2">
+          <div className="flex items-center gap-1.5 bg-[#0D1117] border border-[#30363D] rounded px-2.5 py-1 text-xs">
+            <span className="text-[#8B949E] font-mono">Test Bench:</span>
             <select
               value={presetKey}
               onChange={(e) => handlePresetSelect(e.target.value)}
-              className="bg-transparent text-xs text-amber-300 font-mono focus:outline-none cursor-pointer"
+              className="bg-transparent text-xs text-[#F0F6FC] font-mono focus:outline-none cursor-pointer"
             >
               {Object.entries(PRESETS).map(([key, p]) => (
-                <option key={key} value={key} className="bg-gray-900 text-white">
+                <option key={key} value={key} className="bg-[#161B22] text-[#F0F6FC]">
                   {p.name}
                 </option>
               ))}
             </select>
           </div>
 
-          <button
-            onClick={exportCSV}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 transition flex items-center gap-1.5"
-          >
+          <button onClick={exportCSV} className="btn-secondary text-xs flex items-center gap-1">
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" /> CSV
           </button>
 
-          <button
-            onClick={exportWAV}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-sky-500/20 border border-sky-500/40 text-sky-300 hover:bg-sky-500/30 transition flex items-center gap-1.5 shadow-sm shadow-sky-500/20"
-          >
-            <Download className="w-3.5 h-3.5" /> WAV Audio
+          <button onClick={exportWAV} className="btn-secondary text-xs flex items-center gap-1">
+            <Download className="w-3.5 h-3.5 text-sky-400" /> WAV Audio
           </button>
 
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/50 border border-white/10 text-[11px] font-mono">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#0D1117] border border-[#30363D] text-[11px] font-mono text-[#8B949E]">
             {backendStatus === 'online' ? (
-              <span className="flex items-center gap-1.5 text-emerald-400">
-                <span className="led-indicator on"></span> FASTAPI ACTIVE
-              </span>
+              <span className="text-emerald-400 flex items-center gap-1">● FASTAPI ONLINE</span>
             ) : (
-              <span className="flex items-center gap-1.5 text-amber-400">
-                <span className="led-indicator active-cyan"></span> CLIENT DSP
-              </span>
+              <span className="text-amber-400 flex items-center gap-1">● CLIENT DSP</span>
             )}
           </div>
         </div>
       </header>
 
-      {/* EXTENDED LABORATORY TELEMETRY METRICS */}
+      {/* TECHNICAL TELEMETRY METRICS */}
       <SignalMetrics metrics={dspData?.metrics} />
 
       {/* WEBAUDIO SYNTHESIZER BAR */}
       <AudioEngine generatorConfig={generatorConfig} filterConfig={filterConfig} />
 
-      {/* WORKSPACE SEGMENTED TABS */}
-      <div className="flex items-center justify-between border-b border-white/10 pb-2">
-        <div className="apple-segmented">
+      {/* WORKSPACE TAB SWITCHER */}
+      <div className="flex items-center justify-between border-b border-[#30363D] pb-1.5">
+        <div className="studio-tabs">
           <button
             onClick={() => setActiveTab('scope')}
-            className={`apple-segmented-item flex items-center gap-2 ${activeTab === 'scope' ? 'active' : ''}`}
+            className={`studio-tab-item flex items-center gap-1.5 ${activeTab === 'scope' ? 'active' : ''}`}
           >
-            <Activity className="w-3.5 h-3.5 text-cyan-400" /> CRT Scope & FFT Spectrum
+            <Activity className="w-3.5 h-3.5 text-sky-400" /> Scope & FFT Spectrum
           </button>
 
           <button
             onClick={() => setActiveTab('waterfall')}
-            className={`apple-segmented-item flex items-center gap-2 ${activeTab === 'waterfall' ? 'active' : ''}`}
+            className={`studio-tab-item flex items-center gap-1.5 ${activeTab === 'waterfall' ? 'active' : ''}`}
           >
             <Waves className="w-3.5 h-3.5 text-emerald-400" /> 2D Spectrogram Waterfall
           </button>
 
           <button
             onClick={() => setActiveTab('pipeline')}
-            className={`apple-segmented-item flex items-center gap-2 ${activeTab === 'pipeline' ? 'active' : ''}`}
+            className={`studio-tab-item flex items-center gap-1.5 ${activeTab === 'pipeline' ? 'active' : ''}`}
           >
-            <Network className="w-3.5 h-3.5 text-sky-400" /> Visual Component Graph
+            <Network className="w-3.5 h-3.5 text-sky-400" /> Component Flow Graph
           </button>
 
           <button
             onClick={() => setActiveTab('lisp')}
-            className={`apple-segmented-item flex items-center gap-2 ${activeTab === 'lisp' ? 'active' : ''}`}
+            className={`studio-tab-item flex items-center gap-1.5 ${activeTab === 'lisp' ? 'active' : ''}`}
           >
-            <Cpu className="w-3.5 h-3.5 text-amber-400" /> λ Lisp Machine DSP Plugin
+            <Cpu className="w-3.5 h-3.5 text-amber-400" /> Common Lisp DSP Plugin
           </button>
         </div>
 
-        <div className="text-xs text-gray-400 font-mono hidden md:block">
-          Fs: {generatorConfig.sample_rate} Hz | Duration: {generatorConfig.duration}s
+        <div className="text-xs text-[#8B949E] font-mono hidden md:block">
+          Fs: {generatorConfig.sample_rate} Hz | Dur: {generatorConfig.duration}s
         </div>
       </div>
 
       {/* TAB CONTENT PANES */}
       {activeTab === 'scope' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <Oscilloscope
             timeData={dspData?.time}
             rawSignal={dspData?.raw_signal}
@@ -398,7 +374,7 @@ export default function App() {
         />
       )}
 
-      {/* STUDIO DSP CONTROL PANEL */}
+      {/* TECHNICAL DSP CONTROL PANEL */}
       <ControlPanel
         generatorConfig={generatorConfig}
         setGeneratorConfig={setGeneratorConfig}
@@ -411,9 +387,9 @@ export default function App() {
       />
 
       {/* FOOTER */}
-      <footer className="glass-panel px-4 py-3 flex flex-wrap items-center justify-between text-xs text-gray-400 font-mono">
-        <span>REI SignalLab Studio &copy; 2026 - High-Speed Signal Analysis Suite inspired by Mitov SignalLab</span>
-        <span className="text-cyan-400">FastAPI + SciPy | React 18 + HTML5 Canvas 60FPS</span>
+      <footer className="studio-panel px-3 py-2 flex items-center justify-between text-xs text-[#8B949E] font-mono">
+        <span>REI SignalLab &copy; 2026 - Digital Signal Processing Instrumentation Suite</span>
+        <span>Python FastAPI + SciPy | React 18 + HTML5 Canvas</span>
       </footer>
     </div>
   );
