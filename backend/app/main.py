@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 import numpy as np
 import io
 import wave
@@ -16,14 +17,15 @@ from .schemas import (
     FilterConfig
 )
 from .dsp_engine import DSPEngine
+from .lisp_engine import LispDSPEngine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("signallab_api")
 
 app = FastAPI(
-    title="REI SignalLab API",
+    title="REI SignalLab API with Common Lisp DSP Plugin Engine",
     description="High-Performance Digital Signal Processing & Spectral Analysis Engine inspired by Mitov SignalLab",
-    version="1.1.0"
+    version="1.2.0"
 )
 
 app.add_middleware(
@@ -35,13 +37,20 @@ app.add_middleware(
 )
 
 
+class LispProcessingRequest(BaseModel):
+    lisp_code: str = Field(default="(biquad-filter-simd signal 0.1 0.2 0.1 -0.5 0.25)")
+    generator: SignalGeneratorConfig
+    fft: FFTConfig = Field(default_factory=FFTConfig)
+
+
 @app.get("/")
 def get_root():
     return {
         "app": "REI SignalLab DSP Engine",
         "status": "online",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "features": [
+            "Machine-Level Common Lisp DSP Plugin Engine",
             "Signal Generation (Sine, Square, Triangle, Noise, Pink Noise, Chirp, ECG, Multitone, Pulse)",
             "Modulation Engine (AM, FM, PM)",
             "Math & Quantizer (Hilbert Envelope, Bit Depth Simulation)",
@@ -56,25 +65,16 @@ def get_root():
 @app.post("/api/process", response_model=SignalProcessingResponse)
 def process_signal(req: SignalProcessingRequest):
     try:
-        # 1. Generate Base/Modulated Signal
         t, raw_sig = DSPEngine.generate_signal(req.generator)
         fs = req.generator.sample_rate
-
-        # 2. Math & Quantizer Ops (Gain, Bit quantization, Hilbert envelope)
         quantized_sig, envelope_sig = DSPEngine.apply_math_quantizer(raw_sig, req.math)
-
-        # 3. Apply Digital Filter
         filtered_sig = DSPEngine.apply_filter(quantized_sig, fs, req.filter)
 
-        # 4. FFT Computation
         fft_config_linear = req.fft.model_copy(update={"log_scale": False})
         freqs, mag_linear, phase = DSPEngine.compute_fft(filtered_sig, fs, fft_config_linear)
         _, mag_db, _ = DSPEngine.compute_fft(filtered_sig, fs, req.fft)
 
-        # 5. Calculate Metrics (THD, SNR, SINAD, SFDR, ENOB)
         metrics = DSPEngine.compute_metrics(filtered_sig, freqs, mag_linear, fs)
-
-        # 6. Spectrogram matrix for waterfall
         spec_freqs, spec_times, spec_matrix = DSPEngine.compute_spectrogram(filtered_sig, fs)
 
         return SignalProcessingResponse(
@@ -93,6 +93,42 @@ def process_signal(req: SignalProcessingRequest):
     except Exception as e:
         logger.error(f"Error in process_signal: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"DSP computation error: {str(e)}")
+
+
+@app.post("/api/lisp/process", response_model=SignalProcessingResponse)
+def process_lisp_plugin(req: LispProcessingRequest):
+    """
+    Executes a machine-level Common Lisp DSP Plugin macro on the signal vector.
+    """
+    try:
+        t, raw_sig = DSPEngine.generate_signal(req.generator)
+        fs = req.generator.sample_rate
+
+        # Execute Machine-Level Common Lisp DSP Plugin Macro
+        lisp_filtered, logs = LispDSPEngine.execute_lisp_dsp(req.lisp_code, raw_sig, fs)
+
+        fft_config_linear = req.fft.model_copy(update={"log_scale": False})
+        freqs, mag_linear, phase = DSPEngine.compute_fft(lisp_filtered, fs, fft_config_linear)
+        _, mag_db, _ = DSPEngine.compute_fft(lisp_filtered, fs, req.fft)
+
+        metrics = DSPEngine.compute_metrics(lisp_filtered, freqs, mag_linear, fs)
+        spec_freqs, spec_times, spec_matrix = DSPEngine.compute_spectrogram(lisp_filtered, fs)
+
+        return SignalProcessingResponse(
+            time=t.tolist(),
+            raw_signal=raw_sig.tolist(),
+            filtered_signal=lisp_filtered.tolist(),
+            frequency=freqs.tolist(),
+            spectrum_magnitude=mag_db.tolist(),
+            spectrum_phase=phase.tolist(),
+            metrics=metrics,
+            spectrogram_matrix=spec_matrix.tolist(),
+            spectrogram_times=spec_times.tolist(),
+            spectrogram_frequencies=spec_freqs.tolist()
+        )
+    except Exception as e:
+        logger.error(f"Error executing Lisp plugin: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Lisp DSP Kernel error: {str(e)}")
 
 
 @app.post("/api/export/wav")

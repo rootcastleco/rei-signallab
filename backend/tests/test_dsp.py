@@ -113,3 +113,14 @@ def test_api_wav_export():
     assert response.status_code == 200
     assert response.headers["content-type"] == "audio/wav"
     assert len(response.content) > 100
+
+
+def test_lisp_engine_biquad():
+    from app.lisp_engine import LispDSPEngine
+    signal_in = np.ones(100, dtype=np.float64)
+    lisp_code = "(biquad-filter-simd signal 0.1 0.2 0.1 -0.5 0.25)"
+    out, logs = LispDSPEngine.execute_lisp_dsp(lisp_code, signal_in)
+    assert len(out) == 100
+    assert not np.isnan(out).any()
+    assert logs["status"] == "success"
+

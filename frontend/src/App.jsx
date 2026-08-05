@@ -21,6 +21,7 @@ import VisualPipeline from './components/VisualPipeline';
 import ControlPanel from './components/ControlPanel';
 import AudioEngine from './components/AudioEngine';
 import SignalMetrics from './components/SignalMetrics';
+import LispPluginEditor from './components/LispPluginEditor';
 
 // Studio Laboratory Presets inspired by Mitov SignalLab test benches
 const PRESETS = {
@@ -339,6 +340,13 @@ export default function App() {
           >
             <Network className="w-3.5 h-3.5 text-sky-400" /> Visual Component Graph
           </button>
+
+          <button
+            onClick={() => setActiveTab('lisp')}
+            className={`apple-segmented-item flex items-center gap-2 ${activeTab === 'lisp' ? 'active' : ''}`}
+          >
+            <Cpu className="w-3.5 h-3.5 text-amber-400" /> λ Lisp Machine DSP Plugin
+          </button>
         </div>
 
         <div className="text-xs text-gray-400 font-mono hidden md:block">
@@ -379,6 +387,14 @@ export default function App() {
           fftConfig={fftConfig}
           mathConfig={mathConfig}
           metrics={dspData?.metrics || {}}
+        />
+      )}
+
+      {activeTab === 'lisp' && (
+        <LispPluginEditor
+          generatorConfig={generatorConfig}
+          fftConfig={fftConfig}
+          onLispProcessed={(lispData) => setDspData(lispData)}
         />
       )}
 
