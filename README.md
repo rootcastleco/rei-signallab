@@ -280,6 +280,26 @@ This module provides interactive educational and analytical tools backed by SciP
 
 ---
 
+## 📊 MATLAB Add-On & Client Toolbox Integration
+
+**REI SignalLab 2.1** includes native **MATLAB (R2018b – R2026a+)** integration via an object-oriented client class and 1-click installer:
+
+- **`REISignalLab.m` Client Class**: Connects MATLAB directly to `https://signallab.site` or local API engines using MATLAB's `webwrite` and `webread`.
+- **`install_rei_signallab.m` 1-Click Installer**: Adds the toolbox to the MATLAB search path (`addpath`) and runs connection self-tests.
+- **`matlab/examples/matlab_demo.m`**: Complete demonstration script plotting oscilloscope waveforms, FFT magnitude spectrum, single-plane rotor balancing, SKF/NTN/Cooper/Dodge bearing queries, 3-phase Fortescue power quality, and OpenRouter AI queries directly inside MATLAB figure windows.
+- **Node Graph to `.m` Exporter (`POST /api/matlab/export-m`)**: Converts visual node graph projects into executable MATLAB `.m` scripts.
+
+```matlab
+% Quick Start in MATLAB
+install_rei_signallab
+
+lab = REISignalLab('https://signallab.site');
+sig = lab.processSignal('sine', 440, 1.0, 44100, 0.1, 'lowpass', 1000);
+plot(sig.time, sig.signal); title('REI SignalLab Signal in MATLAB');
+```
+
+---
+
 <a id="node-library"></a>
 
 ## 🎛️ Canonical DSP Node Library
@@ -411,6 +431,14 @@ The interactive OpenAPI schema is served at `/docs` (Swagger UI) and `/redoc`.
 | `POST` | `/api/dsp-lab/autocorrelation` | Normalized autocorrelation & pitch detection |
 | `POST` | `/api/dsp-lab/lms-adaptive` | LMS adaptive noise canceller |
 | `POST` | `/api/dsp-lab/cwt-scalogram` | Continuous Wavelet Transform scalogram |
+
+### MATLAB Add-On & Code Export
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/matlab/client` | Download `REISignalLab.m` object-oriented MATLAB client class |
+| `GET` | `/api/matlab/installer` | Download `install_rei_signallab.m` 1-click MATLAB installer script |
+| `POST` | `/api/matlab/export-m` | Export node graph project into a standalone executable `.m` script |
 
 ### Error envelope
 

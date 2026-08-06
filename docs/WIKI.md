@@ -59,6 +59,7 @@ This wiki describes the public **REI SignalLab 2.1** application and repository.
 - AST-validated custom real-valued math expressions
 - Restricted experimental Python execution with plot capture
 - S-expression DSP macro execution
+- MATLAB Add-On & Client Toolbox (`REISignalLab.m`): Object-oriented MATLAB client class, 1-click installer (`install_rei_signallab.m`), demonstration script (`matlab_demo.m`), and visual node graph to executable `.m` script exporter (`POST /api/matlab/export-m`)
 - CSV and 16-bit mono PCM WAV export
 - Browser audio synthesis via the Web Audio API
 - Matplotlib figures rendered inside the Python scripting sandbox
