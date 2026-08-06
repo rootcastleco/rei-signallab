@@ -68,7 +68,25 @@ echo "⬆️ Pushing image to Artifact Registry..."
 docker push "${IMAGE_TAG}"
 docker push "${IMAGE_LATEST}"
 
-# 6. Deploy to Google Cloud Run
+# 6. Create Temporary Environment Variables YAML File
+ENV_FILE="$(mktemp)"
+trap 'rm -f "${ENV_FILE}"' EXIT
+
+cat > "${ENV_FILE}" <<EOF
+APP_ENV: "production"
+APP_VERSION: "2.1.0"
+COMMIT_SHA: "${COMMIT_SHA}"
+BUILD_TIMESTAMP: "${BUILD_TIMESTAMP}"
+CORS_ALLOWED_ORIGINS: "https://signallab-3305b.web.app,https://signallab-3305b.firebaseapp.com,http://localhost:5173"
+MAX_UPLOAD_BYTES: "26214400"
+MAX_SIGNAL_SAMPLES: "2000000"
+MAX_GRAPH_NODES: "200"
+MAX_GRAPH_CONNECTIONS: "500"
+REQUEST_TIMEOUT_SECONDS: "300"
+LOG_LEVEL: "INFO"
+EOF
+
+# 7. Deploy to Google Cloud Run with --env-vars-file
 echo "☁️ Deploying service to Google Cloud Run (${CLOUD_RUN_SERVICE})..."
 gcloud run deploy "${CLOUD_RUN_SERVICE}" \
   --image="${IMAGE_TAG}" \
@@ -82,13 +100,13 @@ gcloud run deploy "${CLOUD_RUN_SERVICE}" \
   --concurrency=8 \
   --min-instances=0 \
   --max-instances=5 \
-  --set-env-vars="APP_ENV=production,APP_VERSION=2.1.0,COMMIT_SHA=${COMMIT_SHA},BUILD_TIMESTAMP=${BUILD_TIMESTAMP},CORS_ALLOWED_ORIGINS=https://signallab-3305b.web.app,https://signallab-3305b.firebaseapp.com,http://localhost:5173"
+  --env-vars-file="${ENV_FILE}"
 
-# 7. Get Deployed Service URL
+# 8. Get Deployed Service URL
 SERVICE_URL="$(gcloud run services describe "${CLOUD_RUN_SERVICE}" --region="${GCP_REGION}" --project="${GCP_PROJECT_ID}" --format='value(status.url)')"
 echo "🌐 Deployed Cloud Run Service URL: ${SERVICE_URL}"
 
-# 8. Run Live Health Checks
+# 9. Run Live Health Checks
 echo "🧪 Verifying service liveness (/api/health/live)..."
 LIVE_RES="$(curl -fsS "${SERVICE_URL}/api/health/live" || echo "failed")"
 if [[ "${LIVE_RES}" != *"status"* ]] || [[ "${LIVE_RES}" != *"ok"* ]]; then

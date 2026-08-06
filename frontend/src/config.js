@@ -101,3 +101,34 @@ export const safeFetchJson = async (endpoint, options = {}, timeoutMs = 30000) =
     window.clearTimeout(timeoutId);
   }
 };
+
+/**
+ * Frontend Backend Connection Handshake & State Machine.
+ * Validates backend readiness (/api/health/ready) and release version (/api/version).
+ *
+ * @returns {Promise<'API_VERIFIED' | 'API_VERSION_MISMATCH' | 'BACKEND_UNAVAILABLE'>} Handshake status
+ */
+export const verifyBackendHandshake = async () => {
+  try {
+    const expectedVersion = import.meta.env.VITE_EXPECTED_API_VERSION?.trim() || '2.1.0';
+
+    const [readyRes, versionRes] = await Promise.all([
+      safeFetchJson('/api/health/ready', {}, 5000),
+      safeFetchJson('/api/version', {}, 5000)
+    ]);
+
+    if (readyRes?.status !== 'ready') {
+      return 'BACKEND_UNAVAILABLE';
+    }
+
+    if (versionRes?.version && versionRes.version !== expectedVersion) {
+      console.warn(`[Handshake] Version mismatch: expected ${expectedVersion}, got ${versionRes.version}`);
+      return 'API_VERSION_MISMATCH';
+    }
+
+    return 'API_VERIFIED';
+  } catch (err) {
+    console.warn('[Handshake] Backend health check failed:', err.message);
+    return 'BACKEND_UNAVAILABLE';
+  }
+};

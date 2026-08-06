@@ -59,7 +59,7 @@
 
 ## 🚀 Production Deployment & Cloud Run Integration
 
-REI SignalLab is deployed using **Google Cloud Run** (`rei-signallab-api` in `europe-west1`) and **Firebase Hosting** (`signallab-3305b`). Firebase CDN proxies all `/api/**` calls directly to the Cloud Run FastAPI container.
+Cloud Run and Firebase Hosting deployment infrastructure is configured. Production deployment requires the documented GCP/Firebase secrets and a successful deployment workflow run. Firebase CDN proxies all `/api/**` calls directly to the Cloud Run FastAPI container.
 
 For complete setup, health probes, and rollback procedures, refer to [**`docs/DEPLOYMENT.md`**](docs/DEPLOYMENT.md).
 

@@ -27,6 +27,25 @@ jobs:
           PYTHONPATH: backend
         run: pytest backend/tests/ -v
 
+      - name: Test Backend Container Startup
+        run: |
+          echo "🐳 Building local test container..."
+          docker build -t rei-signallab-api:test -f backend/Dockerfile backend
+          echo "🚀 Starting test container on port 8000..."
+          docker run -d --name rei-api-test -p 8000:8000 -e PORT=8000 rei-signallab-api:test
+          trap 'docker logs rei-api-test; docker rm -f rei-api-test' EXIT
+
+          echo "🔍 Waiting for container health readiness..."
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/api/health/ready; then
+              echo "✓ Local Docker container startup test passed!"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "❌ Container startup health check timed out!"
+          exit 1
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -113,7 +132,7 @@ jobs:
           curl -fsS https://signallab-3305b.web.app/api/health/ready
           curl -fsS https://signallab-3305b.web.app/api/version
 
-          echo "🔍 Verifying DSP API endpoint..."
+          echo "🔍 Verifying Vibration API endpoint..."
           curl -fsS -X POST https://signallab-3305b.web.app/api/vibration/analyze \
             -H "Content-Type: application/json" \
             -d '{"sample_rate": 25600, "rpm": {"manual_rpm": 1500.0}}'
