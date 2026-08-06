@@ -411,13 +411,170 @@ class VibrationEngine:
         }
 
     @classmethod
-    def compute_envelope_spectrum(
+    def compute_belt_frequencies(
         cls,
-        sig: np.ndarray,
-        fs: float,
-        low_cutoff_hz: float = 500.0,
-        high_cutoff_hz: float = 5000.0
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        driver_pulley_d1_mm: float,
+        driven_pulley_d2_mm: float,
+        belt_length_l_mm: float,
+        driver_rpm: float
+    ) -> Dict[str, Any]:
+        """
+        Belt Vibration Frequency Calculator (RITEC Tool):
+        Belt Speed V = pi * D1 * N1 / (60 * 1000) m/s
+        Belt Passing Frequency BPF = V / (L / 1000) = (pi * D1 * N1) / (60 * L) Hz
+        """
+        if driver_pulley_d1_mm <= 0 or driven_pulley_d2_mm <= 0 or belt_length_l_mm <= 0 or driver_rpm <= 0:
+            raise ValueError("BELT_INPUT_INVALID: Pulley diameters, belt length, and RPM must be greater than zero.")
+
+        driver_freq_hz = driver_rpm / 60.0
+        driven_rpm = driver_rpm * (driver_pulley_d1_mm / driven_pulley_d2_mm)
+        driven_freq_hz = driven_rpm / 60.0
+
+        belt_speed_m_s = (np.pi * (driver_pulley_d1_mm / 1000.0) * driver_rpm) / 60.0
+        bpf_hz = belt_speed_m_s / (belt_length_l_mm / 1000.0)
+
+        return {
+            "driver_speed_rpm": driver_rpm,
+            "driver_freq_hz": round(driver_freq_hz, 2),
+            "driven_speed_rpm": round(driven_rpm, 1),
+            "driven_freq_hz": round(driven_freq_hz, 2),
+            "belt_speed_m_s": round(belt_speed_m_s, 2),
+            "bpf_hz": round(bpf_hz, 2),
+            "bpf_harmonics_hz": [round(bpf_hz * h, 2) for h in range(1, 6)]
+        }
+
+    @classmethod
+    def compute_shaft_alignment(
+        cls,
+        coupling_diameter_dr_mm: float,
+        dist_coupling_to_front_feet_l1_mm: float,
+        dist_coupling_to_rear_feet_l2_mm: float,
+        rim_top: float, rim_bottom: float,
+        face_top: float, face_bottom: float
+    ) -> Dict[str, Any]:
+        """
+        Face & Rim Shaft Alignment Calculator (RITEC Tool):
+        Offset = (Rim_Top - Rim_Bottom) / 2
+        Angularity = (Face_Top - Face_Bottom) / Coupling_Diameter
+        Front Feet Shim = Offset + Angularity * L1
+        Rear Feet Shim = Offset + Angularity * L2
+        """
+        if coupling_diameter_dr_mm <= 0:
+            raise ValueError("ALIGNMENT_COUPLING_DIAMETER_INVALID: Coupling diameter must be greater than zero.")
+
+        offset_mm = (rim_top - rim_bottom) / 2.0
+        angularity_mm_per_mm = (face_top - face_bottom) / coupling_diameter_dr_mm
+
+        front_feet_shim_mm = offset_mm + angularity_mm_per_mm * dist_coupling_to_front_feet_l1_mm
+        rear_feet_shim_mm = offset_mm + angularity_mm_per_mm * dist_coupling_to_rear_feet_l2_mm
+
+        return {
+            "offset_error_mm": round(offset_mm, 3),
+            "angularity_gap_mm": round((face_top - face_bottom), 3),
+            "front_feet_movement_mm": round(front_feet_shim_mm, 3),
+            "rear_feet_movement_mm": round(rear_feet_shim_mm, 3),
+            "alignment_status": "EXCELLENT" if abs(offset_mm) < 0.05 and abs(face_top - face_bottom) < 0.05 else "ALIGNMENT_CORRECTION_REQUIRED"
+        }
+
+    @classmethod
+    def compute_vibration_unit_conversion(
+        cls,
+        value: float,
+        input_unit: str,
+        freq_hz: float
+    ) -> Dict[str, float]:
+        """
+        Vibration Amplitude Unit Converter (RITEC Tool):
+        Converts between Acceleration (g, m/s²), Velocity (mm/s, in/s), and Displacement (μm, mils) at frequency f.
+        """
+        if freq_hz <= 0:
+            raise ValueError("CONVERTER_FREQ_INVALID: Frequency must be greater than zero.")
+
+        w = 2.0 * np.pi * freq_hz
+
+        # First convert input value to acceleration in m/s² RMS
+        if input_unit in ["g_pk", "g"]:
+            acc_m_s2_rms = (value * 9.80665) / np.sqrt(2.0)
+        elif input_unit == "m_s2_rms":
+            acc_m_s2_rms = value
+        elif input_unit == "mm_s_rms":
+            acc_m_s2_rms = (value / 1000.0) * w
+        elif input_unit == "um_pk_pk":
+            disp_m_rms = (value / 1e6) / (2.0 * np.sqrt(2.0))
+            acc_m_s2_rms = disp_m_rms * (w**2)
+        else:
+            acc_m_s2_rms = value
+
+        acc_g_pk = (acc_m_s2_rms * np.sqrt(2.0)) / 9.80665
+        vel_mm_s_rms = (acc_m_s2_rms / w) * 1000.0
+        disp_um_pk_pk = (vel_mm_s_rms * np.sqrt(2.0) / w) * 1000.0 * 2.0
+
+        return {
+            "acceleration_g_pk": round(acc_g_pk, 3),
+            "acceleration_m_s2_rms": round(acc_m_s2_rms, 3),
+            "velocity_mm_s_rms": round(vel_mm_s_rms, 3),
+            "velocity_in_s_pk": round(vel_mm_s_rms * np.sqrt(2.0) / 25.4, 3),
+            "displacement_um_pk_pk": round(disp_um_pk_pk, 2),
+            "displacement_mils_pk_pk": round(disp_um_pk_pk / 25.4, 2)
+        }
+
+    @classmethod
+    def compute_sdof_mass_spring_damper(
+        cls,
+        mass_kg: float,
+        stiffness_n_m: float,
+        damping_c_n_s_m: float,
+        x0_m: float = 0.01,
+        v0_m_s: float = 0.0,
+        duration_s: float = 1.0,
+        fs: float = 1000.0
+    ) -> Dict[str, Any]:
+        """
+        Mass-Spring-Damper SDOF Free Response Interactive Simulator (RITEC Tool):
+        Calculates undamped natural frequency, damping ratio, damped natural frequency, and time displacement trace.
+        """
+        if mass_kg <= 0 or stiffness_n_m <= 0:
+            raise ValueError("SDOF_INPUT_INVALID: Mass and stiffness must be greater than zero.")
+
+        wn = np.sqrt(stiffness_n_m / mass_kg)
+        fn = wn / (2.0 * np.pi)
+
+        c_critical = 2.0 * np.sqrt(mass_kg * stiffness_n_m)
+        zeta = damping_c_n_s_m / c_critical
+
+        if zeta < 1.0:
+            wd = wn * np.sqrt(1.0 - zeta**2)
+            fd = wd / (2.0 * np.pi)
+            system_type = "Underdamped (Oscillatory)"
+        elif abs(zeta - 1.0) < 1e-5:
+            wd = 0.0
+            fd = 0.0
+            system_type = "Critically Damped"
+        else:
+            wd = 0.0
+            fd = 0.0
+            system_type = "Overdamped"
+
+        N = int(duration_s * fs)
+        t = np.linspace(0, duration_s, N, endpoint=False)
+        x_trace = []
+
+        for tv in t:
+          if zeta < 1.0:
+            val = np.exp(-zeta * wn * tv) * (x0_m * np.cos(wd * tv) + ((v0_m_s + zeta * wn * x0_m) / wd) * np.sin(wd * tv))
+          else:
+            val = x0_m * np.exp(-wn * tv)
+          x_trace.append(float(val))
+
+        return {
+            "natural_freq_hz": round(fn, 2),
+            "natural_freq_rad_s": round(wn, 2),
+            "damping_ratio_zeta": round(zeta, 4),
+            "damped_freq_hz": round(fd, 2),
+            "system_type": system_type,
+            "time": t.tolist(),
+            "displacement_mm": [x * 1000.0 for x in x_trace]
+        }
         """
         Bandpass filter -> Hilbert Envelope Demodulation -> FFT
         """

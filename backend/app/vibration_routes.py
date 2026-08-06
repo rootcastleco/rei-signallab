@@ -262,6 +262,38 @@ async def upload(
     return analyze_vibration(req)
 
 
+@router.post("/belt-calculator")
+def compute_belt(req: dict):
+    try:
+        return VibrationEngine.compute_belt_frequencies(**req)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.post("/alignment-calculator")
+def compute_alignment(req: dict):
+    try:
+        return VibrationEngine.compute_shaft_alignment(**req)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.post("/unit-converter")
+def compute_unit_converter(req: dict):
+    try:
+        return VibrationEngine.compute_vibration_unit_conversion(**req)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.post("/sdof-simulator")
+def compute_sdof(req: dict):
+    try:
+        return VibrationEngine.compute_sdof_mass_spring_damper(**req)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
 @router.get("/bearing-database")
 def bearing_database():
     return [

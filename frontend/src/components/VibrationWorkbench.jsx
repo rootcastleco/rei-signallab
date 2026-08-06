@@ -40,6 +40,7 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
   const waveformCanvasRef = useRef(null);
   const spectrumCanvasRef = useRef(null);
   const polarCanvasRef = useRef(null);
+  const orbitCanvasRef = useRef(null);
   const vibFileInputRef = useRef(null);
 
   const shaftFreqHz = rpm / 60.0;
@@ -626,6 +627,64 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
 
   }, [activeTab, balanceResult, v0Amp, v0Phase, v1Amp, v1Phase]);
 
+  // Proximity Probe Orbit Plot Render (Lissajous X-Y)
+  useEffect(() => {
+    if (activeTab !== 'orbit') return;
+    const oCanvas = orbitCanvasRef.current;
+    if (!oCanvas) return;
+
+    oCanvas.width = oCanvas.parentElement.clientWidth;
+    oCanvas.height = 220;
+    const ctx = oCanvas.getContext('2d');
+    const W = oCanvas.width, H = oCanvas.height;
+    const cx = W / 2, cy = H / 2, R = Math.min(cx, cy) - 25;
+
+    ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, H);
+
+    // Draw Proximity Probe Axes (X @ 45 deg, Y @ 135 deg)
+    ctx.strokeStyle = '#005500'; ctx.lineWidth = 1;
+    [0.33, 0.66, 1.0].forEach(rRatio => {
+      ctx.beginPath(); ctx.arc(cx, cy, R * rRatio, 0, 2 * Math.PI); ctx.stroke();
+    });
+
+    // Probe X Line
+    const radX = (45 * Math.PI) / 180;
+    ctx.beginPath(); ctx.moveTo(cx - R * Math.cos(radX), cy + R * Math.sin(radX)); ctx.lineTo(cx + R * Math.cos(radX), cy - R * Math.sin(radX)); ctx.stroke();
+    ctx.fillStyle = '#00FF00'; ctx.font = 'bold 9px monospace';
+    ctx.fillText('Probe X (45°)', cx + R * Math.cos(radX) + 5, cy - R * Math.sin(radX));
+
+    // Probe Y Line
+    const radY = (135 * Math.PI) / 180;
+    ctx.beginPath(); ctx.moveTo(cx - R * Math.cos(radY), cy + R * Math.sin(radY)); ctx.lineTo(cx + R * Math.cos(radY), cy - R * Math.sin(radY)); ctx.stroke();
+    ctx.fillText('Probe Y (135°)', cx + R * Math.cos(radY) - 60, cy - R * Math.sin(radY));
+
+    // Lissajous Orbit Trajectory: 1X + 2X misalignment + 0.5X sub-sync
+    ctx.strokeStyle = '#00FFFF'; ctx.lineWidth = 1.8; ctx.beginPath();
+    const f1 = shaftFreqHz;
+    const N = 400;
+
+    for (let i = 0; i <= N; i++) {
+      const t = (i / N) * (2.0 / f1); // 2 full revolutions
+      // X & Y Proximity probe signals
+      const xVal = 0.6 * Math.cos(2 * Math.PI * f1 * t) + 0.2 * Math.cos(4 * Math.PI * f1 * t + 0.5);
+      const yVal = 0.6 * Math.sin(2 * Math.PI * f1 * t + 0.3) + 0.2 * Math.sin(4 * Math.PI * f1 * t + 0.8);
+
+      const px = cx + xVal * R * 0.9;
+      const py = cy - yVal * R * 0.9;
+
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // Keyphasor Dot once per revolution (t = 0)
+    const kpX = cx + (0.6 * Math.cos(0) + 0.2 * Math.cos(0.5)) * R * 0.9;
+    const kpY = cy - (0.6 * Math.sin(0.3) + 0.2 * Math.sin(0.8)) * R * 0.9;
+    ctx.fillStyle = '#FF0000'; ctx.beginPath(); ctx.arc(kpX, kpY, 5, 0, 2 * Math.PI); ctx.fill();
+
+    ctx.fillStyle = '#00FF00'; ctx.font = 'bold 11px monospace';
+    ctx.fillText('Proximity Probe Shaft Orbit Plot (Lissajous X-Y + Keyphasor Dot)', 8, 14);
+  }, [activeTab, shaftFreqHz]);
+
   const generateReport = () => {
     const bf = telemetry?.bearing_frequencies || {};
     const reportObj = {
@@ -934,6 +993,9 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
             <button onClick={() => setActiveTab('harmonic')} className={`win98-tab text-xs ${activeTab === 'harmonic' ? 'active font-bold text-[#000080]' : ''}`}>
               1X-10X Harmonic Orders
             </button>
+            <button onClick={() => setActiveTab('orbit')} className={`win98-tab text-xs ${activeTab === 'orbit' ? 'active font-bold text-[#000080]' : ''}`}>
+              🌀 Proximity Orbit Plot
+            </button>
             <button onClick={() => setActiveTab('envelope')} className={`win98-tab text-xs ${activeTab === 'envelope' ? 'active font-bold' : ''}`}>
               Hilbert Envelope
             </button>
@@ -947,10 +1009,14 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
             <canvas ref={waveformCanvasRef} style={{ width: '100%', display: 'block' }} />
           </div>
 
-          {/* Dynamic Plot Display (Spectrum vs Polar Plot) */}
+          {/* Dynamic Plot Display (Spectrum vs Polar Plot vs Orbit Plot) */}
           {activeTab === 'balancing' ? (
             <div className="win98-outset p-1 bg-[#000000]">
               <canvas ref={polarCanvasRef} style={{ width: '100%', display: 'block' }} />
+            </div>
+          ) : activeTab === 'orbit' ? (
+            <div className="win98-outset p-1 bg-[#000000]">
+              <canvas ref={orbitCanvasRef} style={{ width: '100%', display: 'block' }} />
             </div>
           ) : (
             <div className="win98-outset p-1 bg-[#000000]">
