@@ -37,10 +37,32 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
   const [trustMode, setTrustMode] = useState(null);
   const [vibrationFile, setVibrationFile] = useState(null);
 
+  const [driverD1, setDriverD1] = useState(150);
+  const [drivenD2, setDrivenD2] = useState(300);
+  const [beltLength, setBeltLength] = useState(1200);
+
+  const [couplingDr, setCouplingDr] = useState(100);
+  const [distL1, setDistL1] = useState(250);
+  const [distL2, setDistL2] = useState(600);
+  const [rimTop, setRimTop] = useState(0);
+  const [rimBottom, setRimBottom] = useState(0.40);
+  const [faceTop, setFaceTop] = useState(0);
+  const [faceBottom, setFaceBottom] = useState(0.30);
+
+  const [sdofMass, setSdofMass] = useState(10);
+  const [sdofStiffness, setSdofStiffness] = useState(50000);
+  const [sdofDamping, setSdofDamping] = useState(50);
+  const [sdofX0, setSdofX0] = useState(10);
+
+  const [convVal, setConvVal] = useState(5.0);
+  const [convUnit, setConvUnit] = useState('g_pk');
+  const [convFreq, setConvFreq] = useState(50);
+
   const waveformCanvasRef = useRef(null);
   const spectrumCanvasRef = useRef(null);
   const polarCanvasRef = useRef(null);
   const orbitCanvasRef = useRef(null);
+  const sdofCanvasRef = useRef(null);
   const vibFileInputRef = useRef(null);
 
   const shaftFreqHz = rpm / 60.0;
@@ -685,6 +707,49 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
     ctx.fillText('Proximity Probe Shaft Orbit Plot (Lissajous X-Y + Keyphasor Dot)', 8, 14);
   }, [activeTab, shaftFreqHz]);
 
+  // SDOF Mass-Spring-Damper Free Response Canvas Render
+  useEffect(() => {
+    if (activeTab !== 'sdof') return;
+    const sCanvas = sdofCanvasRef.current;
+    if (!sCanvas) return;
+
+    sCanvas.width = sCanvas.parentElement.clientWidth;
+    sCanvas.height = 220;
+    const ctx = sCanvas.getContext('2d');
+    const W = sCanvas.width, H = sCanvas.height;
+
+    ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#004400'; ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
+
+    const m = parseFloat(sdofMass) || 10.0;
+    const k = parseFloat(sdofStiffness) || 50000.0;
+    const c = parseFloat(sdofDamping) || 50.0;
+    const x0 = (parseFloat(sdofX0) || 10.0) / 1000.0; // mm to m
+
+    const wn = Math.sqrt(k / m);
+    const cc = 2.0 * Math.sqrt(m * k);
+    const zeta = c / cc;
+    const wd = wn * Math.sqrt(Math.max(0, 1.0 - zeta * zeta));
+
+    ctx.strokeStyle = '#00FF00'; ctx.lineWidth = 2; ctx.beginPath();
+    const duration = 0.5;
+    const N = W;
+
+    for (let i = 0; i < N; i++) {
+      const t = (i / N) * duration;
+      const xVal = Math.exp(-zeta * wn * t) * x0 * Math.cos(wd * t);
+      const px = i;
+      const py = H / 2 - (xVal / x0) * (H / 2 - 25);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = '#00FF00'; ctx.font = 'bold 11px monospace';
+    ctx.fillText(`SDOF Free Vibration Response (fn: ${(wn / (2 * Math.PI)).toFixed(1)} Hz, ζ: ${zeta.toFixed(3)})`, 8, 16);
+  }, [activeTab, sdofMass, sdofStiffness, sdofDamping, sdofX0]);
+
   const generateReport = () => {
     const bf = telemetry?.bearing_frequencies || {};
     const reportObj = {
@@ -986,21 +1051,30 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
         {/* 2. Middle Visual Displays (2 Columns) */}
         <div className="lg:col-span-2 flex flex-col gap-2">
           {/* Navigation Sub-Tabs */}
-          <div className="win98-tabs">
+          <div className="win98-tabs flex-wrap">
             <button onClick={() => setActiveTab('spectrum')} className={`win98-tab text-xs ${activeTab === 'spectrum' ? 'active font-bold' : ''}`}>
-              FFT Spectrum + Markers
+              FFT Spectrum
             </button>
             <button onClick={() => setActiveTab('harmonic')} className={`win98-tab text-xs ${activeTab === 'harmonic' ? 'active font-bold text-[#000080]' : ''}`}>
-              1X-10X Harmonic Orders
+              1X-10X Harmonics
             </button>
             <button onClick={() => setActiveTab('orbit')} className={`win98-tab text-xs ${activeTab === 'orbit' ? 'active font-bold text-[#000080]' : ''}`}>
-              🌀 Proximity Orbit Plot
-            </button>
-            <button onClick={() => setActiveTab('envelope')} className={`win98-tab text-xs ${activeTab === 'envelope' ? 'active font-bold' : ''}`}>
-              Hilbert Envelope
+              🌀 Orbit Plot
             </button>
             <button onClick={() => setActiveTab('balancing')} className={`win98-tab text-xs ${activeTab === 'balancing' ? 'active font-bold text-[#000080]' : ''}`}>
-              Rotor Balancing Polar Plot
+              ⚖️ Rotor Balancing
+            </button>
+            <button onClick={() => setActiveTab('belt')} className={`win98-tab text-xs ${activeTab === 'belt' ? 'active font-bold text-[#000080]' : ''}`}>
+              🔄 Belt Calculator
+            </button>
+            <button onClick={() => setActiveTab('alignment')} className={`win98-tab text-xs ${activeTab === 'alignment' ? 'active font-bold text-[#000080]' : ''}`}>
+              📐 Shaft Alignment
+            </button>
+            <button onClick={() => setActiveTab('sdof')} className={`win98-tab text-xs ${activeTab === 'sdof' ? 'active font-bold text-[#000080]' : ''}`}>
+              🌊 SDOF Simulator
+            </button>
+            <button onClick={() => setActiveTab('converter')} className={`win98-tab text-xs ${activeTab === 'converter' ? 'active font-bold text-[#000080]' : ''}`}>
+              🔄 Unit Converter
             </button>
           </div>
 
@@ -1009,7 +1083,7 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
             <canvas ref={waveformCanvasRef} style={{ width: '100%', display: 'block' }} />
           </div>
 
-          {/* Dynamic Plot Display (Spectrum vs Polar Plot vs Orbit Plot) */}
+          {/* Dynamic Plot Display (Spectrum vs Polar vs Orbit vs SDOF vs Tools) */}
           {activeTab === 'balancing' ? (
             <div className="win98-outset p-1 bg-[#000000]">
               <canvas ref={polarCanvasRef} style={{ width: '100%', display: 'block' }} />
@@ -1017,6 +1091,95 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
           ) : activeTab === 'orbit' ? (
             <div className="win98-outset p-1 bg-[#000000]">
               <canvas ref={orbitCanvasRef} style={{ width: '100%', display: 'block' }} />
+            </div>
+          ) : activeTab === 'sdof' ? (
+            <div className="win98-outset p-1 bg-[#000000]">
+              <canvas ref={sdofCanvasRef} style={{ width: '100%', display: 'block' }} />
+            </div>
+          ) : activeTab === 'belt' ? (
+            <div className="win98-outset p-3 bg-[#C0C0C0] text-xs font-mono flex flex-col gap-2">
+              <div className="font-bold text-[#000080] border-b border-[#808080] pb-1">Belt Vibration Frequency Calculator (RITEC Tool)</div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><label>Driver Pulley D1 (mm):</label><input type="number" value={driverD1} onChange={e => setDriverD1(parseFloat(e.target.value))} className="w-full font-mono" /></div>
+                <div><label>Driven Pulley D2 (mm):</label><input type="number" value={drivenD2} onChange={e => setDrivenD2(parseFloat(e.target.value))} className="w-full font-mono" /></div>
+                <div><label>Belt Length L (mm):</label><input type="number" value={beltLength} onChange={e => setBeltLength(parseFloat(e.target.value))} className="w-full font-mono" /></div>
+                <div><label>Driver Speed (RPM):</label><input type="number" value={rpm} onChange={e => setRpm(parseFloat(e.target.value))} className="w-full font-mono" /></div>
+              </div>
+              {(() => {
+                const speedMs = (Math.PI * (driverD1 / 1000) * rpm) / 60;
+                const bpfHz = speedMs / (beltLength / 1000);
+                const drivenRpm = rpm * (driverD1 / drivenD2);
+                return (
+                  <div className="bg-[#000000] text-[#00FF00] p-2 border border-[#808080] flex flex-col gap-1 mt-1">
+                    <div>BELT SPEED: {speedMs.toFixed(2)} m/s</div>
+                    <div className="text-[#FFFF00] font-bold">BELT PASSING FREQ (BPF): {bpfHz.toFixed(2)} Hz</div>
+                    <div>DRIVEN SPEED: {drivenRpm.toFixed(1)} RPM ({(drivenRpm / 60).toFixed(1)} Hz)</div>
+                    <div>BPF Harmonics: 1X = {bpfHz.toFixed(1)}Hz, 2X = {(bpfHz * 2).toFixed(1)}Hz, 3X = {(bpfHz * 3).toFixed(1)}Hz</div>
+                  </div>
+                );
+              })()}
+            </div>
+          ) : activeTab === 'alignment' ? (
+            <div className="win98-outset p-3 bg-[#C0C0C0] text-xs font-mono flex flex-col gap-2">
+              <div className="font-bold text-[#000080] border-b border-[#808080] pb-1">Face & Rim Shaft Alignment Calculator (RITEC Tool)</div>
+              <div className="grid grid-cols-2 gap-2 text-[10px]">
+                <div><label>Coupling Diameter Dr (mm):</label><input type="number" value={couplingDr} onChange={e => setCouplingDr(parseFloat(e.target.value))} className="w-full font-mono" /></div>
+                <div><label>Dist to Front Feet L1 (mm):</label><input type="number" value={distL1} onChange={e => setDistL1(parseFloat(e.target.value))} className="w-full font-mono" /></div>
+                <div><label>Dist to Rear Feet L2 (mm):</label><input type="number" value={distL2} onChange={e => setDistL2(parseFloat(e.target.value))} className="w-full font-mono" /></div>
+                <div><label>Rim Reading Top/Bottom (mm):</label><div className="flex gap-1"><input type="number" value={rimTop} onChange={e => setRimTop(parseFloat(e.target.value))} className="w-1/2 font-mono" /><input type="number" value={rimBottom} onChange={e => setRimBottom(parseFloat(e.target.value))} className="w-1/2 font-mono" /></div></div>
+                <div className="col-span-2"><label>Face Reading Top/Bottom (mm):</label><div className="flex gap-1"><input type="number" value={faceTop} onChange={e => setFaceTop(parseFloat(e.target.value))} className="w-1/2 font-mono" /><input type="number" value={faceBottom} onChange={e => setFaceBottom(parseFloat(e.target.value))} className="w-1/2 font-mono" /></div></div>
+              </div>
+              {(() => {
+                const offset = (rimTop - rimBottom) / 2;
+                const angularity = (faceTop - faceBottom) / couplingDr;
+                const ffShim = offset + angularity * distL1;
+                const rfShim = offset + angularity * distL2;
+                return (
+                  <div className="bg-[#000000] text-[#00FF00] p-2 border border-[#808080] flex flex-col gap-1 mt-1">
+                    <div>OFFSET ERROR: {offset.toFixed(3)} mm</div>
+                    <div>ANGULAR GAP: {(faceTop - faceBottom).toFixed(3)} mm</div>
+                    <div className="text-[#00FFFF] font-bold">FRONT FEET MOVEMENT (FF): {ffShim > 0 ? `+${ffShim.toFixed(3)} mm (ADD SHIMS)` : `${ffShim.toFixed(3)} mm (REMOVE)`}</div>
+                    <div className="text-[#00FFFF] font-bold">REAR FEET MOVEMENT (RF): {rfShim > 0 ? `+${rfShim.toFixed(3)} mm (ADD SHIMS)` : `${rfShim.toFixed(3)} mm (REMOVE)`}</div>
+                  </div>
+                );
+              })()}
+            </div>
+          ) : activeTab === 'converter' ? (
+            <div className="win98-outset p-3 bg-[#C0C0C0] text-xs font-mono flex flex-col gap-2">
+              <div className="font-bold text-[#000080] border-b border-[#808080] pb-1">Vibration Unit Converter (RITEC Tool)</div>
+              <div className="grid grid-cols-3 gap-2">
+                <div><label>Value:</label><input type="number" step="0.1" value={convVal} onChange={e => setConvVal(parseFloat(e.target.value))} className="w-full font-mono" /></div>
+                <div>
+                  <label>Input Unit:</label>
+                  <select value={convUnit} onChange={e => setConvUnit(e.target.value)} className="w-full font-mono">
+                    <option value="g_pk">Acceleration (g pk)</option>
+                    <option value="m_s2_rms">Acceleration (m/s² RMS)</option>
+                    <option value="mm_s_rms">Velocity (mm/s RMS)</option>
+                    <option value="um_pk_pk">Displacement (μm pk-pk)</option>
+                  </select>
+                </div>
+                <div><label>Frequency (Hz):</label><input type="number" value={convFreq} onChange={e => setConvFreq(parseFloat(e.target.value))} className="w-full font-mono" /></div>
+              </div>
+              {(() => {
+                const w = 2 * Math.PI * convFreq;
+                let accRms = 1.0;
+                if (convUnit === 'g_pk') accRms = (convVal * 9.80665) / Math.SQRT2;
+                else if (convUnit === 'm_s2_rms') accRms = convVal;
+                else if (convUnit === 'mm_s_rms') accRms = (convVal / 1000) * w;
+                else if (convUnit === 'um_pk_pk') accRms = ((convVal / 1e6) / (2 * Math.SQRT2)) * (w ** 2);
+
+                const gPk = (accRms * Math.SQRT2) / 9.80665;
+                const velRms = (accRms / w) * 1000;
+                const dispUm = (velRms * Math.SQRT2 / w) * 1000 * 2;
+
+                return (
+                  <div className="bg-[#000000] text-[#00FF00] p-2 border border-[#808080] grid grid-cols-2 gap-1 mt-1 text-[11px]">
+                    <div>Acceleration: <span className="font-bold text-[#FFFF00]">{gPk.toFixed(3)} g pk</span> ({accRms.toFixed(2)} m/s² RMS)</div>
+                    <div>Velocity: <span className="font-bold text-[#00FFFF]">{velRms.toFixed(2)} mm/s RMS</span> ({(velRms * Math.SQRT2 / 25.4).toFixed(3)} in/s pk)</div>
+                    <div className="col-span-2">Displacement: <span className="font-bold text-[#FF5555]">{dispUm.toFixed(1)} μm pk-pk</span> ({(dispUm / 25.4).toFixed(2)} mils pk-pk)</div>
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             <div className="win98-outset p-1 bg-[#000000]">

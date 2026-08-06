@@ -362,12 +362,6 @@ export default function App() {
               <Layers size={14} className="text-[#0000FF]" /> 🎛️ Signal Flow Studio <span className="badge-blink">v2.1</span>
             </button>
             <button
-              onClick={() => setActiveView('vibration')}
-              className={`win98-tab font-bold text-xs flex items-center gap-1 ${activeView === 'vibration' ? 'active font-black text-[#000080] bg-[#FFFFCC]' : ''}`}
-            >
-              <Gauge size={14} className="text-[#0000FF]" /> ⚙️ Vibration
-            </button>
-            <button
               onClick={() => setActiveView('electrical')}
               className={`win98-tab font-bold text-xs flex items-center gap-1 ${activeView === 'electrical' ? 'active font-black text-[#000080] bg-[#FFFFCC]' : ''}`}
             >
