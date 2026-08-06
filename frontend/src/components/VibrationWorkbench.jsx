@@ -56,6 +56,18 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
       .catch(() => {});
   }, []);
 
+  const [toneF1, setToneF1] = useState(51);
+  const [toneAmp1, setToneAmp1] = useState(3);
+  const [toneF2, setToneF2] = useState(52);
+  const [toneAmp2, setToneAmp2] = useState(1);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+
+  const audioCtxRef = useRef(null);
+  const osc1Ref = useRef(null);
+  const osc2Ref = useRef(null);
+  const gain1Ref = useRef(null);
+  const gain2Ref = useRef(null);
+
   const [driverD1, setDriverD1] = useState(150);
   const [drivenD2, setDrivenD2] = useState(300);
   const [beltLength, setBeltLength] = useState(1200);
@@ -769,6 +781,61 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
     ctx.fillText(`SDOF Free Vibration Response (fn: ${(wn / (2 * Math.PI)).toFixed(1)} Hz, ζ: ${zeta.toFixed(3)})`, 8, 16);
   }, [activeTab, sdofMass, sdofStiffness, sdofDamping, sdofX0]);
 
+  // Real-time Web Audio Tone Generator Controls
+  const toggleAudioTone = () => {
+    if (isPlayingAudio) {
+      if (osc1Ref.current) try { osc1Ref.current.stop(); } catch(e){}
+      if (osc2Ref.current) try { osc2Ref.current.stop(); } catch(e){}
+      if (audioCtxRef.current) try { audioCtxRef.current.close(); } catch(e){}
+      audioCtxRef.current = null;
+      setIsPlayingAudio(false);
+    } else {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioCtx();
+      audioCtxRef.current = ctx;
+
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      const gain2 = ctx.createGain();
+      const master = ctx.createGain();
+
+      osc1.type = 'sine';
+      osc2.type = 'sine';
+      osc1.frequency.setValueAtTime(parseFloat(toneF1) || 51, ctx.currentTime);
+      osc2.frequency.setValueAtTime(parseFloat(toneF2) || 52, ctx.currentTime);
+
+      gain1.gain.setValueAtTime((parseFloat(toneAmp1) || 3) / 20.0, ctx.currentTime);
+      gain2.gain.setValueAtTime((parseFloat(toneAmp2) || 1) / 20.0, ctx.currentTime);
+      master.gain.setValueAtTime(0.3, ctx.currentTime);
+
+      osc1.connect(gain1);
+      osc2.connect(gain2);
+      gain1.connect(master);
+      gain2.connect(master);
+      master.connect(ctx.destination);
+
+      osc1.start();
+      osc2.start();
+
+      osc1Ref.current = osc1;
+      osc2Ref.current = osc2;
+      gain1Ref.current = gain1;
+      gain2Ref.current = gain2;
+      setIsPlayingAudio(true);
+    }
+  };
+
+  useEffect(() => {
+    if (isPlayingAudio && audioCtxRef.current) {
+      const ctx = audioCtxRef.current;
+      if (osc1Ref.current) osc1Ref.current.frequency.setValueAtTime(parseFloat(toneF1) || 51, ctx.currentTime);
+      if (osc2Ref.current) osc2Ref.current.frequency.setValueAtTime(parseFloat(toneF2) || 52, ctx.currentTime);
+      if (gain1Ref.current) gain1Ref.current.gain.setValueAtTime((parseFloat(toneAmp1) || 3) / 20.0, ctx.currentTime);
+      if (gain2Ref.current) gain2Ref.current.gain.setValueAtTime((parseFloat(toneAmp2) || 1) / 20.0, ctx.currentTime);
+    }
+  }, [toneF1, toneF2, toneAmp1, toneAmp2, isPlayingAudio]);
+
   const generateReport = () => {
     const bf = telemetry?.bearing_frequencies || {};
     const reportObj = {
@@ -1136,6 +1203,9 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
             <button onClick={() => setActiveTab('sdof')} className={`win98-tab text-xs ${activeTab === 'sdof' ? 'active font-bold text-[#000080]' : ''}`}>
               🌊 SDOF Simulator
             </button>
+            <button onClick={() => setActiveTab('tonegen')} className={`win98-tab text-xs ${activeTab === 'tonegen' ? 'active font-bold text-[#000080]' : ''}`}>
+              🔊 Signal Tone Generator
+            </button>
             <button onClick={() => setActiveTab('converter')} className={`win98-tab text-xs ${activeTab === 'converter' ? 'active font-bold text-[#000080]' : ''}`}>
               🔄 Unit Converter
             </button>
@@ -1206,6 +1276,58 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
                   </div>
                 );
               })()}
+            </div>
+          ) : activeTab === 'tonegen' ? (
+            <div className="win98-outset p-3 bg-[#C0C0C0] text-xs font-mono flex flex-col gap-2">
+              <div className="font-bold text-[#000080] border-b border-[#808080] pb-1 flex items-center justify-between">
+                <span>Signal Tone Generator with Audial Beating Effect (RITEC Tool)</span>
+                <span className="text-[10px] text-[#008800]">Audially Demonstrates Acoustic Beating ($\Delta f = |f_1 - f_2|$)</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                {/* Tone 1 */}
+                <div className="bg-[#E0E0E0] p-2 border border-[#808080] flex flex-col gap-1">
+                  <div className="font-bold text-[#0000FF]">Sine Wave 1 (F1):</div>
+                  <div className="flex items-center gap-2">
+                    <label className="w-16">Freq (Hz):</label>
+                    <input type="number" value={toneF1} onChange={e => setToneF1(parseFloat(e.target.value))} className="w-full font-mono text-xs" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="w-16">Amplitude:</label>
+                    <input type="number" step="0.5" value={toneAmp1} onChange={e => setToneAmp1(parseFloat(e.target.value))} className="w-full font-mono text-xs" />
+                  </div>
+                </div>
+
+                {/* Tone 2 */}
+                <div className="bg-[#E0E0E0] p-2 border border-[#808080] flex flex-col gap-1">
+                  <div className="font-bold text-[#0000FF]">Sine Wave 2 (F2):</div>
+                  <div className="flex items-center gap-2">
+                    <label className="w-16">Freq (Hz):</label>
+                    <input type="number" value={toneF2} onChange={e => setToneF2(parseFloat(e.target.value))} className="w-full font-mono text-xs" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="w-16">Amplitude:</label>
+                    <input type="number" step="0.5" value={toneAmp2} onChange={e => setToneAmp2(parseFloat(e.target.value))} className="w-full font-mono text-xs" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Audio Controls & Beating Info */}
+              <div className="bg-[#000000] text-[#00FF00] p-2 border border-[#808080] flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={toggleAudioTone}
+                    className={`win98-btn text-xs font-bold px-3 py-1 ${isPlayingAudio ? 'bg-[#FF0000] text-white' : 'bg-[#00AA00] text-white'}`}
+                  >
+                    {isPlayingAudio ? '⏹ Stop Audio Tone' : '▶ Play Dual Sine Tone Audio'}
+                  </button>
+                  {isPlayingAudio && <span className="badge-blink text-[#FFFF00] font-bold">🔊 AUDIO PLAYING</span>}
+                </div>
+
+                <div className="text-[11px] font-mono">
+                  BEAT FREQUENCY ($\Delta f$): <span className="font-bold text-[#FFFF00]">{Math.abs(toneF1 - toneF2).toFixed(1)} Hz</span> ({Math.abs(toneF1 - toneF2).toFixed(1)} Beats/sec)
+                </div>
+              </div>
             </div>
           ) : activeTab === 'converter' ? (
             <div className="win98-outset p-3 bg-[#C0C0C0] text-xs font-mono flex flex-col gap-2">
