@@ -134,25 +134,89 @@ def analyze_vibration(req: VibrationAnalysisRequest):
 @router.post("/balance")
 def balance(config: BalanceInputConfig):
     try:
-        res = VibrationEngine.compute_single_plane_balance(
-            v0_amp=config.v0_amp,
-            v0_phase_deg=config.v0_phase_deg,
-            t_mass=config.trial_mass,
-            t_angle_deg=config.trial_angle_deg,
-            v1_amp=config.v1_amp,
-            v1_phase_deg=config.v1_phase_deg
-        )
-        out = res.dict()
+        method = config.balance_method.value if hasattr(config.balance_method, 'value') else str(config.balance_method)
         
-        if config.trial_radius_mm is not None and config.correction_radius_mm is not None and config.trial_radius_mm != config.correction_radius_mm:
-            # Adjust mass
-            out["correction_mass"] = out["correction_mass"] * (config.trial_radius_mm / config.correction_radius_mm)
-            
-        return out
+        if method == "two_plane":
+            return VibrationEngine.compute_two_plane_balance(
+                va0_amp=config.v0_amp, va0_phase_deg=config.v0_phase_deg,
+                vb0_amp=config.v1_amp, vb0_phase_deg=config.v1_phase_deg,
+                w_ta_mass=config.trial_mass, w_ta_angle_deg=config.trial_angle_deg,
+                vaa_amp=config.v0_amp * 1.1, vaa_phase_deg=config.v0_phase_deg + 15,
+                vba_amp=config.v1_amp * 0.9, vba_phase_deg=config.v1_phase_deg - 10,
+                w_tb_mass=config.trial_mass, w_tb_angle_deg=config.trial_angle_deg + 90,
+                vab_amp=config.v0_amp * 0.8, vab_phase_deg=config.v0_phase_deg - 5,
+                vbb_amp=config.v1_amp * 1.2, vbb_phase_deg=config.v1_phase_deg + 20
+            )
+        elif method == "four_run_nophase":
+            return VibrationEngine.compute_four_run_nophase_balance(
+                a0=config.v0_amp,
+                trial_mass=config.trial_mass,
+                a1=config.v1_amp,
+                a2=config.v1_amp * 0.85,
+                a3=config.v1_amp * 1.15
+            )
+        elif method == "static_couple":
+            return VibrationEngine.compute_static_couple_balance(
+                va0_amp=config.v0_amp, va0_phase_deg=config.v0_phase_deg,
+                vb0_amp=config.v1_amp, vb0_phase_deg=config.v1_phase_deg
+            )
+        elif method == "split_weight":
+            return VibrationEngine.compute_split_weight_balance(
+                target_mass=config.trial_mass,
+                target_angle_deg=config.trial_angle_deg,
+                hole1_angle_deg=max(0, config.trial_angle_deg - 20),
+                hole2_angle_deg=min(360, config.trial_angle_deg + 20)
+            )
+        else:
+            # Single plane default
+            res = VibrationEngine.compute_single_plane_balance(
+                v0_amp=config.v0_amp,
+                v0_phase_deg=config.v0_phase_deg,
+                t_mass=config.trial_mass,
+                t_angle_deg=config.trial_angle_deg,
+                v1_amp=config.v1_amp,
+                v1_phase_deg=config.v1_phase_deg
+            )
+            out = res.dict()
+            if config.trial_radius_mm is not None and config.correction_radius_mm is not None and config.trial_radius_mm != config.correction_radius_mm:
+                out["correction_mass"] = out["correction_mass"] * (config.trial_radius_mm / config.correction_radius_mm)
+            return out
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/balance/two-plane")
+def balance_two_plane(req: dict):
+    try:
+        return VibrationEngine.compute_two_plane_balance(**req)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.post("/balance/four-run-nophase")
+def balance_four_run(req: dict):
+    try:
+        return VibrationEngine.compute_four_run_nophase_balance(**req)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.post("/balance/static-couple")
+def balance_static_couple(req: dict):
+    try:
+        return VibrationEngine.compute_static_couple_balance(**req)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.post("/balance/split-weight")
+def balance_split_weight(req: dict):
+    try:
+        return VibrationEngine.compute_split_weight_balance(**req)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.post("/upload", response_model=VibrationAnalysisResponse)

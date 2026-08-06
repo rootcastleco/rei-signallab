@@ -206,6 +206,211 @@ class VibrationEngine:
         )
 
     @classmethod
+    def compute_two_plane_balance(
+        cls,
+        va0_amp: float, va0_phase_deg: float,
+        vb0_amp: float, vb0_phase_deg: float,
+        w_ta_mass: float, w_ta_angle_deg: float,
+        vaa_amp: float, vaa_phase_deg: float,
+        vba_amp: float, vba_phase_deg: float,
+        w_tb_mass: float, w_tb_angle_deg: float,
+        vab_amp: float, vab_phase_deg: float,
+        vbb_amp: float, vbb_phase_deg: float
+    ) -> Dict[str, Any]:
+        """
+        Solves 2-Plane Influence Coefficient Matrix Balancing:
+        [ alpha_AA  alpha_AB ] [ W_cA ] = - [ V_A0 ]
+        [ alpha_BA  alpha_BB ] [ W_cB ]   - [ V_B0 ]
+        """
+        VA0 = va0_amp * np.exp(1j * np.radians(va0_phase_deg))
+        VB0 = vb0_amp * np.exp(1j * np.radians(vb0_phase_deg))
+        W_tA = w_ta_mass * np.exp(1j * np.radians(w_ta_angle_deg))
+        W_tB = w_tb_mass * np.exp(1j * np.radians(w_tb_angle_deg))
+
+        VAA = vaa_amp * np.exp(1j * np.radians(vaa_phase_deg))
+        VBA = vba_amp * np.exp(1j * np.radians(vba_phase_deg))
+        VAB = vab_amp * np.exp(1j * np.radians(vab_phase_deg))
+        VBB = vbb_amp * np.exp(1j * np.radians(vbb_phase_deg))
+
+        if np.abs(W_tA) < 1e-9 or np.abs(W_tB) < 1e-9:
+            raise ValueError("BALANCE_TRIAL_MASS_ZERO: Trial mass must be greater than zero.")
+
+        alpha_AA = (VAA - VA0) / W_tA
+        alpha_BA = (VBA - VB0) / W_tA
+        alpha_AB = (VAB - VA0) / W_tB
+        alpha_BB = (VBB - VB0) / W_tB
+
+        A_mat = np.array([[alpha_AA, alpha_AB], [alpha_BA, alpha_BB]], dtype=complex)
+        det = np.linalg.det(A_mat)
+
+        if np.abs(det) < 1e-12:
+            raise ValueError("BALANCE_MATRIX_SINGULAR: 2-plane influence matrix is singular or ill-conditioned.")
+
+        V0_vec = np.array([VA0, VB0], dtype=complex)
+        W_c_vec = -np.linalg.solve(A_mat, V0_vec)
+
+        W_cA, W_cB = W_c_vec[0], W_c_vec[1]
+
+        mass_A = float(np.abs(W_cA))
+        angle_A = float(np.degrees(np.angle(W_cA)) % 360.0)
+        mass_B = float(np.abs(W_cB))
+        angle_B = float(np.degrees(np.angle(W_cB)) % 360.0)
+
+        return {
+            "balance_type": "two_plane",
+            "plane_a": {
+                "initial_vibration_amp": va0_amp,
+                "initial_vibration_phase_deg": va0_phase_deg,
+                "trial_mass": w_ta_mass,
+                "trial_angle_deg": w_ta_angle_deg,
+                "correction_mass": round(mass_A, 3),
+                "correction_angle_deg": round(angle_A, 2)
+            },
+            "plane_b": {
+                "initial_vibration_amp": vb0_amp,
+                "initial_vibration_phase_deg": vb0_phase_deg,
+                "trial_mass": w_tb_mass,
+                "trial_angle_deg": w_tb_angle_deg,
+                "correction_mass": round(mass_B, 3),
+                "correction_angle_deg": round(angle_B, 2)
+            },
+            "influence_matrix": {
+                "alpha_AA_amp": round(float(np.abs(alpha_AA)), 4),
+                "alpha_AA_phase_deg": round(float(np.degrees(np.angle(alpha_AA)) % 360.0), 2),
+                "alpha_BB_amp": round(float(np.abs(alpha_BB)), 4),
+                "alpha_BB_phase_deg": round(float(np.degrees(np.angle(alpha_BB)) % 360.0), 2)
+            }
+        }
+
+    @classmethod
+    def compute_four_run_nophase_balance(
+        cls,
+        a0: float,
+        trial_mass: float,
+        a1: float,
+        a2: float,
+        a3: float
+    ) -> Dict[str, Any]:
+        """
+        Solves 4-Run No-Phase Balancing (Phase-less amplitude-only balancing):
+        Run 0: Initial amplitude A0
+        Run 1: Trial mass W at 0 deg -> A1
+        Run 2: Trial mass W at 120 deg -> A2
+        Run 3: Trial mass W at 240 deg -> A3
+        """
+        if a0 <= 0 or trial_mass <= 0:
+            raise ValueError("BALANCE_INPUT_INVALID: Initial amplitude and trial mass must be greater than zero.")
+
+        # Vector K estimation using 3-run displacement vector law of cosines
+        angles_rad = [0.0, np.radians(120.0), np.radians(240.0)]
+        amps = [a1, a2, a3]
+
+        K_re = 0.0
+        K_im = 0.0
+        for amp, ang in zip(amps, angles_rad):
+            delta = (amp**2 - a0**2) / (2.0 * trial_mass * a0 + 1e-9)
+            K_re += delta * np.cos(ang)
+            K_im += delta * np.sin(ang)
+
+        K_re /= 1.5
+        K_im /= 1.5
+
+        sens = np.sqrt(K_re**2 + K_im**2)
+        if sens < 1e-6:
+            sens = 1e-6
+
+        unbalance_phase_rad = np.arctan2(K_im, K_re)
+        corr_angle_deg = float((np.degrees(unbalance_phase_rad + np.pi)) % 360.0)
+        corr_mass = float((a0 / (sens * trial_mass + 1e-9)) * trial_mass)
+
+        return {
+            "balance_type": "four_run_nophase",
+            "initial_amp": a0,
+            "trial_mass": trial_mass,
+            "trial_amps": [a1, a2, a3],
+            "correction_mass": round(corr_mass, 3),
+            "correction_angle_deg": round(corr_angle_deg, 2)
+        }
+
+    @classmethod
+    def compute_static_couple_balance(
+        cls,
+        va0_amp: float, va0_phase_deg: float,
+        vb0_amp: float, vb0_phase_deg: float
+    ) -> Dict[str, Any]:
+        """
+        Decomposes 2-plane initial vibration vectors into Static and Couple Unbalance components:
+        V_static = (V_A + V_B) / 2
+        V_couple = (V_A - V_B) / 2
+        """
+        VA0 = va0_amp * np.exp(1j * np.radians(va0_phase_deg))
+        VB0 = vb0_amp * np.exp(1j * np.radians(vb0_phase_deg))
+
+        V_static = (VA0 + VB0) / 2.0
+        V_couple = (VA0 - VB0) / 2.0
+
+        static_amp = float(np.abs(V_static))
+        static_phase_deg = float(np.degrees(np.angle(V_static)) % 360.0)
+
+        couple_amp = float(np.abs(V_couple))
+        couple_phase_deg = float(np.degrees(np.angle(V_couple)) % 360.0)
+
+        return {
+            "balance_type": "static_couple",
+            "static_component": {
+                "amplitude": round(static_amp, 3),
+                "phase_deg": round(static_phase_deg, 2)
+            },
+            "couple_component": {
+                "amplitude": round(couple_amp, 3),
+                "phase_deg": round(couple_phase_deg, 2)
+            },
+            "dominant_unbalance": "Static Unbalance" if static_amp > couple_amp else "Couple Unbalance"
+        }
+
+    @classmethod
+    def compute_split_weight_balance(
+        cls,
+        target_mass: float,
+        target_angle_deg: float,
+        hole1_angle_deg: float,
+        hole2_angle_deg: float
+    ) -> Dict[str, Any]:
+        """
+        Splits a single correction weight vector into two fixed physical hole/blade angles:
+        W_target = W1 * exp(j * hole1) + W2 * exp(j * hole2)
+        """
+        t_rad = np.radians(target_angle_deg)
+        h1_rad = np.radians(hole1_angle_deg)
+        h2_rad = np.radians(hole2_angle_deg)
+
+        denom = np.sin(h2_rad - h1_rad)
+        if np.abs(denom) < 1e-6:
+            raise ValueError("BALANCE_HOLES_COLLINEAR: Fixed hole angles cannot be collinear or equal.")
+
+        w1 = target_mass * np.sin(h2_rad - t_rad) / denom
+        w2 = target_mass * np.sin(t_rad - h1_rad) / denom
+
+        if w1 < 0 or w2 < 0:
+            raise ValueError("BALANCE_SPLIT_OUT_OF_BOUNDS: Target correction angle is not between the specified hole angles.")
+
+        return {
+            "balance_type": "split_weight",
+            "target_correction": {
+                "mass": target_mass,
+                "angle_deg": target_angle_deg
+            },
+            "hole_1": {
+                "angle_deg": hole1_angle_deg,
+                "mass": round(float(w1), 3)
+            },
+            "hole_2": {
+                "angle_deg": hole2_angle_deg,
+                "mass": round(float(w2), 3)
+            }
+        }
+
+    @classmethod
     def compute_envelope_spectrum(
         cls,
         sig: np.ndarray,

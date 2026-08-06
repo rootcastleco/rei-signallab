@@ -60,17 +60,62 @@ class BearingConfig(BaseModel):
     manufacturer: str = Field(default='')
     model: str = Field(default='')
 
+class BalanceMethod(str, Enum):
+    SINGLE_PLANE = "single_plane"
+    TWO_PLANE = "two_plane"
+    FOUR_RUN_NOPHASE = "four_run_nophase"
+    STATIC_COUPLE = "static_couple"
+    SPLIT_WEIGHT = "split_weight"
+
 class BalanceInputConfig(BaseModel):
-    v0_amp: float = Field(ge=0)
-    v0_phase_deg: float
-    trial_mass: float = Field(gt=0)
-    trial_angle_deg: float
-    v1_amp: float = Field(ge=0)
-    v1_phase_deg: float
+    balance_method: BalanceMethod = Field(default=BalanceMethod.SINGLE_PLANE)
+    v0_amp: float = Field(default=4.8, ge=0)
+    v0_phase_deg: float = Field(default=72.0)
+    trial_mass: float = Field(default=10.0, gt=0)
+    trial_angle_deg: float = Field(default=0.0)
+    v1_amp: float = Field(default=7.2, ge=0)
+    v1_phase_deg: float = Field(default=128.0)
     trial_radius_mm: Optional[float] = Field(default=None)
     correction_radius_mm: Optional[float] = Field(default=None)
     rotation_direction: RotationDirection = Field(default=RotationDirection.CW)
     amplitude_unit: AmplitudeUnit = Field(default=AmplitudeUnit.MM_S)
+
+class TwoPlaneBalanceConfig(BaseModel):
+    va0_amp: float = Field(ge=0)
+    va0_phase_deg: float
+    vb0_amp: float = Field(ge=0)
+    vb0_phase_deg: float
+    w_ta_mass: float = Field(gt=0)
+    w_ta_angle_deg: float
+    vaa_amp: float = Field(ge=0)
+    vaa_phase_deg: float
+    vba_amp: float = Field(ge=0)
+    vba_phase_deg: float
+    w_tb_mass: float = Field(gt=0)
+    w_tb_angle_deg: float
+    vab_amp: float = Field(ge=0)
+    vab_phase_deg: float
+    vbb_amp: float = Field(ge=0)
+    vbb_phase_deg: float
+
+class FourRunNoPhaseConfig(BaseModel):
+    a0: float = Field(gt=0)
+    trial_mass: float = Field(gt=0)
+    a1: float = Field(ge=0)
+    a2: float = Field(ge=0)
+    a3: float = Field(ge=0)
+
+class StaticCoupleConfig(BaseModel):
+    va0_amp: float = Field(ge=0)
+    va0_phase_deg: float
+    vb0_amp: float = Field(ge=0)
+    vb0_phase_deg: float
+
+class SplitWeightConfig(BaseModel):
+    target_mass: float = Field(gt=0)
+    target_angle_deg: float
+    hole1_angle_deg: float
+    hole2_angle_deg: float
 
 class VibrationAnalysisRequest(BaseModel):
     signal_data: Optional[List[float]] = Field(default=None)
