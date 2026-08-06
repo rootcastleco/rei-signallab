@@ -42,8 +42,10 @@ This wiki describes the public **REI SignalLab 2.1** application and repository.
 - FFT magnitude and phase analysis with selectable windows
 - RMS, peak-to-peak, DC, THD, SNR, SINAD, SFDR, ENOB, and fundamental estimates
 - Oscilloscope, spectrum, and spectrogram visualizations
-- 69 canonical typed DSP and vibration nodes
+- 69 canonical typed DSP and vibration nodes with multi-column grid palette & Full Spec Explorer Modal
 - Deterministic Kahn-scheduled node-graph experiments
+- 🤖 OpenRouter AI Copilot & Scientific LLM Suite: 5 free LLM models (`Gemini 2.0 Flash Lite`, `Llama 3.3 70B`, `DeepSeek R1`, `Qwen 2.5 Coder 32B`, `Mistral 7B`), ⚙️ AI Settings Modal, obfuscated key, 1-click prompts & Smart Local In-Browser Fallback Engine
+- 👤 Phase 4 Firebase Authentication & Cloud Project Persistence: Email/Password login, Google SSO with redirect fallback, Guest Mode, Cloud Firestore & LocalStorage project sync
 - GPS L1 C/A SDR Signal Simulator (`gps-sdr-sim` integration): 1023-chip Gold code, WGS84 orbit kinematics, Doppler shifts, C/N0, GDOP/PDOP/HDOP/VDOP, NMEA stream, and SDR binary export (.bin)
 - Sensor calibration and conversion among acceleration, velocity, and displacement across 13 standard industrial vibration units
 - 3,570+ rolling element bearing database (SKF, NTN, Cooper, Dodge) with instant search

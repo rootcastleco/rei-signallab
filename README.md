@@ -50,12 +50,13 @@
 
 **REI SignalLab 2.1** is an instrument-grade digital signal processing, spectral analysis, visual node graph flow studio, and industrial vibration analysis workbench. Developed by **[Batuhan Ayribas](https://batuhanayribas.com)** at **[RootCastle](https://rootcastle.com)**, it provides:
 
-1. **Canonical Typed Node Library (`.rei-signal 2.1`)**: Versioned node registry (`GET /api/nodes`) exposing 69 canonical DSP and Vibration nodes with strictly enforced port data types (`Signal<Real64>`, `Signal<Complex128>`, `SpectrumFrame`, `Scalar<Real64>`, `PatternEvent`).
+1. **Canonical Typed Node Library (`.rei-signal 2.1`)**: Versioned node registry (`GET /api/nodes`) exposing canonical DSP and Vibration nodes with strictly enforced port data types (`Signal<Real64>`, `Signal<Complex128>`, `SpectrumFrame`, `Scalar<Real64>`, `PatternEvent`). Includes a multi-column responsive grid palette and full **📚 Canonical Node Library Explorer Modal**.
 2. **Kahn Topological Execution Engine (`POST /api/graph/execute`)**: Deterministic graph validation and execution engine with 10-point port compatibility checks, cycle detection, and Kahn's topological scheduler.
-3. **REI Vibration Analysis Workbench**: End-to-end industrial machinery condition monitoring, single-plane complex vector rotor balancing, kinematic bearing defect frequency tracking (BPFO, BPFI, BSF, FTF), Hilbert envelope demodulation, 1X-10X harmonic order spectrum bar view, and rule-based fault classification.
-4. **Numerical Golden Verification Suite**: Comprehensive Pytest suite enforcing IEEE double-precision float64 error $\le 10^{-12}$, FFT/IFFT reconstruction RMS error $\le 10^{-9}$, DCT Type II error $\le 10^{-12}$, and Haar wavelet error $\le 10^{-12}$.
-5. **Safe AST Math Expression Evaluator**: Custom expression filter (`generic.real_value_filter`) evaluated safely using Python AST parsing without `exec()` or `eval()`
-6. **Layered Sandbox & Resource Governance**: Static AST policy, out-of-process script execution under OS resource limits, enforced graph size ceilings, and per-caller rate limiting on every route — see [Security & Hardening](#security).
+3. **🤖 OpenRouter AI Copilot & LLM Assistant**: Real-time scientific AI telemetry reasoning and DSP analysis supporting 5 free LLM models (`google/gemini-2.0-flash-lite-preview-02-05:free`, `meta-llama/llama-3.3-70b-instruct:free`, `deepseek/deepseek-r1:free`, `qwen/qwen-2.5-coder-32b-instruct:free`, `mistralai/mistral-7b-instruct:free`) with ⚙️ AI Settings modal, obfuscated system key, and Smart Local In-Browser Fallback Engine.
+4. **👤 Phase 4 Firebase Authentication & Cloud Project Sync**: Multi-provider user authentication (Email/Password, Google SSO with redirect fallback, Guest Mode) and real-time Cloud Firestore project persistence (`users/{userId}/projects`) with LocalStorage offline synchronization.
+5. **REI Vibration Analysis Workbench**: End-to-end industrial machinery condition monitoring, single-plane complex vector rotor balancing, kinematic bearing defect frequency tracking (BPFO, BPFI, BSF, FTF), Hilbert envelope demodulation, 1X-10X harmonic order spectrum bar view, and rule-based fault classification.
+6. **Numerical Golden Verification Suite**: Comprehensive Pytest suite enforcing IEEE double-precision float64 error $\le 10^{-12}$, FFT/IFFT reconstruction RMS error $\le 10^{-9}$, DCT Type II error $\le 10^{-12}$, and Haar wavelet error $\le 10^{-12}$.
+7. **Layered Sandbox & Resource Governance**: Static AST policy, out-of-process script execution under OS resource limits, enforced graph size ceilings, and per-caller rate limiting on every route — see [Security & Hardening](#security).
 
 ---
 
