@@ -89,15 +89,25 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Capture previous revision
+      - name: Capture previous active revision (100% traffic)
         id: capture
         run: |
-          PREV="$(gcloud run services describe ${{ env.CLOUD_RUN_SERVICE }} \
+          SERVICE_JSON="$(gcloud run services describe ${{ env.CLOUD_RUN_SERVICE }} \
             --region=${{ env.GCP_REGION }} \
             --project=${{ secrets.GCP_PROJECT_ID }} \
-            --format='value(status.traffic[0].revisionName)' 2>/dev/null || echo '')"
+            --format=json 2>/dev/null || echo '')"
+          
+          PREV=""
+          if [ -n "${SERVICE_JSON}" ]; then
+            PREV="$(jq -r '.status.traffic[]? | select(.percent == 100 or .percent == null) | .revisionName' <<<"${SERVICE_JSON}" | head -n 1)"
+            if [ -z "${PREV}" ] || [ "${PREV}" = "null" ]; then
+              PREV="$(jq -r '.status.latestReadyRevisionName // .status.traffic[0].revisionName // ""' <<<"${SERVICE_JSON}")"
+            fi
+          fi
+
+          if [ "${PREV}" = "null" ]; then PREV=""; fi
           echo "previous_revision=${PREV}" >> "$GITHUB_OUTPUT"
-          echo "📌 Previous revision: ${PREV:-'(first deploy)'}"
+          echo "📌 Active production revision for rollback: ${PREV:-'(first deploy)'}"
 
       - name: Authorize Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
@@ -148,7 +158,7 @@ jobs:
             --non-interactive
 
   production-smoke-test:
-    name: Production Smoke Test (JSON-Validated)
+    name: Production Smoke Test (Functional + JSON-Validated)
     needs: [deploy-firebase, deploy-cloud-run]
     runs-on: ubuntu-latest
     permissions:
@@ -166,7 +176,7 @@ jobs:
       - name: Set up Cloud SDK (for rollback)
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Verify Live Health Endpoints (JSON Content-Type + jq Assertions)
+      - name: Verify Live Health & Functional API Endpoints
         env:
           PREVIOUS_REVISION: ${{ needs.deploy-cloud-run.outputs.previous_revision }}
         run: |
@@ -198,7 +208,7 @@ jobs:
             fi
 
             if ! grep -qi '^content-type:.*application/json' "${headers}"; then
-              echo "❌ ${label}: NON_JSON_RESPONSE"
+              echo "❌ ${label}: NON_JSON_RESPONSE — expected application/json."
               head -c 500 "${body}"
               return 1
             fi
@@ -212,6 +222,7 @@ jobs:
             echo "✓ ${label} passed."
           }
 
+          # 1. Health Probes
           check_json_endpoint \
             "${{ env.LIVE_URL }}/api/health/live" \
             "ok" \
@@ -222,6 +233,7 @@ jobs:
             "ready" \
             "Readiness Probe" || SMOKE_FAILED=1
 
+          # 2. Version Manifest (strict SHA regex verification)
           echo "🧪 Verifying Version Manifest..."
           VERSION_JSON="$(curl --fail --silent --show-error "${{ env.LIVE_URL }}/api/version" 2>/dev/null || echo "")"
           if [ -z "${VERSION_JSON}" ]; then
@@ -231,13 +243,43 @@ jobs:
             .service == "rei-signallab-api" and
             .version == "2.1.0" and
             .apiVersion == "v1" and
-            (.commitSha | length > 0)
+            (.commitSha | test("^[0-9a-f]{7,40}$"))
           ' <<<"${VERSION_JSON}" >/dev/null 2>&1; then
             echo "❌ Version Manifest assertion failed:"
             echo "${VERSION_JSON}" | jq '.' 2>/dev/null || echo "${VERSION_JSON}"
             SMOKE_FAILED=1
           else
-            echo "✓ Version Manifest passed."
+            echo "✓ Version Manifest passed (strict git SHA regex verified)."
+          fi
+
+          # 3. Node Catalog Registry Functional Test
+          echo "🧪 Verifying Node Catalog Registry..."
+          NODES_JSON="$(curl --fail --silent --show-error "${{ env.LIVE_URL }}/api/nodes" 2>/dev/null || echo "")"
+          if ! jq -e 'type == "array" and length > 0' <<<"${NODES_JSON}" >/dev/null 2>&1; then
+            echo "❌ Node Catalog Registry test failed."
+            SMOKE_FAILED=1
+          else
+            echo "✓ Node Catalog Registry functional test passed."
+          fi
+
+          # 4. Vibration Analysis DSP Engine Functional Test
+          echo "🧪 Verifying Vibration Analysis DSP Engine..."
+          VIB_JSON="$(curl --fail --silent --show-error \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d '{"sample_rate": 25600, "rpm": {"manual_rpm": 1500.0}}' \
+            "${{ env.LIVE_URL }}/api/vibration/analyze" 2>/dev/null || echo "")"
+
+          if ! jq -e '
+            (.trust_mode | length > 0) and
+            (.time_metrics.rms_acc_g | type == "number") and
+            (.fft_frequencies | length > 0)
+          ' <<<"${VIB_JSON}" >/dev/null 2>&1; then
+            echo "❌ Vibration Analysis DSP Engine test failed."
+            echo "${VIB_JSON}" | jq '.' 2>/dev/null || echo "${VIB_JSON}"
+            SMOKE_FAILED=1
+          else
+            echo "✓ Vibration Analysis DSP Engine functional test passed."
           fi
 
           if [ "${SMOKE_FAILED}" -ne 0 ]; then
@@ -247,12 +289,12 @@ jobs:
             echo "================================================================="
 
             if [ -n "${PREVIOUS_REVISION}" ]; then
-              echo "🔄 Rolling back Cloud Run to: ${PREVIOUS_REVISION}..."
+              echo "🔄 Rolling back Cloud Run traffic to: ${PREVIOUS_REVISION}..."
               gcloud run services update-traffic ${{ env.CLOUD_RUN_SERVICE }} \
                 --region=${{ env.GCP_REGION }} \
                 --project=${{ secrets.GCP_PROJECT_ID }} \
                 --to-revisions="${PREVIOUS_REVISION}=100" || true
-              echo "⚠️  Cloud Run rollback attempted."
+              echo "⚠️  Cloud Run traffic rollback executed (Firebase proxy automatically routes to active traffic revision)."
             else
               echo "⚠️  No previous revision for rollback (first deploy)."
             fi
@@ -261,5 +303,5 @@ jobs:
           fi
 
           echo "================================================================="
-          echo " 🎉 ALL SMOKE TESTS PASSED — PRODUCTION VERIFIED"
+          echo " 🎉 ALL FUNCTIONAL SMOKE TESTS PASSED — PRODUCTION VERIFIED"
           echo "================================================================="

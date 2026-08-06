@@ -109,8 +109,7 @@ In [`firebase.json`](file:///c:/Appdev/rei-signallab/firebase.json), the `/api/*
         "source": "/api/**",
         "run": {
           "serviceId": "rei-signallab-api",
-          "region": "europe-west1",
-          "pinTag": true
+          "region": "europe-west1"
         }
       },
       {
@@ -121,6 +120,9 @@ In [`firebase.json`](file:///c:/Appdev/rei-signallab/firebase.json), the `/api/*
   }
 }
 ```
+
+> [!NOTE]
+> `pinTag: true` is deliberately omitted from `firebase.json` so that Firebase Hosting dynamically proxies all `/api/**` traffic to Cloud Run's active 100% traffic revision. When `gcloud run services update-traffic` rolls back Cloud Run to the previous revision upon a smoke test failure, Firebase Hosting traffic is immediately rolled back with zero latency!
 
 Deploy hosting updates:
 

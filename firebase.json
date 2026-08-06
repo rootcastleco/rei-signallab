@@ -40,8 +40,7 @@
         "source": "/api/**",
         "run": {
           "serviceId": "rei-signallab-api",
-          "region": "europe-west1",
-          "pinTag": true
+          "region": "europe-west1"
         }
       },
       {

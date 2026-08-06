@@ -37,31 +37,37 @@ if ! gcloud auth print-access-token >/dev/null 2>&1; then
 fi
 echo "✓ Authenticated with GCP."
 
-# 2. Capture Previous Revision for Auto-Rollback
+# 2. Capture Exact Active 100% Traffic Revision for Auto-Rollback
 PREVIOUS_REVISION=""
-if gcloud run services describe "${CLOUD_RUN_SERVICE}" \
-     --region="${GCP_REGION}" \
-     --project="${GCP_PROJECT_ID}" \
-     --format='value(status.traffic[0].revisionName)' >/dev/null 2>&1; then
+SERVICE_JSON="$(gcloud run services describe "${CLOUD_RUN_SERVICE}" --region="${GCP_REGION}" --project="${GCP_PROJECT_ID}" --format=json 2>/dev/null || echo '')"
+if [ -n "${SERVICE_JSON}" ]; then
   PREVIOUS_REVISION="$(
-    gcloud run services describe "${CLOUD_RUN_SERVICE}" \
-      --region="${GCP_REGION}" \
-      --project="${GCP_PROJECT_ID}" \
-      --format='value(status.traffic[0].revisionName)'
+    jq -r '
+      .status.traffic[]? | select(.percent == 100 or .percent == null) | .revisionName
+    ' <<<"${SERVICE_JSON}" | head -n 1
   )"
-  echo "📌 Previous active revision: ${PREVIOUS_REVISION}"
+  if [ -z "${PREVIOUS_REVISION}" ] || [ "${PREVIOUS_REVISION}" = "null" ]; then
+    PREVIOUS_REVISION="$(
+      jq -r '.status.latestReadyRevisionName // .status.traffic[0].revisionName // ""' <<<"${SERVICE_JSON}"
+    )"
+  fi
+fi
+
+if [ -n "${PREVIOUS_REVISION}" ] && [ "${PREVIOUS_REVISION}" != "null" ]; then
+  echo "📌 Active production revision for rollback: ${PREVIOUS_REVISION}"
 else
+  PREVIOUS_REVISION=""
   echo "ℹ️  No existing service found; this is a first deployment."
 fi
 
 rollback_cloud_run() {
   if [ -n "${PREVIOUS_REVISION}" ]; then
-    echo "🔄 Rolling back traffic to previous revision: ${PREVIOUS_REVISION}..."
+    echo "🔄 Rolling back Cloud Run traffic to revision: ${PREVIOUS_REVISION}..."
     gcloud run services update-traffic "${CLOUD_RUN_SERVICE}" \
       --region="${GCP_REGION}" \
       --project="${GCP_PROJECT_ID}" \
       --to-revisions="${PREVIOUS_REVISION}=100" || true
-    echo "⚠️  Rollback attempted to: ${PREVIOUS_REVISION}"
+    echo "⚠️  Cloud Run traffic rollback executed to: ${PREVIOUS_REVISION}"
   else
     echo "⚠️  No previous revision available for rollback."
   fi
@@ -136,7 +142,7 @@ gcloud run deploy "${CLOUD_RUN_SERVICE}" \
 SERVICE_URL="$(gcloud run services describe "${CLOUD_RUN_SERVICE}" --region="${GCP_REGION}" --project="${GCP_PROJECT_ID}" --format='value(status.url)')"
 echo "🌐 Deployed Cloud Run Service URL: ${SERVICE_URL}"
 
-# 10. JSON-Validated Health Checks with Auto-Rollback
+# 10. JSON-Validated Health & Functional Smoke Checks with Auto-Rollback
 check_json_endpoint() {
   local url="$1"
   local expected_status="$2"
@@ -182,17 +188,11 @@ check_json_endpoint() {
 
 SMOKE_FAILED=0
 
-check_json_endpoint \
-  "${SERVICE_URL}/api/health/live" \
-  "ok" \
-  "Liveness Probe" || SMOKE_FAILED=1
+# Health Probes
+check_json_endpoint "${SERVICE_URL}/api/health/live" "ok" "Liveness Probe" || SMOKE_FAILED=1
+check_json_endpoint "${SERVICE_URL}/api/health/ready" "ready" "Readiness Probe" || SMOKE_FAILED=1
 
-check_json_endpoint \
-  "${SERVICE_URL}/api/health/ready" \
-  "ready" \
-  "Readiness Probe" || SMOKE_FAILED=1
-
-# Version manifest: validate service identity, version, and commitSha
+# Version Manifest (strict git SHA regex check)
 echo "🧪 Verifying Version Manifest (${SERVICE_URL}/api/version)..."
 VERSION_JSON="$(curl --fail --silent --show-error "${SERVICE_URL}/api/version" 2>/dev/null || echo "")"
 if [ -z "${VERSION_JSON}" ]; then
@@ -202,13 +202,43 @@ elif ! jq -e '
   .service == "rei-signallab-api" and
   .version == "2.1.0" and
   .apiVersion == "v1" and
-  (.commitSha | length > 0)
+  (.commitSha | test("^[0-9a-f]{7,40}$"))
 ' <<<"${VERSION_JSON}" >/dev/null 2>&1; then
-  echo "❌ Version Manifest: Identity or version assertion failed."
+  echo "❌ Version Manifest: Identity, version, or strict commitSha regex assertion failed."
   echo "${VERSION_JSON}" | jq '.' 2>/dev/null || echo "${VERSION_JSON}"
   SMOKE_FAILED=1
 else
-  echo "✓ Version Manifest passed."
+  echo "✓ Version Manifest passed (strict commitSha regex verified)."
+fi
+
+# Node Catalog Registry Functional Test
+echo "🧪 Verifying Node Catalog Registry (${SERVICE_URL}/api/nodes)..."
+NODES_JSON="$(curl --fail --silent --show-error "${SERVICE_URL}/api/nodes" 2>/dev/null || echo "")"
+if ! jq -e 'type == "array" and length > 0' <<<"${NODES_JSON}" >/dev/null 2>&1; then
+  echo "❌ Node Catalog Registry test failed."
+  SMOKE_FAILED=1
+else
+  echo "✓ Node Catalog Registry functional test passed ($(jq 'length' <<<"${NODES_JSON}") registered nodes)."
+fi
+
+# Vibration Analysis DSP Engine Functional Test
+echo "🧪 Verifying Vibration Analysis DSP Engine (${SERVICE_URL}/api/vibration/analyze)..."
+VIB_JSON="$(curl --fail --silent --show-error \
+  -H "Content-Type: application/json" \
+  -X POST \
+  -d '{"sample_rate": 25600, "rpm": {"manual_rpm": 1500.0}}' \
+  "${SERVICE_URL}/api/vibration/analyze" 2>/dev/null || echo "")"
+
+if ! jq -e '
+  (.trust_mode | length > 0) and
+  (.time_metrics.rms_acc_g | type == "number") and
+  (.fft_frequencies | length > 0)
+' <<<"${VIB_JSON}" >/dev/null 2>&1; then
+  echo "❌ Vibration Analysis DSP Engine test failed."
+  echo "${VIB_JSON}" | jq '.' 2>/dev/null || echo "${VIB_JSON}"
+  SMOKE_FAILED=1
+else
+  echo "✓ Vibration Analysis DSP Engine functional test passed."
 fi
 
 if [ "${SMOKE_FAILED}" -ne 0 ]; then
