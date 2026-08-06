@@ -14,6 +14,7 @@ import NodeGraphStudio from './components/NodeGraphStudio';
 import VibrationWorkbench from './components/VibrationWorkbench';
 import ElectricalWorkbench from './components/ElectricalWorkbench';
 import AntennaWorkbench from './components/AntennaWorkbench';
+import GpsWorkbench from './components/GpsWorkbench';
 
 const PRESETS = {
   SINE_440: {
@@ -374,6 +375,12 @@ export default function App() {
               <Radio size={14} className="text-[#0088FF]" /> 📡 Antenna & RF
             </button>
             <button
+              onClick={() => setActiveView('gps')}
+              className={`win98-tab font-bold text-xs flex items-center gap-1 ${activeView === 'gps' ? 'active font-black text-[#000080] bg-[#FFFFCC]' : ''}`}
+            >
+              <Radio size={14} className="text-[#00FF00]" /> 🛰️ GPS SDR Simulator
+            </button>
+            <button
               onClick={() => setActiveView('python')}
               className={`win98-tab font-bold text-xs flex items-center gap-1 ${activeView === 'python' ? 'active font-black text-[#000080]' : ''}`}
             >
@@ -516,6 +523,10 @@ export default function App() {
 
             {activeView === 'antenna' && (
               <AntennaWorkbench />
+            )}
+
+            {activeView === 'gps' && (
+              <GpsWorkbench />
             )}
 
             {activeView === 'graph' && (
