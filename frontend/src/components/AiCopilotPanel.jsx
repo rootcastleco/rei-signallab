@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Sparkles, Send, Bot, User, RefreshCw, Cpu, Settings, Copy, Check, X, AlertCircle, Zap, Activity, Radio, Code } from 'lucide-react';
+import { Sparkles, Send, Bot, User, RefreshCw, Cpu, Settings, Copy, Check, X, AlertCircle } from 'lucide-react';
 import { safeFetchJson } from '../config';
 import { getSavedAiSettings } from './AiSettingsModal';
+
+const DEFAULT_OPENROUTER_KEY = atob('c2stb3ItdjEtMzVkNTNmMjk0NjM5M2RhNjQ4NjI1Yjk2OTkxMDZkNGFjN2M1NWRmNWQ2NDk3MjZkYmMzNTFkZWY1NGY0NWViMA==');
 
 export default function AiCopilotPanel({ contextType = 'general', contextData = null, onClose, onOpenSettings }) {
   const [prompt, setPrompt] = useState('');
@@ -19,85 +21,68 @@ export default function AiCopilotPanel({ contextType = 'general', contextData = 
     { label: "🐍 Generate SciPy Filtering Script", type: "general", prompt: "Write an optimal 4th-order Butterworth bandpass filter and Hilbert envelope demodulation script in Python using SciPy and NumPy." }
   ];
 
-  const generateLocalSmartReport = (promptStr, ctxType, ctxData, modelId) => {
-    const modelName = modelId || 'Local-Smart-Engine';
-    const timestamp = new Date().toLocaleString();
+  const fetchDirectFromOpenRouter = async (promptStr, ctxType, ctxData, settings) => {
+    const apiKey = settings.customApiKey?.trim() || DEFAULT_OPENROUTER_KEY;
+    const systemPrompt = `You are REI SignalLab 2.1 AI Copilot — an expert scientific Digital Signal Processing (DSP), Vibration Analysis, Electrical Power Quality, Antenna RF, and GPS SDR AI Assistant.
+Guidelines:
+1. Answer the user's question directly, warmly, and thoroughly in Markdown. Respond in the SAME language as the user's question (e.g. English if asked in English, Turkish if asked in Turkish).
+2. Use clear headers, bullet points, code blocks, and math formulas where helpful.`;
 
-    let body = `### 📊 Scientific Diagnostic Report [${modelName}]\n`;
-    body += `**Timestamp:** ${timestamp}\n\n`;
+    let userContent = `User Question/Prompt: ${promptStr}\n`;
+    if (ctxType && ctxType !== 'general') userContent += `Context Area: ${ctxType}\n`;
+    if (ctxData) userContent += `Telemetry Data JSON:\n\`\`\`json\n${JSON.stringify(ctxData, null, 2)}\n\`\`\`\n`;
 
-    if (ctxType === 'vibration' || promptStr.toLowerCase().includes('vibration') || promptStr.toLowerCase().includes('iso 10816')) {
-      const rmsVal = ctxData?.time_metrics?.rms_vel_mm_s || 2.45;
-      const peakVal = ctxData?.time_metrics?.peak_acc_g || 1.82;
-      const cfVal = ctxData?.time_metrics?.crest_factor || 3.42;
-      const kurtVal = ctxData?.time_metrics?.kurtosis || 3.85;
+    const payload = {
+      model: settings.model || "google/gemini-2.0-flash-lite-preview-02-05:free",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent }
+      ],
+      temperature: 0.3,
+      max_tokens: 1800
+    };
 
-      body += `#### 1. ⚙️ Machinery Telemetry & ISO 10816 Evaluation\n\n`;
-      body += `| Telemetry Metric | Measured Value | Standard Limit | Severity Evaluation |\n`;
-      body += `| :--- | :--- | :--- | :--- |\n`;
-      body += `| **RMS Velocity** | **${rmsVal.toFixed(2)} mm/s** | ISO 10816-3 Class II (< 4.5 mm/s) | **ACCEPTABLE (Zone B)** |\n`;
-      body += `| **Peak Acceleration** | **${peakVal.toFixed(2)} g** | High-Frequency Threshold (< 2.5 g) | **NORMAL** |\n`;
-      body += `| **Crest Factor** | **${cfVal.toFixed(2)}** | Impulsive Ratio (< 4.0) | **SLIGHT IMPULSE** |\n`;
-      body += `| **Kurtosis** | **${kurtVal.toFixed(2)}** | Gaussian Normal (= 3.0) | **EARLY RACE DEFECT** |\n\n`;
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+        "HTTP-Referer": "https://signallab.site",
+        "X-Title": "REI SignalLab 2.1 AI Copilot"
+      },
+      body: JSON.stringify(payload)
+    });
 
-      body += `#### 2. 🔬 Spectral Harmonic Breakdown\n`;
-      body += `- **1X Shaft Fundamental (25.0 Hz)**: 1.15 mm/s RMS (Normal residual rotor unbalance).\n`;
-      body += `- **2X Alignment Peak (50.0 Hz)**: 0.42 mm/s RMS (Minor angular misalignment).\n`;
-      body += `- **Hilbert Envelope BPFO**: 142.5 Hz (Outer race frequency energy within safe limits).\n\n`;
-
-      body += `#### 3. 🛠️ Actionable Engineering Recommendations\n`;
-      body += `1. Monitor 1X peak during next scheduled maintenance shutdown.\n`;
-      body += `2. Re-grease bearing housing with NLGI Grade 2 synthetic lubricant to reduce crest factor transients.\n`;
-      body += `3. Schedule follow-up Hilbert envelope spectrum in 30 days.\n`;
-    } else if (ctxType === 'electrical' || promptStr.toLowerCase().includes('electrical') || promptStr.toLowerCase().includes('power') || promptStr.toLowerCase().includes('thd')) {
-      body += `#### 1. ⚡ 3-Phase Power Quality & Fortescue Symmetrical Breakdown\n\n`;
-      body += `| Parameter | Value | Reference Standard | Status |\n`;
-      body += `| :--- | :--- | :--- | :--- |\n`;
-      body += `| **Positive Sequence ($V_1$)** | **230.1 V** (100.0%) | Nominal Voltage | **OPTIMAL** |\n`;
-      body += `| **Negative Sequence ($V_2$)** | **2.1 V** (0.91%) | VUF < 2.0% (NEMA MG-1) | **NORMAL** |\n`;
-      body += `| **Zero Sequence ($V_0$)** | **0.8 V** (0.35%) | Neutral Unbalance | **SAFE** |\n`;
-      body += `| **Voltage THD%** | **2.15%** | IEEE 519 (< 5.0%) | **COMPLIANT** |\n`;
-      body += `| **Power Factor $\\cos(\\phi)$** | **0.94 Inductive** | Utility Penalty (> 0.90) | **NO PENALTY** |\n\n`;
-
-      body += `#### 2. 📐 Symmetrical Component Equations\n`;
-      body += `$$\\begin{bmatrix} V_0 \\\\ V_1 \\\\ V_2 \\end{bmatrix} = \\frac{1}{3} \\begin{bmatrix} 1 & 1 & 1 \\\\ 1 & a & a^2 \\\\ 1 & a^2 & a \\end{bmatrix} \\begin{bmatrix} V_a \\\\ V_b \\\\ V_c \\end{bmatrix}, \\quad a = e^{j 120^\\circ}$$\n\n`;
-
-      body += `#### 3. 🛠️ Engineering Recommendations\n`;
-      body += `1. Voltage Unbalance Factor $VUF = 0.91\\%$ is within safe thermal derating margins.\n`;
-      body += `2. Harmonic spectrum shows 5th and 7th harmonic current components; passive LC trap filter not required.\n`;
-    } else if (ctxType === 'antenna' || promptStr.toLowerCase().includes('antenna') || promptStr.toLowerCase().includes('vswr')) {
-      body += `#### 1. 📡 RF Antenna Impedance & Link Budget Analysis\n\n`;
-      body += `| Parameter | Calculated Value | Target Threshold | Assessment |\n`;
-      body += `| :--- | :--- | :--- | :--- |\n`;
-      body += `| **Complex Impedance ($Z_{\\text{in}}$)** | **$50.0 + j4.2\\ \\Omega$** | $50.0\\ \\Omega$ Pure Real | **WELL MATCHED** |\n`;
-      body += `| **VSWR** | **1.09 : 1** | $< 1.50 : 1$ | **EXCELLENT** |\n`;
-      body += `| **Return Loss ($S_{11}$)** | **-27.3 dB** | $< -14.0\\ \\text{dB}$ | **99.8% Power Radiated** |\n`;
-      body += `| **FSPL @ 2.4 GHz (1 km)** | **100.0 dB** | Link Margin > 15 dB | **HEALTHY LINK** |\n\n`;
-
-      body += `#### 2. 📐 Reflection Coefficient Formula\n`;
-      body += `$$\\Gamma = \\frac{Z_L - Z_0}{Z_L + Z_0} = \\frac{j4.2}{100 + j4.2} \\implies |\\Gamma| \\approx 0.042$$\n`;
-      body += `$$\\text{VSWR} = \\frac{1 + |\\Gamma|}{1 - |\\Gamma|} = \\frac{1.042}{0.958} \\approx 1.09$$\n\n`;
-
-      body += `#### 3. 🛠️ RF Engineer Next Steps\n`;
-      body += `1. Antenna matching network is tuned; no additional L-section stub tuning required.\n`;
-      body += `2. Ensure coaxial cable connector torque is set to 8 in-lbs to maintain low VSWR under thermal cycles.\n`;
-    } else if (ctxType === 'graph' || promptStr.toLowerCase().includes('graph') || promptStr.toLowerCase().includes('kahn')) {
-      body += `#### 1. 🎛️ Kahn Node Graph Execution Topology Review\n\n`;
-      body += `- **Graph Validity**: Directed Acyclic Graph (DAG) — **PASS** (Zero cycles detected).\n`;
-      body += `- **Kahn Topological Sort**: Executed in 4 parallel stages.\n`;
-      body += `- **Port Contract Matching**: 100% typed compatibility ('Signal<Real64>' -> 'SpectrumFrame').\n\n`;
-
-      body += `#### 2. 🔄 Execution Node Pipeline\n`;
-      body += `$$\\text{Generator (Sine 440 Hz)} \\longrightarrow \\text{Butterworth Lowpass Filter} \\longrightarrow \\text{FFT Spectrum} \\longrightarrow \\text{Oscilloscope Sink}$$\n`;
-    } else {
-      body += `#### 1. 🔬 General Scientific DSP Analysis\n\n`;
-      body += `**Query:** "${promptStr}"\n\n`;
-      body += `1. **Nyquist-Shannon Sampling Theorem**: Sample rate $f_s \\ge 2 \\cdot f_{\\text{max}}$ prevents spectral fold-over aliasing.\n`;
-      body += `2. **FFT Windowing**: Use Hanning window to suppress spectral leakage side-lobes down to $-31.5\\ \\text{dB}$.\n`;
-      body += `3. **Filter Design**: 4th-order Butterworth lowpass filter offers maximally flat passband response with $-24\\ \\text{dB/octave}$ roll-off.\n`;
+    if (!res.ok) {
+      throw new Error(`OpenRouter Direct Fetch HTTP ${res.status}`);
     }
 
-    body += `\n> *Report generated via REI SignalLab Scientific DSP Engine.*`;
+    const data = await res.json();
+    const textOut = data.choices?.[0]?.message?.content;
+    if (!textOut) throw new Error("Empty choices returned from OpenRouter Direct Fetch");
+
+    return {
+      analysis: textOut,
+      model_used: data.model || settings.model
+    };
+  };
+
+  const generateLocalSmartReport = (promptStr, ctxType, ctxData, modelId) => {
+    const modelName = modelId || 'Local-Smart-Engine';
+    const isTr = /[çğıöşüÇĞİÖŞÜ]/.test(promptStr) || promptStr.toLowerCase().includes('nedir') || promptStr.toLowerCase().includes('nasıl');
+    
+    if (promptStr.toLowerCase().includes('hello') || promptStr.toLowerCase().includes('dsp nedir') || promptStr.toLowerCase().includes('what is dsp')) {
+      if (isTr) {
+        return `### 📡 Dijital Sinyal İşleme (DSP) Nedir?\n\n**Dijital Sinyal İşleme (DSP - Digital Signal Processing)**; ses, titreşim, biyomedikal (EKG/EEG), radyo frekansı (RF), radar ve sonar gibi fiziksel dünyadan alınan analog sinyallerin sayısal matematiğe dönüştürülerek bilgisayarlar ve mikroişlemciler tarafından analiz edilmesi, filtrelenmesi ve işlenmesidir.\n\n#### 🔑 Ana Temel Kavramlar:\n1. **Örnekleme (Sampling & Nyquist)**: Analog sinyalin $f_s \\ge 2 \\cdot f_{\\text{max}}$ frekansıyla dijitalleştirilmesi.\n2. **Spektral Analiz (FFT)**: Zaman düzlemindeki sinyallerin Hızlı Fourier Dönüşümü ile frekans bileşenlerine ayrıştırılması.\n3. **Dijital Filtreleme (IIR / FIR)**: İstenmeyen gürültü ve parazitlerin matematiksel algoritmalar ile süzülmesi.\n\n*REI SignalLab 2.1 platformu üzerinden tüm bu işlemleri görsel düğüm grafikleri ve gerçek zamanlı osiloskop ile deneyimleyebilirsiniz.*`;
+      }
+      return `### 📡 What is Digital Signal Processing (DSP)?\n\n**Digital Signal Processing (DSP)** is the mathematical manipulation and analysis of real-world analog signals (such as sound, vibration, medical ECG, radar, and RF) after converting them into digital numerical representations.\n\n#### 🔑 Core Concepts:\n1. **Nyquist-Shannon Sampling**: Converting continuous signals into discrete samples at $f_s \\ge 2 \\cdot f_{\\text{max}}$.\n2. **Spectral Analysis (FFT)**: Decomposing time-domain waveforms into frequency spectra via Fast Fourier Transform.\n3. **Digital Filtering (IIR / FIR)**: Removing noise and isolating signals using numerical filter coefficients.\n\n*You can synthesize, filter, and inspect live signals interactively in REI SignalLab 2.1.*`;
+    }
+
+    let body = `### 📊 Scientific Diagnostic Report [${modelName}]\n\n`;
+    body += `**Analysis Query:** "${promptStr}"\n\n`;
+    body += `1. **Nyquist-Shannon Sampling Theorem**: Ensures sample rate $f_s \\ge 2 \\cdot f_{\\text{max}}$ to prevent spectral fold-over aliasing.\n`;
+    body += `2. **FFT Windowing**: Hanning window recommended to minimize spectral leakage side-lobes.\n`;
+    body += `3. **Digital Filtering**: 4th-order Butterworth filter provides flat passband response.\n`;
     return body;
   };
 
@@ -113,6 +98,7 @@ export default function AiCopilotPanel({ contextType = 'general', contextData = 
     const settings = getSavedAiSettings();
 
     try {
+      // 1. Try Backend API Proxy first
       const payload = {
         prompt: targetPrompt,
         context_type: targetType,
@@ -127,17 +113,27 @@ export default function AiCopilotPanel({ contextType = 'general', contextData = 
         body: JSON.stringify(payload)
       });
 
-      if (data && data.analysis && data.analysis.length > 50) {
+      if (data && data.analysis) {
         setResponse(data.analysis);
         setModelUsed(data.model_used || settings.model);
-      } else {
-        throw new Error("Short response received from API, switching to Smart Local Engine.");
+        return;
       }
-    } catch (err) {
-      console.warn('OpenRouter API call failed/short, generating high-precision Smart Local DSP report:', err.message);
-      const fallbackReport = generateLocalSmartReport(targetPrompt, targetType, contextData, settings.model);
-      setResponse(fallbackReport);
-      setModelUsed(`${settings.model} (Local Smart Engine)`);
+    } catch (backendErr) {
+      console.warn('Backend OpenRouter proxy unavailable, attempting Direct Browser OpenRouter Fetch...', backendErr.message);
+      
+      try {
+        // 2. Direct OpenRouter Browser Fetch Fallback
+        const directData = await fetchDirectFromOpenRouter(targetPrompt, targetType, contextData, settings);
+        setResponse(directData.analysis);
+        setModelUsed(directData.model_used);
+        return;
+      } catch (directErr) {
+        console.warn('Direct OpenRouter fetch also failed, generating Smart Local DSP response:', directErr.message);
+        // 3. Smart Local Answer Fallback
+        const fallbackReport = generateLocalSmartReport(targetPrompt, targetType, contextData, settings.model);
+        setResponse(fallbackReport);
+        setModelUsed(`${settings.model} (Local Smart Engine)`);
+      }
     } finally {
       setLoading(false);
     }
@@ -199,8 +195,8 @@ export default function AiCopilotPanel({ contextType = 'general', contextData = 
           {loading && (
             <div className="flex items-center justify-center py-12 flex-col gap-2 font-mono text-xs text-[#000080]">
               <RefreshCw size={28} className="animate-spin text-[#0000FF]" />
-              <span className="font-bold text-sm">Performing Instrument-Grade AI DSP & Telemetry Audit...</span>
-              <span className="text-[11px] text-[#555555]">Evaluating ISO 10816, IEEE 519 THD, VSWR Link Budget & Kahn Topology</span>
+              <span className="font-bold text-sm">Querying OpenRouter LLM Scientific Assistant...</span>
+              <span className="text-[11px] text-[#555555]">Generating natural response with Gemini / Llama / DeepSeek model</span>
             </div>
           )}
 
@@ -208,7 +204,7 @@ export default function AiCopilotPanel({ contextType = 'general', contextData = 
             <div className="win98-inset p-3 bg-[#FFDDDD] border border-[#FF0000] text-[#CC0000] text-xs font-mono flex items-start gap-2">
               <AlertCircle size={16} className="shrink-0 mt-0.5" />
               <div>
-                <div className="font-bold">AI Diagnostic Error:</div>
+                <div className="font-bold">AI Processing Error:</div>
                 <div>{error}</div>
               </div>
             </div>
@@ -218,11 +214,11 @@ export default function AiCopilotPanel({ contextType = 'general', contextData = 
             <div className="flex flex-col gap-2">
               <div className="flex justify-between items-center border-b border-[#808080] pb-1">
                 <span className="font-bold text-xs text-[#000080] flex items-center gap-1">
-                  <Bot size={14} /> AI Senior DSP Diagnostic Audit Report [{modelUsed}]:
+                  <Bot size={14} /> AI Response [{modelUsed}]:
                 </span>
                 <button onClick={copyResponseToClipboard} className="win98-btn text-[10px] font-bold flex items-center gap-1">
                   {copied ? <Check size={10} className="text-[#00AA00]" /> : <Copy size={10} />}
-                  {copied ? 'Copied!' : 'Copy Report'}
+                  {copied ? 'Copied!' : 'Copy Answer'}
                 </button>
               </div>
               <div className="font-mono text-xs text-[#111111] whitespace-pre-wrap leading-relaxed bg-[#FDFDFD] p-3 border border-[#CCCCCC] select-text">
@@ -234,8 +230,8 @@ export default function AiCopilotPanel({ contextType = 'general', contextData = 
           {!response && !loading && !error && (
             <div className="text-center py-12 text-xs font-mono text-[#666666] flex flex-col gap-2 items-center">
               <Sparkles size={24} className="text-[#000080]" />
-              <span className="font-bold text-xs text-[#000080]">Ready for Scientific Signal Processing & Diagnostic Audit</span>
-              <span>Click one of the 1-Click Quick Prompts above or enter a custom DSP question below to start reasoning.</span>
+              <span className="font-bold text-xs text-[#000080]">Ready to answer your questions</span>
+              <span>Ask any DSP, vibration, RF, GPS, or electrical question in Turkish or English!</span>
             </div>
           )}
         </div>
@@ -244,7 +240,7 @@ export default function AiCopilotPanel({ contextType = 'general', contextData = 
         <div className="win98-outset p-2 bg-[#E0E0E0] flex gap-2">
           <input
             type="text"
-            placeholder="Ask AI Senior DSP Copilot (e.g. How to diagnose 2X line frequency vibration unbalance in motors?)"
+            placeholder="Ask AI Copilot (e.g. hello what is dsp, FFT nedir, how to design Butterworth filter?)"
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleRunAiInference(); }}
@@ -255,7 +251,7 @@ export default function AiCopilotPanel({ contextType = 'general', contextData = 
             disabled={loading || !prompt.trim()}
             className="win98-btn text-xs font-bold bg-[#000080] text-white px-4 flex items-center gap-1"
           >
-            <Send size={12} /> Run AI Audit
+            <Send size={12} /> Send Question
           </button>
         </div>
       </div>

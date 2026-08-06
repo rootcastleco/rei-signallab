@@ -56,22 +56,13 @@ OPENROUTER_FREE_MODELS: List[AIModelSpec] = [
     )
 ]
 
-SYSTEM_PROMPT = """You are REI SignalLab 2.1 AI Copilot — an elite scientific Digital Signal Processing (DSP), Industrial Vibration Condition Monitoring, Electrical Power Quality, Antenna RF, and GPS SDR AI Senior Instrumentation Engineer.
+SYSTEM_PROMPT = """You are REI SignalLab 2.1 AI Copilot — an expert, intelligent, friendly scientific Digital Signal Processing (DSP), Industrial Vibration Analysis, Electrical Power Quality, Antenna RF, and GPS SDR AI Assistant.
 
-Your objective is to provide exhaustive, instrument-grade, mathematically rigorous, and action-oriented scientific diagnostic reports.
-
-Structure your response with clear Markdown formatting:
-1. **📊 Executive Diagnostic Summary**: Brief high-level engineering evaluation of the signal or problem.
-2. **📈 Key Telemetry & Metric Analysis**: A Markdown table breaking down parameters (RMS, Peak, Crest Factor, Kurtosis, THD%, VSWR, Symmetrical Components V0/V1/V2, FFT spectral peaks).
-3. **📐 ISO / IEEE / Industrial Standards Evaluation**:
-   - For Vibration: Evaluate ISO 10816-3 machinery velocity severity limits (Zone A: Good, Zone B: Acceptable, Zone C: Restricted, Zone D: Unacceptable / Danger).
-   - For Electrical Power: Evaluate IEEE 519 harmonic limits, Fortescue voltage unbalance factor VUF% (< 2.0% normal), and Power Factor cos(phi).
-   - For Antenna RF: Evaluate VSWR (< 1.5:1 optimal), Return Loss S11 (dB), and Friis Link Budget Margin.
-   - For Node Graphs: Analyze Kahn topological sort DAG ordering, port data types, and node execution pipeline.
-4. **🔬 Mathematical Decomposition & Formulas**: Include relevant LaTeX formulas (e.g., $v_{\\text{rms}} = \\sqrt{\\frac{1}{N}\\sum v^2[n]}$, $S_{11} = 20\\log_{10}|\\Gamma|$).
-5. **🛠️ Actionable Engineering Recommendations**: 3 to 5 concrete step-by-step remediation or optimization actions for the maintenance engineer.
-
-Be thorough, precise, technical, and detailed. Avoid short or generic one-liners.
+Guidelines for your responses:
+1. **Natural & Direct Answers**: If the user asks a general question, greeting, or concept explanation (e.g. "what is dsp", "hello", "dsp nedir?", "explain FFT"), answer directly, warmly, and thoroughly in clear Markdown. Explain concepts step-by-step with real-world examples, relevant math formulas, and code where helpful.
+2. **Language Matching**: Always respond in the SAME language as the user's question (e.g., if asked in Turkish, answer in clear Turkish; if asked in English, answer in clear English).
+3. **Structured Telemetry Audits**: If the user specifically asks for a machinery vibration audit, electrical THD inspection, or node graph review, provide metric tables, standard checks (ISO 10816-3, IEEE 519), and actionable recommendations.
+4. **Formatting**: Use clean Markdown formatting with clear headers, bullet points, bold key terms, and standard math notation.
 """
 
 class OpenRouterAIService:
@@ -87,12 +78,13 @@ class OpenRouterAIService:
         if not api_key:
             raise ValueError("OPENROUTER_KEY_MISSING: No OpenRouter API key available.")
 
-        # Construct Rich Context Prompt
-        user_content = f"### Scientific Diagnostic Task:\nUser Question/Prompt: {req.prompt}\nContext Area: {req.context_type}\n"
+        # Construct Context Prompt
+        user_content = f"User Question/Prompt: {req.prompt}\n"
+        if req.context_type and req.context_type != 'general':
+            user_content += f"Context Area: {req.context_type}\n"
         if req.context_data:
-            user_content += f"\n### Live Telemetry Data JSON:\n```json\n{json.dumps(req.context_data, indent=2)}\n```\n"
+            user_content += f"\nLive Telemetry Data JSON:\n```json\n{json.dumps(req.context_data, indent=2)}\n```\n"
 
-        # Build model candidate list starting with requested model then trying fallback models
         requested_model = req.model
         fallback_models = [m.id for m in OPENROUTER_FREE_MODELS if m.id != requested_model]
         candidates = [requested_model] + fallback_models
@@ -106,7 +98,7 @@ class OpenRouterAIService:
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_content}
                 ],
-                "temperature": 0.25,
+                "temperature": 0.3,
                 "max_tokens": 1800
             }
 
@@ -124,7 +116,7 @@ class OpenRouterAIService:
             )
 
             try:
-                with urllib.request.urlopen(request, timeout=22) as response:
+                with urllib.request.urlopen(request, timeout=20) as response:
                     resp_data = json.loads(response.read().decode("utf-8"))
                     choices = resp_data.get("choices", [])
                     if choices and choices[0].get("message", {}).get("content"):
@@ -138,10 +130,10 @@ class OpenRouterAIService:
                         )
             except urllib.error.HTTPError as http_err:
                 err_body = http_err.read().decode("utf-8", errors="ignore")
-                logger.warning(f"OpenRouter Model {model_id} HTTP {http_err.code}: {err_body}. Trying next model candidate...")
+                logger.warning(f"OpenRouter Model {model_id} HTTP {http_err.code}: {err_body}")
                 last_error = f"HTTP {http_err.code}: {err_body}"
             except Exception as e:
-                logger.warning(f"OpenRouter Model {model_id} Exception: {e}. Trying next model candidate...")
+                logger.warning(f"OpenRouter Model {model_id} Exception: {e}")
                 last_error = str(e)
 
-        raise ValueError(f"OPENROUTER_ALL_MODELS_FAILED: {last_error or 'Could not complete inference on free models.'}")
+        raise ValueError(f"OPENROUTER_ALL_MODELS_FAILED: {last_error or 'Could not complete inference.'}")
