@@ -4,9 +4,12 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   GoogleAuthProvider,
   signInAnonymously,
   signOut,
+  updateProfile,
+  sendPasswordResetEmail,
   onAuthStateChanged
 } from "firebase/auth";
 import {
@@ -15,7 +18,6 @@ import {
   doc,
   setDoc,
   getDocs,
-  getDoc,
   deleteDoc,
   query,
   orderBy,
@@ -37,8 +39,15 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 
 // Authentication Helpers
-export const signUpWithEmail = async (email, password) => {
+export const signUpWithEmail = async (email, password, displayName) => {
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  if (displayName && displayName.trim()) {
+    try {
+      await updateProfile(userCredential.user, { displayName: displayName.trim() });
+    } catch (e) {
+      console.warn('Profile name update failed:', e);
+    }
+  }
   return userCredential.user;
 };
 
@@ -49,8 +58,27 @@ export const loginWithEmail = async (email, password) => {
 
 export const loginWithGoogle = async () => {
   const provider = new GoogleAuthProvider();
-  const userCredential = await signInWithPopup(auth, provider);
-  return userCredential.user;
+  provider.setCustomParameters({ prompt: 'select_account' });
+  try {
+    const userCredential = await signInWithPopup(auth, provider);
+    return userCredential.user;
+  } catch (popupErr) {
+    console.warn('Google Popup login failed/blocked, trying Redirect mode:', popupErr.code, popupErr.message);
+    if (
+      popupErr.code === 'auth/popup-blocked' ||
+      popupErr.code === 'auth/popup-closed-by-user' ||
+      popupErr.code === 'auth/cancelled-popup-request'
+    ) {
+      // Fallback to full page redirect if popup is blocked
+      await signInWithRedirect(auth, provider);
+      return null;
+    }
+    throw popupErr;
+  }
+};
+
+export const resetUserPassword = async (email) => {
+  await sendPasswordResetEmail(auth, email);
 };
 
 export const loginGuest = async () => {
@@ -64,6 +92,33 @@ export const logoutUser = async () => {
 
 export const subscribeToAuthChanges = (callback) => {
   return onAuthStateChanged(auth, callback);
+};
+
+// Friendly Error Translator
+export const formatAuthError = (err) => {
+  const code = err.code || '';
+  switch (code) {
+    case 'auth/invalid-credential':
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+      return 'E-posta veya şifre hatalı. Lütfen bilgilerinizi kontrol ediniz.';
+    case 'auth/email-already-in-use':
+      return 'Bu e-posta adresi zaten kullanımda. Giriş yapmayı deneyin veya şifrenizi sıfırlayın.';
+    case 'auth/weak-password':
+      return 'Şifre çok zayıf. Şifreniz en az 6 karakter olmalıdır.';
+    case 'auth/invalid-email':
+      return 'Geçersiz e-posta adresi biçimi.';
+    case 'auth/popup-blocked':
+      return 'Google giriş penceresi engellendi. Lütfen tarayıcı açılır pencere engelleyicisini kapatın.';
+    case 'auth/popup-closed-by-user':
+      return 'Google giriş penceresi kapatıldı.';
+    case 'auth/unauthorized-domain':
+      return 'Bu alan adı (domain) Firebase Auth kabul listesinde onaylanmamış. Firebase Console > Authentication > Settings bölümünden bu domaini ekleyin.';
+    case 'auth/operation-not-allowed':
+      return 'Google/E-posta ile giriş yöntemi Firebase Console üzerinde henüz aktif edilmemiş. Lütfen Firebase Console > Authentication bölümünden oturum sağlayıcıyı aktif edin.';
+    default:
+      return err.message ? err.message.replace('Firebase: ', '') : 'Oturum açma hatası oluştu.';
+  }
 };
 
 // Project Persistence Helpers (Firestore + LocalStorage Fallback)
@@ -99,7 +154,6 @@ export const saveUserProject = async (user, projectData) => {
     userEmail: user ? (user.email || 'Guest User') : 'Guest User'
   };
 
-  // 1. Always save to LocalStorage for instant offline availability
   const localProjects = getLocalProjects();
   const existingIdx = localProjects.findIndex(p => p.id === projectId);
   if (existingIdx >= 0) {
@@ -109,7 +163,6 @@ export const saveUserProject = async (user, projectData) => {
   }
   saveLocalProjects(localProjects);
 
-  // 2. If authenticated user, save to Cloud Firestore
   if (user && !user.isAnonymous) {
     try {
       const projRef = doc(db, `users/${user.uid}/projects`, projectId);
@@ -154,11 +207,9 @@ export const fetchUserProjects = async (user) => {
 };
 
 export const deleteUserProject = async (user, projectId) => {
-  // 1. Delete from LocalStorage
   const localProjects = getLocalProjects().filter(p => p.id !== projectId);
   saveLocalProjects(localProjects);
 
-  // 2. Delete from Firestore if authenticated
   if (user && !user.isAnonymous) {
     try {
       await deleteDoc(doc(db, `users/${user.uid}/projects`, projectId));
