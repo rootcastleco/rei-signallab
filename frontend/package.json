@@ -15,7 +15,7 @@
   "dependencies": {
     "firebase": "^12.17.1",
     "lucide-react": "^0.344.0",
-    "react": "^18.2.0",
+    "react": "^19.2.8",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
@@ -24,7 +24,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.3",
-    "@types/react": "^18.2.66",
+    "@types/react": "^19.2.18",
     "@types/react-dom": "^18.2.22",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.5.4",
