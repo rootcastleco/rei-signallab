@@ -123,7 +123,7 @@ def analyze_vibration(req: VibrationAnalysisRequest):
             envelope_magnitude=env_mag.tolist(),
             bearing_frequencies=bearing_freqs,
             harmonic_orders=[HarmonicOrder(**h) for h in harmonic_orders],
-            diagnostics=[d.dict() for d in diagnostics],
+            diagnostics=[d.model_dump() for d in diagnostics],
             balance_result=None,
             trust_mode=trust_mode
         )
@@ -179,7 +179,7 @@ def balance(config: BalanceInputConfig):
                 v1_amp=config.v1_amp,
                 v1_phase_deg=config.v1_phase_deg
             )
-            out = res.dict()
+            out = res.model_dump()
             if config.trial_radius_mm is not None and config.correction_radius_mm is not None and config.trial_radius_mm != config.correction_radius_mm:
                 out["correction_mass"] = out["correction_mass"] * (config.trial_radius_mm / config.correction_radius_mm)
             return out

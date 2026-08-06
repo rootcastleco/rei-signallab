@@ -127,17 +127,75 @@ on 3000 while only 5173 was allowlisted, so `npm run dev` hit a CORS wall.
 
 ---
 
+## Session 2026-08-06 (cont.) — Go-live attempt
+
+Goal was to put the backend live. **Not achieved** — blocked on credentials that
+only the repository owner can supply. What the attempt established:
+
+### The Cloud Run service does not exist
+
+Probing the derived service URL
+(`https://rei-signallab-api-36308448808.europe-west1.run.app`, project number
+taken from the Firebase config) returns a **Google-frontend 404**, not a DNS
+failure. The hostname reaches Cloud Run's frontend and no service matches:
+`rei-signallab-api` has never been created in `europe-west1`. This explains the
+`/api/**` rewrite falling through to `index.html` on both domains.
+
+### Why the deploy could not be run from here
+
+| Blocker | Detail |
+| :--- | :--- |
+| `gcloud` not installed | Not on PATH on this machine |
+| `gcloud auth login` is interactive | Browser-based; the owner must run it |
+| Docker Desktop will not start | Daemon never came up over a 7-minute wait, so no local image build/push |
+
+`scripts/deploy-cloud-run.sh` was reviewed line by line and is correct — it
+creates the Artifact Registry repo if absent, builds, pushes, deploys with
+2 GiB / 2 CPU / concurrency 8, smoke-tests, and rolls back on failure.
+
+### A blocker that would have failed the deploy anyway
+
+Running the API locally under production env and replaying the CD pipeline's own
+smoke payload found `POST /api/vibration/analyze` returning **HTTP 500**:
+
+```
+type object 'VibrationEngine' has no attribute 'compute_envelope_spectrum'
+```
+
+The method's **body existed but its `def` line and `@classmethod` decorator had
+been deleted** in an earlier edit — the body was orphaned as dead code after
+`compute_sdof_mass_spring_damper`'s `return`, with its docstring sitting as an
+unreachable expression. The flagship vibration endpoint and the graph's
+`vibration.envelope_analysis` node were both broken in production.
+
+The whole existing suite passed regardless, because it tests engines directly
+and never drove the routes. Restored the signature (defaults `500 Hz` /
+`5000 Hz`, matching what the node registry already documented) and added
+`backend/tests/test_routes_smoke_golden.py`: 36 tests that drive **every**
+endpoint over HTTP, plus a guard asserting no registered route lacks smoke
+coverage. Had this deploy succeeded before the fix, the pipeline's smoke test
+would have failed and auto-rolled-back.
+
+Backend suite: 118 -> 154 tests.
+
+---
+
 ## Open items
 
-### Blocking production
+### Blocking production — owner action required
 
-1. **The API is not live.** `/api/version` returns the SPA's `index.html` on both
-   `signallab.site` and `signallab-3305b.web.app`, so the Firebase `/api/**`
-   rewrite is not resolving to Cloud Run — the backend has never deployed
-   successfully. Every workbench in the UI is calling an endpoint that does not
-   answer. Requires the GCP secrets (`GCP_WORKLOAD_IDENTITY_PROVIDER`,
-   `GCP_SERVICE_ACCOUNT`, `GCP_PROJECT_ID`) and one successful pipeline run.
-2. **`www.signallab.site` has no valid TLS certificate** — the cert presented
+1. **Deploy the backend.** The Cloud Run service does not exist. Either:
+   - install the gcloud SDK, `gcloud auth login`, then
+     `GCP_PROJECT_ID=signallab-3305b GCP_REGION=europe-west1 ./scripts/deploy-cloud-run.sh`; or
+   - configure the three repo secrets (`GCP_WORKLOAD_IDENTITY_PROVIDER`,
+     `GCP_SERVICE_ACCOUNT`, `GCP_PROJECT_ID`) and let the CD pipeline do it.
+
+   Until this lands, every workbench in the UI calls an endpoint that returns
+   the SPA's HTML.
+2. **Firebase Hosting must be redeployed after the service exists.** A `run`
+   rewrite cannot resolve to a service that is absent, which is consistent with
+   hosting currently serving `index.html` for `/api/**`.
+3. **`www.signallab.site` has no valid TLS certificate** — the presented cert
    does not cover the `www` host. Either provision it in Firebase Hosting or
    drop the hostname.
 
@@ -156,3 +214,8 @@ on 3000 while only 5173 was allowlisted, so `npm run dev` hit a CORS wall.
 7. **`/api/lisp/process` has no execution timeout.** Lower risk than the Python
    sandbox — the interpreter only dispatches a fixed macro set — but it is
    unbounded and shares the compute bucket.
+8. **Pydantic/NumPy interop warning.** Validating the large float lists in
+   vibration responses emits `np.bool scalars ... interpreted as an index`
+   (a future error) from inside `pydantic/type_adapter.py`. Our own values are
+   plain Python types; this is a library interaction to re-check on the next
+   pydantic or numpy bump.

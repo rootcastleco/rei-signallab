@@ -627,6 +627,15 @@ class VibrationEngine:
             "time": t.tolist(),
             "displacement_mm": [x * 1000.0 for x in x_trace]
         }
+
+    @classmethod
+    def compute_envelope_spectrum(
+        cls,
+        sig: np.ndarray,
+        fs: float,
+        low_cutoff_hz: float = 500.0,
+        high_cutoff_hz: float = 5000.0
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Bandpass filter -> Hilbert Envelope Demodulation -> FFT
         """
