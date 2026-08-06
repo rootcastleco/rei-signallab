@@ -4,33 +4,50 @@
 
 ### Extended Typed DSP Node Library, Kahn Execution Engine, Numerical Golden Precision Suite & REI Vibration Analysis Workbench
 
-*Inspired by **Mitov SignalLab**, engineered with **Typed Canonical Node Library (`.rei-signal 2.1`)**, **Kahn Topological Execution Engine**, **Safe AST Math Expression Filter**, **Numerical Golden Precision Verification**, and **REI Vibration Analysis Workbench**.*
+*Engineered by **[Betuhan Ayribas](https://betuhanayribas.com)** at **[RootCastle](https://rootcastle.com)** — Engineering Beyond Boundaries*
+
+<br/>
+
+<a href="https://betuhanayribas.com"><img src="https://img.shields.io/badge/Betuhan%20Ayribas-betuhanayribas.com-071521?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJ3aGl0ZSI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgMThjLTQuNDIgMC04LTMuNTgtOC04czMuNTgtOCA4LTggOCAzLjU4IDggOC0zLjU4IDgtOCA4eiIvPjwvc3ZnPg==&logoColor=white" alt="Betuhan Ayribas"/></a>
+<a href="https://rootcastle.com"><img src="https://img.shields.io/badge/RootCastle-rootcastle.com-087EA4?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJ3aGl0ZSI+PHBhdGggZD0iTTEyIDNMNCA5djEyaDV2LTdoNnY3aDVWOXoiLz48L3N2Zz4=&logoColor=white" alt="RootCastle"/></a>
+
+<br/>
 
 [![Live App on Firebase](https://img.shields.io/badge/Live%20App-signallab--3305b.web.app-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://signallab-3305b.web.app)
 [![PDF User Manual](https://img.shields.io/badge/PDF%20Manual-16--Page%20Wiki-FF0000?style=for-the-badge&logo=adobeacrobatreader&logoColor=white)](docs/wiki/REI_SignalLab_2_1_Product_Wiki.tex)
+[![GitHub Wiki](https://img.shields.io/badge/GitHub-Wiki-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/rootcastleco/rei-signallab/wiki)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-2.1.0-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![SciPy](https://img.shields.io/badge/SciPy-DSP-8CAAE6?style=for-the-badge&logo=scipy&logoColor=white)](https://scipy.org)
 [![React 18](https://img.shields.io/badge/React-18.2-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
-[Live Demo](https://signallab-3305b.web.app) | [16-Page PDF User Manual](docs/wiki/REI_SignalLab_2_1_Product_Wiki.tex) | [Overview](#overview) | [Screenshots](#application-screenshots) | [Vibration Workbench](#rei-vibration-analysis-workbench) | [Canonical Node Library](#canonical-dsp-node-library) | [Numerical Golden Precision](#numerical-golden-precision-suite) | [API Spec](#api-endpoints-summary) | [Quick Start](#quick-start)
+[Live Demo](https://signallab-3305b.web.app) | [16-Page PDF User Manual](docs/wiki/REI_SignalLab_2_1_Product_Wiki.tex) | [GitHub Wiki](https://github.com/rootcastleco/rei-signallab/wiki) | [Overview](#overview) | [Screenshots](#application-screenshots) | [Vibration Workbench](#rei-vibration-analysis-workbench) | [Canonical Node Library](#canonical-dsp-node-library) | [Numerical Golden Precision](#numerical-golden-precision-suite) | [API Spec](#api-endpoints-summary) | [Quick Start](#quick-start)
 
 </div>
 
 ---
 
-## 🚀 Live Application & Repository
+## 🏢 About
 
-- **Firebase Hosting Live App**: [**https://signallab-3305b.web.app**](https://signallab-3305b.web.app)
-- **Firebase Mirror**: [**https://signallab-3305b.firebaseapp.com**](https://signallab-3305b.firebaseapp.com)
-- **GitHub Repository**: [**https://github.com/rootcastleco/rei-signallab**](https://github.com/rootcastleco/rei-signallab)
+**REI SignalLab 2.1** is developed and maintained by **[Betuhan Ayribas](https://betuhanayribas.com)**, founder of **[RootCastle](https://rootcastle.com)**.
+
+| | |
+| :--- | :--- |
+| **Developer** | [Betuhan Ayribas](https://betuhanayribas.com) |
+| **Company** | [RootCastle](https://rootcastle.com) — Engineering Beyond Boundaries |
+| **Live Application** | [signallab-3305b.web.app](https://signallab-3305b.web.app) |
+| **Firebase Mirror** | [signallab-3305b.firebaseapp.com](https://signallab-3305b.firebaseapp.com) |
+| **Source Repository** | [github.com/rootcastleco/rei-signallab](https://github.com/rootcastleco/rei-signallab) |
+| **GitHub Wiki** | [github.com/rootcastleco/rei-signallab/wiki](https://github.com/rootcastleco/rei-signallab/wiki) |
+| **Version** | 2.1.0 |
+| **License** | MIT |
 
 ---
 
 ## Overview
 
-**REI SignalLab 2.1** is an instrument-grade digital signal processing, spectral analysis, visual node graph flow studio, and industrial vibration analysis workbench. Inspired by **Mitov SignalLab**, it provides:
+**REI SignalLab 2.1** is an instrument-grade digital signal processing, spectral analysis, visual node graph flow studio, and industrial vibration analysis workbench. Developed by **[Betuhan Ayribas](https://betuhanayribas.com)** at **[RootCastle](https://rootcastle.com)**, it provides:
 
 1. **Canonical Typed Node Library (`.rei-signal 2.1`)**: Versioned node registry (`GET /api/nodes`) exposing 35+ canonical DSP and Vibration nodes with strictly enforced port data types (`Signal<Real64>`, `Signal<Complex128>`, `SpectrumFrame`, `Scalar<Real64>`, `PatternEvent`).
 2. **Kahn Topological Execution Engine (`POST /api/graph/execute`)**: Deterministic graph validation and execution engine with 10-point port compatibility checks, cycle detection, and Kahn's topological scheduler.
@@ -198,3 +215,15 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ## License
 
 Distributed under the **MIT License**. See `LICENSE` for more information.
+
+---
+
+<div align="center">
+
+**Developed by [Betuhan Ayribas](https://betuhanayribas.com)**
+
+**[RootCastle](https://rootcastle.com) — Engineering Beyond Boundaries**
+
+REI SignalLab 2.1 • Version 2.1.0 • August 2026
+
+</div>
