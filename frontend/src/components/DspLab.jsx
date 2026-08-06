@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Activity, Sliders, Waves, Play, RefreshCw, BarChart2, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { safeFetchJson } from '../config';
 
-export default function UnpingcoDspLab() {
+export default function DspLab() {
   const [activeTab, setActiveTab] = useState('aliasing'); // 'aliasing' | 'fir' | 'autocorr' | 'lms' | 'cwt'
   const [isExecuting, setIsExecuting] = useState(false);
 
@@ -120,7 +120,6 @@ export default function UnpingcoDspLab() {
       });
       setFirData(data);
     } catch (err) {
-      // Local fallback FIR
       const freqs = [], mag = [];
       for (let i = 0; i < 200; i++) {
         const f = (i / 200) * (firFsHz / 2);
@@ -259,7 +258,6 @@ export default function UnpingcoDspLab() {
     ctx.strokeStyle = '#003300'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
 
-    // Draw Continuous Sine (Cyan)
     ctx.strokeStyle = '#00FFFF'; ctx.lineWidth = 1.5; ctx.beginPath();
     aliasingData.signal_continuous?.forEach((v, i) => {
       const px = (i / aliasingData.signal_continuous.length) * W;
@@ -268,7 +266,6 @@ export default function UnpingcoDspLab() {
     });
     ctx.stroke();
 
-    // Draw Sampled Points (Red/Green Dots)
     ctx.fillStyle = aliasingData.is_aliased ? '#FF0000' : '#00FF00';
     aliasingData.signal_sampled?.forEach((v, i) => {
       const px = (i / (aliasingData.signal_sampled.length - 1)) * W;
@@ -314,6 +311,36 @@ export default function UnpingcoDspLab() {
     ctx.fillText(`Stopband Attenuation: ${firData.stopband_attenuation_db?.toFixed(1)} dB`, 8, 30);
   }, [activeTab, firData]);
 
+  // Autocorrelation Canvas Render
+  useEffect(() => {
+    if (activeTab !== 'autocorr' || !autocorrData) return;
+    const canvas = autocorrCanvasRef.current;
+    if (!canvas) return;
+    canvas.width = canvas.parentElement.clientWidth; canvas.height = 240;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#003300'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
+
+    ctx.strokeStyle = '#00FF00'; ctx.lineWidth = 1.8; ctx.beginPath();
+    const corr = autocorrData.autocorrelation || [];
+    corr.forEach((v, i) => {
+      const px = (i / corr.length) * W;
+      const py = H / 2 - v * (H / 2 - 20);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    });
+    ctx.stroke();
+
+    ctx.fillStyle = '#00FF00'; ctx.font = 'bold 11px monospace';
+    ctx.fillText(`Autocorrelation Rxx[τ] | Max Lag: ${maxLag} samples`, 8, 14);
+    if (autocorrData.dominant_freq_hz) {
+      ctx.fillStyle = '#FFFF00';
+      ctx.fillText(`Dominant Pitch: ${autocorrData.dominant_freq_hz.toFixed(1)} Hz (Period: ${autocorrData.dominant_period_ms.toFixed(1)} ms)`, 8, 30);
+    }
+  }, [activeTab, autocorrData]);
+
   // LMS Canvas Render
   useEffect(() => {
     if (activeTab !== 'lms' || !lmsData) return;
@@ -325,7 +352,6 @@ export default function UnpingcoDspLab() {
 
     ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, H);
 
-    // Draw Noisy Input (Gray)
     ctx.strokeStyle = '#555555'; ctx.lineWidth = 1; ctx.beginPath();
     lmsData.noisy_input?.forEach((v, i) => {
       const px = (i / lmsData.noisy_input.length) * W;
@@ -334,7 +360,6 @@ export default function UnpingcoDspLab() {
     });
     ctx.stroke();
 
-    // Draw Filtered Output (Green)
     ctx.strokeStyle = '#00FF00'; ctx.lineWidth = 1.8; ctx.beginPath();
     lmsData.filtered_output?.forEach((v, i) => {
       const px = (i / lmsData.filtered_output.length) * W;
@@ -370,7 +395,7 @@ export default function UnpingcoDspLab() {
       for (let s = 0; s < numS; s++) {
         for (let t = 0; t < numT; t++) {
           const val = mat[s][t];
-          const hue = (1.0 - val) * 240; // Blue to Red heatmap
+          const hue = (1.0 - val) * 240;
           ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
           ctx.fillRect(t * cellW, H - (s + 1) * cellH, cellW + 1, cellH + 1);
         }
@@ -378,7 +403,7 @@ export default function UnpingcoDspLab() {
     }
 
     ctx.fillStyle = '#FFFFFF'; ctx.font = 'bold 11px monospace';
-    ctx.fillText(`CWT Wavelet Time-Frequency Scalogram (Morlet/Ricker) | Chirp ${cwtFStart}Hz -> ${cwtFStop}Hz`, 8, 14);
+    ctx.fillText(`CWT Wavelet Time-Frequency Scalogram | Chirp ${cwtFStart}Hz -> ${cwtFStop}Hz`, 8, 14);
   }, [activeTab, cwtData]);
 
   return (
@@ -387,7 +412,7 @@ export default function UnpingcoDspLab() {
       <div className="win98-titlebar bg-[#000080] text-white px-2 py-1 flex items-center justify-between font-bold text-xs select-none">
         <div className="flex items-center gap-1.5">
           <Activity size={14} className="text-[#00FFFF]" />
-          <span>Python for Signal Processing Lab (J. Unpingco Algorithms)</span>
+          <span>DSP Lab (Digital Signal Processing Workbench)</span>
           {aliasingData?.trust_mode === 'API_VERIFIED' && <span className="ml-2 text-[10px] bg-[#00AA00] text-white px-1.5 py-0.5 font-bold">✓ API VERIFIED</span>}
           {aliasingData?.trust_mode === 'LOCAL_BROWSER_DSP' && <span className="ml-2 text-[10px] bg-[#00AAAA] text-white px-1.5 py-0.5 font-bold">✓ LOCAL BROWSER DSP</span>}
         </div>
@@ -458,6 +483,29 @@ export default function UnpingcoDspLab() {
               <div className="flex items-end">
                 <button onClick={runFirDesign} className="win98-btn text-xs font-bold w-full">
                   <Play size={12} className="inline mr-1" /> Design Equiripple FIR
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'autocorr' && (
+          <div className="flex flex-col gap-2">
+            <div className="win98-outset p-1 bg-[#000000]">
+              <canvas ref={autocorrCanvasRef} style={{ width: '100%', display: 'block' }} />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs font-mono bg-[#E0E0E0] p-2 border border-[#808080]">
+              <div>
+                <label className="font-bold">Max Lag (samples):</label>
+                <input type="number" value={maxLag} onChange={e => setMaxLag(e.target.value)} className="w-full font-mono bg-white border border-[#808080] px-1" />
+              </div>
+              <div>
+                <label className="font-bold">Sample Rate (Hz):</label>
+                <input type="number" value={autocorrFs} onChange={e => setAutocorrFs(e.target.value)} className="w-full font-mono bg-white border border-[#808080] px-1" />
+              </div>
+              <div className="col-span-2 flex items-end">
+                <button onClick={runAutocorr} className="win98-btn text-xs font-bold w-full">
+                  <Play size={12} className="inline mr-1" /> Compute Autocorrelation Rxx[τ]
                 </button>
               </div>
             </div>

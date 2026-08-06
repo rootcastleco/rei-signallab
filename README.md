@@ -99,9 +99,9 @@ The **REI Vibration Analysis Workbench** is an end-to-end industrial condition m
 
 ---
 
-## 📘 Python for Signal Processing Lab (J. Unpingco Algorithms)
+## 📘 Digital Signal Processing Lab (DSP Lab)
 
-Modeled after Jose Unpingco's textbook [*Python for Signal Processing*](https://github.com/unpingco/Python-for-Signal-Processing) (Springer), this module provides interactive educational and analytical tools backed by SciPy API endpoints (`/api/dsp-lab/*`):
+This module provides interactive educational and analytical tools backed by SciPy API endpoints (`/api/dsp-lab/*`):
 
 - **Sampling Theorem & Aliasing Fold-Over**: Visualizes continuous signal $s(t) = \sin(2\pi f t)$ vs discrete samples $s[n]$, highlights Nyquist frequency $f_{\text{nyquist}} = f_s / 2$, and calculates folded aliased frequency $f_{\text{aliased}} = |f_{\text{signal}} - k \cdot f_{\text{sample}}|$.
 - **Parks-McClellan Optimal Equiripple FIR Filter Design**: Uses `scipy.signal.remez` to compute optimal Type I FIR impulse response $h[n]$ and magnitude response $|H(e^{j\omega})|$ dB with exact passband ripple and stopband attenuation metrics.
