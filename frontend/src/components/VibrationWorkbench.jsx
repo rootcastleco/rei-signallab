@@ -69,6 +69,9 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
   const gain1Ref = useRef(null);
   const gain2Ref = useRef(null);
 
+  const toneWaveformCanvasRef = useRef(null);
+  const toneSpectrumCanvasRef = useRef(null);
+
   const [driverD1, setDriverD1] = useState(150);
   const [drivenD2, setDrivenD2] = useState(300);
   const [beltLength, setBeltLength] = useState(1200);
@@ -837,6 +840,88 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
     }
   }, [toneF1, toneF2, toneAmp1, toneAmp2, isPlayingAudio]);
 
+  // Tone Generator Dual-Sine Time Waveform & Spectrum Canvas Render
+  useEffect(() => {
+    if (activeTab !== 'tonegen') return;
+
+    // 1. Time Waveform Canvas
+    const twCanvas = toneWaveformCanvasRef.current;
+    if (twCanvas) {
+      twCanvas.width = twCanvas.parentElement.clientWidth;
+      twCanvas.height = 140;
+      const ctx = twCanvas.getContext('2d');
+      const W = twCanvas.width, H = twCanvas.height;
+
+      ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = '#003300'; ctx.lineWidth = 1;
+      for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
+
+      const f1 = parseFloat(toneF1) || 51;
+      const a1 = parseFloat(toneAmp1) || 3;
+      const f2 = parseFloat(toneF2) || 52;
+      const a2 = parseFloat(toneAmp2) || 1;
+      const maxAmp = Math.max(a1 + a2, 1.0);
+
+      ctx.strokeStyle = '#00FFFF'; ctx.lineWidth = 1.8; ctx.beginPath();
+      const N = W;
+      const T = 0.2; // 200 ms view
+
+      for (let i = 0; i < N; i++) {
+        const t = (i / N) * T;
+        const val = a1 * Math.sin(2 * Math.PI * f1 * t) + a2 * Math.sin(2 * Math.PI * f2 * t);
+        const px = i;
+        const py = H / 2 - (val / maxAmp) * (H / 2 - 15);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = '#00FF00'; ctx.font = 'bold 10px monospace';
+      ctx.fillText(`Time Waveform | F1: ${f1}Hz (${a1}), F2: ${f2}Hz (${a2}) | Beating Envelope Δf: ${Math.abs(f1 - f2).toFixed(1)}Hz`, 8, 14);
+    }
+
+    // 2. FFT Spectrum Canvas
+    const tsCanvas = toneSpectrumCanvasRef.current;
+    if (tsCanvas) {
+      tsCanvas.width = tsCanvas.parentElement.clientWidth;
+      tsCanvas.height = 140;
+      const ctx = tsCanvas.getContext('2d');
+      const W = tsCanvas.width, H = tsCanvas.height;
+
+      ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = '#003300'; ctx.lineWidth = 1;
+      for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(0, H - 20); ctx.lineTo(W, H - 20); ctx.stroke();
+
+      const f1 = parseFloat(toneF1) || 51;
+      const a1 = parseFloat(toneAmp1) || 3;
+      const f2 = parseFloat(toneF2) || 52;
+      const a2 = parseFloat(toneAmp2) || 1;
+
+      const fMax = Math.max(f1, f2, 100) * 1.5;
+      const maxAmp = Math.max(a1, a2, 1.0) * 1.2;
+
+      // Draw Spike F1
+      const x1 = (f1 / fMax) * (W - 60) + 30;
+      const h1 = (a1 / maxAmp) * (H - 40);
+      ctx.strokeStyle = '#00FF00'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x1, H - 20); ctx.lineTo(x1, H - 20 - h1); ctx.stroke();
+      ctx.fillStyle = '#00FF00'; ctx.font = 'bold 10px monospace';
+      ctx.fillText(`F1:${f1}Hz (${a1})`, x1 - 20, H - 25 - h1);
+
+      // Draw Spike F2
+      const x2 = (f2 / fMax) * (W - 60) + 30;
+      const h2 = (a2 / maxAmp) * (H - 40);
+      ctx.strokeStyle = '#FFFF00'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x2, H - 20); ctx.lineTo(x2, H - 20 - h2); ctx.stroke();
+      ctx.fillStyle = '#FFFF00'; ctx.font = 'bold 10px monospace';
+      ctx.fillText(`F2:${f2}Hz (${a2})`, x2 - 20, H - 25 - h2);
+
+      ctx.fillStyle = '#00FF00'; ctx.font = 'bold 10px monospace';
+      ctx.fillText(`FFT Spectrum | Discrete Peaks (Linear Scale)`, 8, 14);
+    }
+  }, [activeTab, toneF1, toneF2, toneAmp1, toneAmp2]);
+
   const generateReport = () => {
     const bf = telemetry?.bearing_frequencies || {};
     const reportObj = {
@@ -1292,7 +1377,7 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
             <div className="win98-outset p-3 bg-[#C0C0C0] text-xs font-mono flex flex-col gap-2">
               <div className="font-bold text-[#000080] border-b border-[#808080] pb-1 flex items-center justify-between">
                 <span>Signal Tone Generator with Audial Beating Effect (RITEC Tool)</span>
-                <span className="text-[10px] text-[#008800]">Audially Demonstrates Acoustic Beating ($\Delta f = |f_1 - f_2|$)</span>
+                <span className="text-[10px] text-[#008800]">Audially & Visually Demonstrates Acoustic Beating ($\Delta f = |f_1 - f_2|$)</span>
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-[11px]">
@@ -1321,6 +1406,16 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
                     <input type="number" step="0.5" value={toneAmp2} onChange={e => setToneAmp2(parseFloat(e.target.value))} className="w-full font-mono text-xs" />
                   </div>
                 </div>
+              </div>
+
+              {/* Real-time Time Waveform Canvas */}
+              <div className="win98-outset p-1 bg-[#000000] border border-[#808080]">
+                <canvas ref={toneWaveformCanvasRef} style={{ width: '100%', display: 'block' }} />
+              </div>
+
+              {/* Real-time FFT Spectrum Canvas */}
+              <div className="win98-outset p-1 bg-[#000000] border border-[#808080]">
+                <canvas ref={toneSpectrumCanvasRef} style={{ width: '100%', display: 'block' }} />
               </div>
 
               {/* Audio Controls & Beating Info */}
