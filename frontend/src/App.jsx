@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText, Layers, AlertTriangle, Gauge, Zap, Radio, User, Folder } from 'lucide-react';
+import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText, Layers, AlertTriangle, Gauge, Zap, Radio, User, Folder, Info } from 'lucide-react';
 import { safeFetchJson, verifyBackendHandshake } from './config';
 import { subscribeToAuthChanges } from './firebaseAuth';
 
@@ -20,6 +20,7 @@ import DspLab from './components/DspLab';
 import SrwWorkbench from './components/SrwWorkbench';
 import UserAuthModal from './components/UserAuthModal';
 import ProjectManagerModal from './components/ProjectManagerModal';
+import AboutModal from './components/AboutModal';
 
 const PRESETS = {
   SINE_440: {
@@ -76,6 +77,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showProjectModal, setShowProjectModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
   const [currentGraphState, setCurrentGraphState] = useState(null);
 
   useEffect(() => {
@@ -462,6 +464,9 @@ export default function App() {
             <button className="win98-btn font-bold bg-[#FFFFCC] text-[#000080]" onClick={() => setShowProjectModal(true)}>
               <Folder size={13} className="text-[#0000FF]" /> Saved Projects & Cloud Sync
             </button>
+            <button className="win98-btn font-bold bg-[#E8E8E8] text-[#000080]" onClick={() => setShowAboutModal(true)}>
+              <Info size={13} className="text-[#00AA00]" /> About & Credits
+            </button>
             <button className="win98-btn" onClick={exportCSV}>
               <FileText size={13} className="text-[#00AA00]" /> Save CSV
             </button>
@@ -651,6 +656,11 @@ export default function App() {
           }}
           onClose={() => setShowProjectModal(false)}
         />
+      )}
+
+      {/* System Architecture & Credits Modal */}
+      {showAboutModal && (
+        <AboutModal onClose={() => setShowAboutModal(false)} />
       )}
     </div>
   );
