@@ -1063,14 +1063,39 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
               <option value="Dodge">Dodge Mounted Bearings</option>
             </select>
 
-            {/* Search Query Input */}
-            <input
-              type="text"
-              placeholder="Search 3,500+ bearings (e.g. NTN 16001, SKF 6205)..."
-              value={bearingSearchQuery}
-              onChange={e => setBearingSearchQuery(e.target.value)}
-              className="text-[10px] font-mono w-full bg-[#FFFFFF] border border-[#808080] px-1 py-0.5"
-            />
+            {/* Search Query Input with SEARCH Button */}
+            <div className="flex gap-1">
+              <input
+                type="text"
+                placeholder="Model (e.g. NTN 16001, SKF 6205)..."
+                value={bearingSearchQuery}
+                onChange={e => setBearingSearchQuery(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (bearingSearchQuery.trim()) {
+                      safeFetchJson(`/api/vibration/bearing-search?q=${encodeURIComponent(bearingSearchQuery.trim())}&brand=${selectedBrand}`)
+                        .then(data => { if (Array.isArray(data) && data.length > 0) setBearingDbList(data); })
+                        .catch(() => {});
+                    }
+                  }
+                }}
+                className="text-[10px] font-mono w-full bg-[#FFFFFF] border border-[#808080] px-1 py-0.5"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (bearingSearchQuery.trim()) {
+                    safeFetchJson(`/api/vibration/bearing-search?q=${encodeURIComponent(bearingSearchQuery.trim())}&brand=${selectedBrand}`)
+                      .then(data => { if (Array.isArray(data) && data.length > 0) setBearingDbList(data); })
+                      .catch(() => {});
+                  }
+                }}
+                className="win98-btn text-[10px] font-bold px-2 py-0.5 bg-[#337AB7] text-[#FFFFFF]"
+              >
+                🔍 Search
+              </button>
+            </div>
 
             {/* Quick Model Select */}
             <select
