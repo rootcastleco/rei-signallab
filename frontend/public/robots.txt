@@ -1,0 +1,9 @@
+# REI SignalLab 2.1 — Search Engine Robots Configuration
+# https://signallab.site
+
+User-agent: *
+Allow: /
+Allow: /assets/
+Allow: /sitemap.xml
+
+Sitemap: https://signallab.site/sitemap.xml
