@@ -125,13 +125,28 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
         const data = await safeFetchJson('/api/nodes');
         if (Array.isArray(data)) setNodeCatalog(data);
       } catch (e) {
-        // Fallback Client Spec Catalog
+        // Fallback Client Spec Catalog covering all domain categories
         setNodeCatalog([
           { type: 'generator.signal', category: 'Generators', display_name: 'Signal Generator', input_ports: [], output_ports: [{ name: 'signal_out', data_type: 'Signal<Real64>' }], parameter_schema: { frequency: { type: 'number', default: 440 } } },
+          { type: 'generator.gaussian_noise', category: 'Generators', display_name: 'Gaussian Noise', input_ports: [], output_ports: [{ name: 'signal_out', data_type: 'Signal<Real64>' }], parameter_schema: { std_dev: { type: 'number', default: 1.0 } } },
           { type: 'filter.lowpass', category: 'Filters', display_name: 'LowPass Filter', input_ports: [{ name: 'signal_in', data_type: 'Signal<Real64>' }], output_ports: [{ name: 'signal_out', data_type: 'Signal<Real64>' }], parameter_schema: { cutoff: { type: 'number', default: 1000 } } },
+          { type: 'filter.highpass', category: 'Filters', display_name: 'HighPass Filter', input_ports: [{ name: 'signal_in', data_type: 'Signal<Real64>' }], output_ports: [{ name: 'signal_out', data_type: 'Signal<Real64>' }], parameter_schema: { cutoff: { type: 'number', default: 100 } } },
           { type: 'transform.fft', category: 'Transformations', display_name: 'Fast Fourier Transform', input_ports: [{ name: 'signal_in', data_type: 'Signal<Real64>' }], output_ports: [{ name: 'spectrum_out', data_type: 'SpectrumFrame' }], parameter_schema: { n_fft: { type: 'integer', default: 1024 } } },
           { type: 'converter.complex_to_real', category: 'Converters', display_name: 'Complex to Real Splitter', input_ports: [{ name: 'complex_in', data_type: 'Signal<Complex128>' }], output_ports: [{ name: 'real', data_type: 'Signal<Real64>' }], parameter_schema: {} },
-          { type: 'analysis.noise_stats', category: 'Analysis', display_name: 'Noise & THD Analyzer', input_ports: [{ name: 'signal_in', data_type: 'Signal<Real64>' }], output_ports: [{ name: 'stats', data_type: 'StructuredFrame' }], parameter_schema: {} }
+          { type: 'analysis.noise_stats', category: 'Analysis', display_name: 'Noise & THD Analyzer', input_ports: [{ name: 'signal_in', data_type: 'Signal<Real64>' }], output_ports: [{ name: 'stats', data_type: 'StructuredFrame' }], parameter_schema: {} },
+          { type: 'vibration.sensor_calibration', category: 'Vibration Analysis', display_name: 'IEPE/MEMS Calibration', input_ports: [{ name: 'raw_input', data_type: 'Signal<Real64>' }], output_ports: [{ name: 'calibrated_signal', data_type: 'Signal<Real64>' }], parameter_schema: { sensitivity: { type: 'number', default: 100 } } },
+          { type: 'vibration.bearing_frequencies', category: 'Vibration Analysis', display_name: 'Bearing Frequencies (BPFO/BPFI)', input_ports: [], output_ports: [{ name: 'bearing_freqs', data_type: 'StructuredFrame' }], parameter_schema: { rpm: { type: 'number', default: 1480 } } },
+          { type: 'electrical.power_metrics', category: 'Electrical Power', display_name: 'Electrical Power Quality', input_ports: [{ name: 'voltage_in', data_type: 'Signal<Real64>' }, { name: 'current_in', data_type: 'Signal<Real64>' }], output_ports: [{ name: 'power_metrics', data_type: 'StructuredFrame' }], parameter_schema: {} },
+          { type: 'electrical.symmetrical_components', category: 'Electrical Power', display_name: 'Fortescue 3-Phase Symmetrical', input_ports: [], output_ports: [{ name: 'symmetrical_components', data_type: 'StructuredFrame' }], parameter_schema: {} },
+          { type: 'antenna.vswr_return_loss', category: 'Antenna & RF', display_name: 'VSWR & Return Loss', input_ports: [], output_ports: [{ name: 'vswr', data_type: 'Scalar<Real64>' }], parameter_schema: { r_load: { type: 'number', default: 75 } } },
+          { type: 'antenna.friis_link_budget', category: 'Antenna & RF', display_name: 'Friis Transmission Link Budget', input_ports: [], output_ports: [{ name: 'link_budget', data_type: 'StructuredFrame' }], parameter_schema: { tx_power_dbm: { type: 'number', default: 30 } } },
+          { type: 'gps.gold_code_gen', category: 'GPS SDR', display_name: 'GPS C/A Gold Code Generator', input_ports: [], output_ports: [{ name: 'gold_code_signal', data_type: 'Signal<Real64>' }], parameter_schema: { prn: { type: 'integer', default: 1 } } },
+          { type: 'gps.constellation_sim', category: 'GPS SDR', display_name: 'GPS Constellation Orbital Simulator', input_ports: [], output_ports: [{ name: 'constellation_status', data_type: 'StructuredFrame' }], parameter_schema: { user_lat: { type: 'number', default: 41.0082 } } },
+          { type: 'srw.beam_kinematics', category: 'SRW Radiation', display_name: 'SRW Electron Beam Kinematics', input_ports: [], output_ports: [{ name: 'kinematics', data_type: 'StructuredFrame' }], parameter_schema: { energy_gev: { type: 'number', default: 3.0 } } },
+          { type: 'srw.wavefront_intensity', category: 'SRW Radiation', display_name: 'SRW 2D Transverse Wavefront', input_ports: [], output_ports: [{ name: 'intensity_matrix', data_type: 'StructuredFrame' }], parameter_schema: {} },
+          { type: 'dsp_lab.aliasing_simulator', category: 'DSP Lab', display_name: 'Sampling & Aliasing Simulator', input_ports: [], output_ports: [{ name: 'aliasing_result', data_type: 'StructuredFrame' }], parameter_schema: { f_signal_hz: { type: 'number', default: 1500 } } },
+          { type: 'dsp_lab.autocorr_pitch', category: 'DSP Lab', display_name: 'Autocorrelation Pitch Estimator', input_ports: [{ name: 'signal_in', data_type: 'Signal<Real64>' }], output_ports: [{ name: 'pitch_result', data_type: 'StructuredFrame' }], parameter_schema: {} },
+          { type: 'sandbox.python_exec', category: 'Custom', display_name: 'Python Math Script Sandbox', input_ports: [{ name: 'signal_in', data_type: 'Signal<Real64>' }], output_ports: [{ name: 'signal_out', data_type: 'Signal<Real64>' }], parameter_schema: { python_code: { type: 'string', default: 'output_signal = [x * 2 for x in input_signal]' } } }
         ]);
       }
     }
@@ -382,11 +397,24 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
           </div>
         </div>
 
-        {/* Catalog Items */}
-        <div className="flex gap-1.5 overflow-x-auto py-1">
-          {filteredCatalog.slice(0, 10).map((spec) => (
-            <button key={spec.type} onClick={() => addNode(spec)} className="win98-btn text-[10px] flex items-center gap-1 whitespace-nowrap">
-              <Plus size={10} className="text-[#0000FF]" /> {spec.display_name}
+        {/* Category Quick Filter Chips */}
+        <div className="flex gap-1 overflow-x-auto py-1 border-b border-[#808080] pb-1.5">
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`win98-btn text-[10px] px-2 py-0.5 whitespace-nowrap font-bold ${selectedCategory === cat ? 'bg-[#000080] text-[#FFFFFF] font-black' : ''}`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Catalog Items (All Nodes rendered without slice limit) */}
+        <div className="flex gap-1.5 overflow-x-auto py-1 max-h-24 flex-wrap">
+          {filteredCatalog.map((spec) => (
+            <button key={spec.type} onClick={() => addNode(spec)} className="win98-btn text-[10px] flex items-center gap-1 whitespace-nowrap py-1">
+              <Plus size={10} className="text-[#0000FF]" /> <span className="font-semibold">{spec.display_name}</span> <span className="text-[9px] opacity-70">({spec.category})</span>
             </button>
           ))}
         </div>
