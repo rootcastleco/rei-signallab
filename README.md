@@ -20,9 +20,10 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-2.1.0-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![SciPy](https://img.shields.io/badge/SciPy-DSP-8CAAE6?style=for-the-badge&logo=scipy&logoColor=white)](https://scipy.org)
 [![React 18](https://img.shields.io/badge/React-18.2-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org)
+[![Tests](https://img.shields.io/badge/Tests-154%20backend%20%2B%2017%20frontend-4CAF50?style=for-the-badge&logo=pytest&logoColor=white)](#testing)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
-[Live Demo](https://signallab.site) | [16-Page PDF User Manual](docs/wiki/REI_SignalLab_2_1_Product_Wiki.tex) | [GitHub Wiki](https://github.com/rootcastleco/rei-signallab/wiki) | [Overview](#overview) | [Screenshots](#application-screenshots) | [Vibration Workbench](#rei-vibration-analysis-workbench) | [Canonical Node Library](#canonical-dsp-node-library) | [Numerical Golden Precision](#numerical-golden-precision-suite) | [API Spec](#api-endpoints-summary) | [Quick Start](#quick-start)
+[Live Demo](https://signallab.site) | [16-Page PDF User Manual](docs/wiki/REI_SignalLab_2_1_Product_Wiki.tex) | [GitHub Wiki](https://github.com/rootcastleco/rei-signallab/wiki) | [Overview](#overview) | [Security](#security) | [Testing](#testing) | [Screenshots](#application-screenshots) | [Vibration Workbench](#vibration-workbench) | [Canonical Node Library](#node-library) | [Numerical Golden Precision](#golden-precision) | [API Spec](#api-endpoints-summary) | [Quick Start](#quick-start)
 
 </div>
 
@@ -54,16 +55,131 @@
 3. **REI Vibration Analysis Workbench**: End-to-end industrial machinery condition monitoring, single-plane complex vector rotor balancing, kinematic bearing defect frequency tracking (BPFO, BPFI, BSF, FTF), Hilbert envelope demodulation, 1X-10X harmonic order spectrum bar view, and rule-based fault classification.
 4. **Numerical Golden Verification Suite**: Comprehensive Pytest suite enforcing IEEE double-precision float64 error $\le 10^{-12}$, FFT/IFFT reconstruction RMS error $\le 10^{-9}$, DCT Type II error $\le 10^{-12}$, and Haar wavelet error $\le 10^{-12}$.
 5. **Safe AST Math Expression Evaluator**: Custom expression filter (`generic.real_value_filter`) evaluated safely using Python AST parsing without `exec()` or `eval()`
+6. **Layered Sandbox & Resource Governance**: Static AST policy, out-of-process script execution under OS resource limits, enforced graph size ceilings, and per-caller rate limiting on every route — see [Security & Hardening](#security).
+
+---
+
+<a id="security"></a>
+
+## 🔒 Security & Hardening
+
+Every endpoint is unauthenticated, so all input is treated as hostile. The full
+threat model lives in [**`SECURITY.md`**](SECURITY.md).
+
+### Python scripting sandbox
+
+`POST /api/python/execute` executes caller-supplied Python and is the highest-risk
+surface in the project. It is **disabled by default whenever `APP_ENV=production`**
+and must be opted into explicitly with `ENABLE_PYTHON_SANDBOX=true`.
+
+Defence is layered — no submitted code ever runs inside the API worker:
+
+| Layer | Implementation |
+| :--- | :--- |
+| **Static AST policy** | [`backend/app/sandbox/guard.py`](backend/app/sandbox/guard.py) — import allowlist, rejection of all dunder access (the entry point for `().__class__.__base__.__subclasses__()` traversal), and of the reflection / code-loading builtins (`getattr`, `eval`, `compile`, `open`, `globals`, …) |
+| **Process isolation** | [`backend/app/sandbox/runner.py`](backend/app/sandbox/runner.py) — child interpreter under `RLIMIT_AS` and `RLIMIT_CPU`, parent-enforced wall-clock timeout, socket creation disabled, restricted builtins map |
+| **Kill switch** | `ENABLE_PYTHON_SANDBOX`, off by default in production |
+
+Host data is injected into the script namespace **as values**, never formatted
+into the source, so a large signal vector cannot inflate the script past the size
+cap or influence how it parses.
+
+28 known escape classes are pinned as regression tests in
+[`backend/tests/test_security_golden.py`](backend/tests/test_security_golden.py).
+
+> This is a hardened interpreter, **not an OS-level jail**. Before enabling it on
+> a public deployment, isolate it as described under *Python Scripting Sandbox*
+> in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+### Resource governance
+
+| Control | Default | Enforced in |
+| :--- | :--- | :--- |
+| `MAX_UPLOAD_BYTES` | 25 MB | Request middleware + upload routes |
+| `MAX_SIGNAL_SAMPLES` | 2,000,000 | `/api/process`, `/api/upload/signal` |
+| `MAX_GRAPH_NODES` | 200 | Graph validator, before any per-node work |
+| `MAX_GRAPH_CONNECTIONS` | 500 | Graph validator |
+| `MAX_SANDBOX_NODES_PER_GRAPH` | 4 | Graph validator — caps interpreter fan-out from a single request |
+| `PYTHON_SANDBOX_TIMEOUT_SECONDS` | 8 | Parent process kill deadline |
+| `PYTHON_SANDBOX_MEMORY_MB` | 512 | `RLIMIT_AS` on the sandbox child |
+
+### Rate limiting
+
+A dependency-free fixed-window limiter ([`backend/app/ratelimit.py`](backend/app/ratelimit.py))
+keyed on client IP, returning HTTP 429 with a `Retry-After` header:
+
+| Bucket | Default | Scope |
+| :--- | :--- | :--- |
+| `global` | 240 / min | Every request |
+| `compute` | 60 / min | DSP, graph execution, Lisp, WAV export, uploads |
+| `sandbox` | 10 / min | `/api/python/execute` |
+
+Limits are enforced **per Cloud Run instance**. This protects a single instance
+from CPU saturation; it is not a distributed quota.
+
+---
+
+<a id="testing"></a>
+
+## 🧪 Testing & Quality Gates
+
+| Suite | Count | Scope |
+| :--- | ---: | :--- |
+| Numerical golden | — | Float64 / FFT / DCT / Haar precision against NumPy & SciPy references |
+| Security golden | — | Sandbox escape classes, graph limits, rate limiter, request validation |
+| Route smoke | 36 | Drives **every** endpoint over HTTP, plus a guard that fails when a registered route has no coverage |
+| Docs contract | — | Asserts documented endpoints exist and node-count claims match the registry |
+| **Backend total** | **154** | `pytest` |
+| **Frontend** | **17** | `vitest` — API error envelope, non-JSON rejection, timeout mapping, backend handshake states |
+
+The route smoke suite exists because the golden suites exercise engines
+directly: a route calling an engine method that had lost its `def` line returned
+HTTP 500 in production while the entire suite passed.
+
+**CI gates** (`.github/workflows/ci.yml`) run on every pull request:
+
+- Backend `pytest` with the sandbox enabled, so the boundary is exercised rather than skipped
+- Frontend ESLint and Vitest, then the Vite production build
+- `pip-audit` on production Python dependencies and `npm audit --omit=dev`
+- Docker container build and readiness-probe startup test
+- Dependabot (`.github/dependabot.yml`) tracks pip, npm and GitHub Actions updates
+
+```bash
+# Backend
+pip install -r backend/requirements-dev.txt
+$env:PYTHONPATH="backend"; py -m pytest backend/tests
+
+# Frontend
+cd frontend && npm run lint && npm test
+```
 
 ---
 
 ## 🚀 Production Deployment & Cloud Run Integration
 
-Cloud Run and Firebase Hosting deployment infrastructure is configured. Production deployment requires the documented GCP/Firebase secrets and a successful deployment workflow run. Firebase CDN proxies all `/api/**` calls directly to the Cloud Run FastAPI container.
+Firebase Hosting serves the static frontend and proxies all `/api/**` calls to
+the Cloud Run FastAPI container. Deployment is fully automated by
+`.github/workflows/deploy.yml`, which builds, pushes, deploys, smoke-tests the
+live service, and **auto-rolls-back to the previous revision** if any check fails.
 
-For complete setup, health probes, and rollback procedures, refer to [**`docs/DEPLOYMENT.md`**](docs/DEPLOYMENT.md).
+For architecture, health probes, and rollback procedures, see
+[**`docs/DEPLOYMENT.md`**](docs/DEPLOYMENT.md).
 
-### Quick Deployment
+### First-time GCP setup
+
+The pipeline authenticates via Workload Identity Federation — no long-lived
+service account keys. [`scripts/setup-github-wif.sh`](scripts/setup-github-wif.sh)
+provisions the deployer service account, its roles, and a WIF pool and OIDC
+provider pinned to this repository, then prints the three required GitHub secrets:
+
+```bash
+gcloud auth login
+./scripts/setup-github-wif.sh
+```
+
+The script is idempotent and safe to re-run.
+
+### Manual deployment
 
 ```bash
 # 1. Authenticate with Google Cloud
@@ -76,6 +192,9 @@ GCP_PROJECT_ID=signallab-3305b GCP_REGION=europe-west1 ./scripts/deploy-cloud-ru
 # 3. Deploy Frontend Assets & API Rewrites to Firebase Hosting
 npx firebase deploy --only hosting
 ```
+
+> Firebase Hosting must be deployed **after** the Cloud Run service exists — a
+> `run` rewrite cannot resolve to a service that is absent.
 
 ### Health Verification Commands
 
@@ -124,6 +243,8 @@ Modeled after Oleg Chubar's [`SRW`](https://github.com/ochubar/SRW) (Synchrotron
 
 ---
 
+<a id="vibration-workbench"></a>
+
 ## ⚙️ REI Vibration Analysis Workbench & Condition Monitoring Suite
 
 The **REI Vibration Analysis Workbench** is an end-to-end industrial condition monitoring suite incorporating comprehensive diagnostics tools:
@@ -158,7 +279,13 @@ This module provides interactive educational and analytical tools backed by SciP
 
 ---
 
+<a id="node-library"></a>
+
 ## 🎛️ Canonical DSP Node Library
+
+The registry holds **69** canonical nodes. The table below is a representative
+selection — query `GET /api/nodes` for the authoritative, versioned list
+including port signatures and parameter schemas.
 
 | Category | Canonical Type | Legacy Alias | Description |
 | :--- | :--- | :--- | :--- |
@@ -196,6 +323,8 @@ This module provides interactive educational and analytical tools backed by SciP
 
 ---
 
+<a id="golden-precision"></a>
+
 ## 🎯 Numerical Golden Precision Suite
 
 All mathematical nodes and algorithms are verified against NumPy/SciPy reference standards in `backend/tests/test_golden.py` and `backend/tests/test_vibration_golden.py`:
@@ -209,22 +338,92 @@ All mathematical nodes and algorithms are verified against NumPy/SciPy reference
 - **Bearing Fault Frequency Precision**: Relative error $\le 0.1\%$ (Pass)
 - **Single-Plane Rotor Balancing Precision**: Mass error $\le 1.0\%$, Angle error $\le 1.0^\circ$ (Pass)
 
+Domain-specific golden suites cover the Antenna, Electrical, GPS, SRW, DSP Lab
+and node-registry surfaces, alongside the security, route-smoke and docs-contract
+suites described in [Testing & Quality Gates](#testing).
+
 ---
 
 ## API Endpoints Summary
 
+The interactive OpenAPI schema is served at `/docs` (Swagger UI) and `/redoc`.
+
+### Core & health
+
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/` | Health check & 2.1.0 feature manifest |
-| `GET` | `/api/nodes` | Get canonical node specs registry array |
-| `GET` | `/api/nodes/{node_type}` | Get specific canonical node spec |
+| `GET` | `/` | Service manifest & registered node count |
+| `GET` | `/api/health/live` | Liveness probe |
+| `GET` | `/api/health/ready` | Readiness probe — validates registry and engine modules |
+| `GET` | `/api/version` | Build manifest (version, API version, commit SHA) |
+
+### Node registry & graph engine
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/nodes` | Canonical node spec registry array |
+| `GET` | `/api/nodes/{node_type}` | Specific canonical node spec |
 | `POST` | `/api/graph/validate` | 10-point Graph Validation (`ValidationResult`) |
 | `POST` | `/api/graph/execute` | Kahn Topological Graph Execution Engine (`2.1.0`) |
-| `POST` | `/api/python/execute` | Restricted Python DSP sandbox engine |
-| `POST` | `/api/upload/signal` | Upload `.wav`, `.csv`, `.txt`, `.json` signal files |
+
+### Signal processing
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
 | `POST` | `/api/process` | Processing pipeline (Time, FFT, Metrics, Spectrogram) |
+| `POST` | `/api/upload/signal` | Upload `.wav`, `.csv`, `.txt`, `.json` signal files |
 | `POST` | `/api/lisp/process` | S-Expression DSP DSL kernel execution |
 | `POST` | `/api/export/wav` | Downloadable 16-bit PCM WAV audio generator |
+| `POST` | `/api/python/execute` | Python DSP sandbox — returns **403** unless `ENABLE_PYTHON_SANDBOX=true` |
+
+### Vibration analysis
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/vibration/analyze` | Full condition-monitoring analysis (metrics, FFT, envelope, diagnostics) |
+| `POST` | `/api/vibration/upload` | Analyse an uploaded vibration signal file |
+| `POST` | `/api/vibration/balance` | Single-plane complex vector rotor balancing |
+| `POST` | `/api/vibration/balance/two-plane` | Two-plane influence coefficient balancing |
+| `POST` | `/api/vibration/balance/four-run-nophase` | Phase-less four-run balancing |
+| `POST` | `/api/vibration/balance/static-couple` | Static / couple unbalance decomposition |
+| `POST` | `/api/vibration/balance/split-weight` | Correction weight split across fixed holes |
+| `POST` | `/api/vibration/belt-calculator` | Belt passing frequency calculator |
+| `POST` | `/api/vibration/alignment-calculator` | Face & rim shaft alignment shim calculator |
+| `POST` | `/api/vibration/unit-converter` | 13-unit vibration amplitude converter |
+| `POST` | `/api/vibration/sdof-simulator` | Mass-spring-damper SDOF free response |
+| `GET` | `/api/vibration/bearing-database` | Kinematic bearing catalog |
+| `GET` | `/api/vibration/bearing-search` | Bearing catalog search by model or brand |
+
+### Domain workbenches
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/electrical/analyze` | 3-phase symmetrical components, power, THD |
+| `POST` | `/api/electrical/upload` | Analyse an uploaded electrical signal file |
+| `POST` | `/api/antenna/analyze` | VSWR, return loss, FSPL, waveguide cutoff |
+| `POST` | `/api/gps/simulate` | GPS L1 C/A constellation & baseband simulation |
+| `GET` | `/api/gps/gold-code/{prn}` | 1023-chip C/A Gold Code for a PRN |
+| `POST` | `/api/gps/export-iq-bin` | Binary I/Q baseband stream for SDR hardware |
+| `POST` | `/api/srw/simulate` | Synchrotron & undulator radiation optics |
+| `POST` | `/api/dsp-lab/sampling-aliasing` | Sampling theorem & aliasing fold-over |
+| `POST` | `/api/dsp-lab/fir-parks-mcclellan` | Parks-McClellan equiripple FIR design |
+| `POST` | `/api/dsp-lab/autocorrelation` | Normalized autocorrelation & pitch detection |
+| `POST` | `/api/dsp-lab/lms-adaptive` | LMS adaptive noise canceller |
+| `POST` | `/api/dsp-lab/cwt-scalogram` | Continuous Wavelet Transform scalogram |
+
+### Error envelope
+
+Every error response shares one structured shape, with `X-Request-ID` echoed on
+the response header:
+
+```json
+{
+  "code": "RATE_LIMIT_EXCEEDED",
+  "message": "Rate limit exceeded for 'sandbox': 10 requests per 60s.",
+  "details": { "bucket": "sandbox", "limit": 10, "retryAfterSeconds": 42 },
+  "requestId": "0f4c1a9e-..."
+}
+```
 
 ---
 
@@ -240,8 +439,9 @@ cd rei-signallab
 py -m venv .venv
 .venv\Scripts\activate
 
-# Install dependencies
-pip install -r backend/requirements.txt
+# Install dependencies (requirements-dev.txt adds pytest + httpx on top of
+# requirements.txt, which holds runtime dependencies only)
+pip install -r backend/requirements-dev.txt
 
 # Run Pytest suite
 $env:PYTHONPATH="backend"; py -m pytest backend/tests
@@ -249,6 +449,12 @@ $env:PYTHONPATH="backend"; py -m pytest backend/tests
 # Start FastAPI server
 $env:PYTHONPATH="backend"; py -m uvicorn app.main:app --reload --port 8000
 ```
+
+Interactive API docs are then available at
+[http://localhost:8000/docs](http://localhost:8000/docs).
+
+To exercise the Python scripting sandbox locally, start the server with
+`ENABLE_PYTHON_SANDBOX=true` — it is off by default under `APP_ENV=production`.
 
 ### 2. Run Frontend Studio
 
@@ -258,7 +464,15 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000) in your browser. The Vite dev
+server proxies `/api` to `http://localhost:8000`.
+
+```bash
+npm run lint          # ESLint
+npm test              # Vitest
+npm run test:coverage # Vitest with coverage report
+npm run build         # Production bundle
+```
 
 ---
 
