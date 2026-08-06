@@ -59,7 +59,8 @@ class VibrationEngine:
             return acc_g * cls.GRAVITY_M_S2
         elif target_unit == "g":
             return acc_g
-        return acc_g
+        else:
+            raise ValueError("VIBRATION_UNIT_UNSUPPORTED: Unknown target unit '{}'. Supported: g, m/s²".format(target_unit))
 
     @classmethod
     def integrate_acceleration_to_velocity(
@@ -75,7 +76,7 @@ class VibrationEngine:
         """
         N = len(acc_m_s2)
         if N < 10:
-            return np.zeros_like(acc_m_s2)
+            raise ValueError("INSUFFICIENT_RECORD_LENGTH: Need >= 10 samples for integration, got {}".format(N))
 
         fft_a = np.fft.rfft(acc_m_s2)
         freqs = np.fft.rfftfreq(N, d=1.0/fs)
@@ -104,7 +105,7 @@ class VibrationEngine:
         """
         N = len(vel_mm_s)
         if N < 10:
-            return np.zeros_like(vel_mm_s)
+            raise ValueError("INSUFFICIENT_RECORD_LENGTH: Need >= 10 samples for integration, got {}".format(N))
 
         vel_m_s = vel_mm_s / 1000.0
         fft_v = np.fft.rfft(vel_m_s)
@@ -220,8 +221,7 @@ class VibrationEngine:
         high = min(high_cutoff_hz, nyq - 5)
 
         if low >= high or len(sig) < 16:
-            freqs = np.fft.rfftfreq(len(sig), 1.0/fs)
-            return freqs, np.zeros_like(freqs)
+            raise ValueError("ENVELOPE_INVALID_PARAMS: Signal too short (need >= 16 samples) or invalid cutoff frequencies (low_cutoff >= high_cutoff)")
 
         b, a = scipy_signal.butter(4, [low / nyq, high / nyq], btype="bandpass")
         bandpassed = scipy_signal.filtfilt(b, a, sig)
@@ -291,14 +291,38 @@ class VibrationEngine:
 
         if not results:
             results.append(DiagnosticEvidence(
-                fault_type="Normal Operation",
-                confidence=0.95,
+                fault_type="No configured fault rule exceeded",
+                confidence=0.0,
                 severity="normal",
                 evidence=[
                     f"Overall velocity {rms_vel_mm_s:.2f} mm/s RMS is within ISO 10816 Class I/II acceptable limits",
                     f"Kurtosis {kurtosis_val:.2f} indicates smooth Gaussian vibration"
                 ],
-                limitations=["Continuous trend monitoring recommended"]
+                limitations=["Absence of triggered rules does not confirm machine health. Verify ISO 10816 applicability."]
             ))
 
         return results
+
+    @classmethod
+    def compute_harmonic_orders(cls, fft_freqs, fft_magnitude, shaft_freq_hz, num_orders=10):
+        orders = []
+        for i in range(1, num_orders + 1):
+            target_freq = i * shaft_freq_hz
+            # Find the peak magnitude within ±5 Hz of the target frequency
+            mask = (fft_freqs >= target_freq - 5) & (fft_freqs <= target_freq + 5)
+            if np.any(mask):
+                max_idx = np.argmax(fft_magnitude[mask])
+                actual_freq = fft_freqs[mask][max_idx]
+                amp = fft_magnitude[mask][max_idx]
+            else:
+                actual_freq = target_freq
+                amp = 0.0
+            
+            amp_db = 20 * np.log10(amp) if amp > 0 else -100.0
+            orders.append({
+                "order": i,
+                "frequency_hz": float(actual_freq),
+                "amplitude": float(amp),
+                "amplitude_db": float(amp_db)
+            })
+        return orders

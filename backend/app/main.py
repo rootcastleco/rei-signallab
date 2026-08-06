@@ -21,6 +21,7 @@ from app.graph.registry import NodeRegistry, NodeSpec
 from app.graph.validator import GraphValidator
 from app.graph.engine import GraphExecutionEngine
 from app.graph.migration import ProjectMigrationManager
+from app.vibration_routes import router as vibration_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("signallab")
@@ -234,3 +235,5 @@ def export_wav(req: SignalProcessingRequest):
         return Response(content=wav_io.read(), media_type="audio/wav", headers={"Content-Disposition": "attachment; filename=signallab21.wav"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"WAV Export Failure: {str(e)}")
+
+app.include_router(vibration_router, prefix="/api/vibration")

@@ -29,125 +29,117 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
   const [telemetry, setTelemetry] = useState(null);
   const [balanceResult, setBalanceResult] = useState(null);
   const [isExecuting, setIsExecuting] = useState(false);
+  
+  const [sampleRate, setSampleRate] = useState(25600);
+  const [sensitivityUnit, setSensitivityUnit] = useState('mV/g');
+  const [contactAngle, setContactAngle] = useState(0);
+  const [measurementLocation, setMeasurementLocation] = useState('DE');
+  const [trustMode, setTrustMode] = useState(null);
+  const [vibrationFile, setVibrationFile] = useState(null);
 
   const waveformCanvasRef = useRef(null);
   const spectrumCanvasRef = useRef(null);
   const polarCanvasRef = useRef(null);
+  const vibFileInputRef = useRef(null);
 
   const shaftFreqHz = rpm / 60.0;
 
-  // Compute Bearing Kinematic Frequencies (BPFO, BPFI, BSF, FTF)
-  const gamma = (ballDiameter / pitchDiameter);
-  const ftf = 0.5 * shaftFreqHz * (1.0 - gamma);
-  const bpfo = 0.5 * numElements * shaftFreqHz * (1.0 - gamma);
-  const bpfi = 0.5 * numElements * shaftFreqHz * (1.0 + gamma);
-  const bsf = (pitchDiameter / (2.0 * ballDiameter)) * shaftFreqHz * (1.0 - gamma * gamma);
-
-  // Synthesize Telemetry Signal & FFT
-  const runVibrationAnalysis = useCallback(() => {
+  const runVibrationAnalysis = useCallback(async () => {
     setIsExecuting(true);
+    try {
+      const requestBody = {
+        signal_data: null,  // null = synthetic demo from backend
+        sample_rate: parseInt(sampleRate),
+        sensor: {
+          sensitivity: parseFloat(sensitivity),
+          sensitivity_unit: sensitivityUnit,
+          bias_voltage: 0.0,
+          target_unit: 'g'
+        },
+        measurement_point: {
+          machine_id: machineName,
+          location: measurementLocation,
+          axis: sensorAxis,
+        },
+        rpm: {
+          rpm_source: 'manual',
+          manual_rpm: parseFloat(rpm),
+        },
+        bearing: numElements > 0 ? {
+          num_elements: parseInt(numElements),
+          ball_diameter_mm: parseFloat(ballDiameter),
+          pitch_diameter_mm: parseFloat(pitchDiameter),
+          contact_angle_deg: parseFloat(contactAngle),
+        } : null,
+        machine_name: machineName,
+        machine_type: machineType,
+      };
 
-    const fs = 25600;
-    const dur = 0.1;
-    const N = Math.floor(fs * dur);
-    const t = [], rawAcc = [], velMmS = [];
+      const data = await safeFetchJson('/api/vibration/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
 
-    // Synthesize Unbalance (1X), Misalignment (2X), and BPFO Impact Pulse
-    for (let i = 0; i < N; i++) {
-      const tv = i / fs;
-      t.push(tv);
-      // 1X Fundamental + 2X Misalignment
-      let y = 1.2 * Math.cos(2 * Math.PI * shaftFreqHz * tv) + 0.4 * Math.cos(2 * Math.PI * 2 * shaftFreqHz * tv + 0.5);
-      // BPFO Bearing Impact Spike
-      const impactPeriod = 1.0 / bpfo;
-      if (Math.abs(tv % impactPeriod) < 0.0005) {
-        y += 2.5 * (Math.random() > 0.5 ? 1 : -1);
-      }
-      rawAcc.push(y);
-      velMmS.push((y / (2 * Math.PI * shaftFreqHz)) * 1000.0 * 0.1);
+      setTelemetry(data);
+      setTrustMode(data.trust_mode || 'API_VERIFIED');
+    } catch (err) {
+      alert('Vibration analysis failed: ' + err.message);
+      setTrustMode('BACKEND_UNAVAILABLE');
+    } finally {
+      setIsExecuting(false);
     }
+  }, [machineName, measurementLocation, sensorAxis, rpm, numElements, ballDiameter, pitchDiameter, contactAngle, machineType, sampleRate, sensitivity, sensitivityUnit]);
 
-    // FFT Calculation
-    const nFft = 1024;
-    const freqs = [], magDb = [];
-    for (let k = 0; k < nFft / 2; k++) {
-      const f = k * fs / nFft;
-      freqs.push(f);
-      let mag = 0.001 + Math.random() * 0.005;
-      if (Math.abs(f - shaftFreqHz) < 15) mag = 1.2;
-      if (Math.abs(f - 2 * shaftFreqHz) < 15) mag = 0.4;
-      if (Math.abs(f - bpfo) < 15) mag = 0.8;
-      magDb.push(20 * Math.log10(Math.max(1e-5, mag)));
+  const handleVibrationFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsExecuting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('sample_rate', sampleRate);
+      formData.append('sensitivity', sensitivity);
+      formData.append('sensitivity_unit', sensitivityUnit);
+      formData.append('rpm', rpm);
+      formData.append('num_elements', numElements);
+      formData.append('ball_diameter_mm', ballDiameter);
+      formData.append('pitch_diameter_mm', pitchDiameter);
+      formData.append('contact_angle_deg', contactAngle);
+      
+      const data = await safeFetchJson('/api/vibration/upload', {
+        method: 'POST',
+        body: formData
+      });
+      setTelemetry(data);
+      setTrustMode(data.trust_mode || 'API_VERIFIED');
+      setVibrationFile(file.name);
+    } catch (err) {
+      alert('File upload failed: ' + err.message);
+    } finally {
+      setIsExecuting(false);
     }
-
-    // Envelope FFT Calculation
-    const envFreqs = [], envMag = [];
-    for (let k = 0; k < 512; k++) {
-      const f = k * fs / 1024;
-      envFreqs.push(f);
-      let mag = 0.01 + Math.random() * 0.02;
-      if (Math.abs(f - bpfo) < 10) mag = 0.45;
-      if (Math.abs(f - 2 * bpfo) < 10) mag = 0.22;
-      envMag.push(mag);
-    }
-
-    // Overall Metrics
-    let sumSq = 0, pk = 0;
-    for (let i = 0; i < N; i++) {
-      sumSq += rawAcc[i] * rawAcc[i];
-      if (Math.abs(rawAcc[i]) > pk) pk = Math.abs(rawAcc[i]);
-    }
-    const rmsVal = Math.sqrt(sumSq / N);
-
-    setTelemetry({
-      time: t, acceleration: rawAcc, velocity: velMmS,
-      frequency: freqs, spectrum_magnitude: magDb,
-      envelope_freqs: envFreqs, envelope_mag: envMag,
-      metrics: {
-        rms_acc_g: rmsVal.toFixed(3),
-        peak_acc_g: pk.toFixed(3),
-        rms_vel_mm_s: (rmsVal * 9.80665).toFixed(2),
-        crest_factor: (pk / rmsVal).toFixed(2),
-        kurtosis: (3.8).toFixed(2)
-      }
-    });
-
-    setIsExecuting(false);
-  }, [shaftFreqHz, bpfo]);
+  };
 
   // Single-Plane Balancing Calculation
-  const calculateBalancing = () => {
-    const v0Rad = (v0Phase * Math.PI) / 180;
-    const v1Rad = (v1Phase * Math.PI) / 180;
-    const tRad = (trialAngle * Math.PI) / 180;
-
-    const V0_re = v0Amp * Math.cos(v0Rad), V0_im = v0Amp * Math.sin(v0Rad);
-    const V1_re = v1Amp * Math.cos(v1Rad), V1_im = v1Amp * Math.sin(v1Rad);
-    const Wt_re = trialMass * Math.cos(tRad), Wt_im = trialMass * Math.sin(tRad);
-
-    const dV_re = V1_re - V0_re, dV_im = V1_im - V0_im;
-
-    // Alpha = dV / Wt
-    const denom = Wt_re * Wt_re + Wt_im * Wt_im || 1;
-    const alpha_re = (dV_re * Wt_re + dV_im * Wt_im) / denom;
-    const alpha_im = (dV_im * Wt_re - dV_re * Wt_im) / denom;
-
-    // W_corr = -V0 / alpha
-    const alpha_mag_sq = alpha_re * alpha_re + alpha_im * alpha_im || 1;
-    const Wc_re = (-V0_re * alpha_re - V0_im * alpha_im) / alpha_mag_sq;
-    const Wc_im = (-V0_im * alpha_re + V0_re * alpha_im) / alpha_mag_sq;
-
-    const corrMass = Math.sqrt(Wc_re * Wc_re + Wc_im * Wc_im);
-    let corrAngle = (Math.atan2(Wc_im, Wc_re) * 180) / Math.PI;
-    if (corrAngle < 0) corrAngle += 360;
-
-    setBalanceResult({
-      correction_mass: corrMass.toFixed(2),
-      correction_angle: corrAngle.toFixed(1),
-      v0_amp: v0Amp, v0_phase: v0Phase,
-      v1_amp: v1Amp, v1_phase: v1Phase,
-      trial_mass: trialMass, trial_angle: trialAngle
-    });
+  const calculateBalancing = async () => {
+    try {
+      const data = await safeFetchJson('/api/vibration/balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          v0_amp: parseFloat(v0Amp),
+          v0_phase_deg: parseFloat(v0Phase),
+          trial_mass: parseFloat(trialMass),
+          trial_angle_deg: parseFloat(trialAngle),
+          v1_amp: parseFloat(v1Amp),
+          v1_phase_deg: parseFloat(v1Phase),
+        })
+      });
+      setBalanceResult(data);
+    } catch (err) {
+      alert('Balance calculation failed: ' + err.message);
+    }
   };
 
   useEffect(() => {
@@ -173,13 +165,15 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
       for (let y = 0; y < H; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
 
       ctx.strokeStyle = '#00FFFF'; ctx.lineWidth = 1.5; ctx.beginPath();
-      const sig = telemetry.acceleration;
-      for (let i = 0; i < W; i++) {
-        const idx = Math.floor(i * sig.length / W);
-        const y = H / 2 - (sig[idx] / 4.0) * (H / 2 - 10);
-        if (i === 0) ctx.moveTo(i, y); else ctx.lineTo(i, y);
+      const sig = telemetry.calibrated_signal || [];
+      if (sig.length > 0) {
+        for (let i = 0; i < W; i++) {
+          const idx = Math.floor(i * sig.length / W);
+          const y = H / 2 - (sig[idx] / 4.0) * (H / 2 - 10);
+          if (i === 0) ctx.moveTo(i, y); else ctx.lineTo(i, y);
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
 
       ctx.fillStyle = '#00FF00'; ctx.font = 'bold 10px monospace';
       ctx.fillText('Acceleration Waveform (g peak)', 8, 14);
@@ -199,31 +193,20 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
       for (let y = 0; y < H; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
 
       // Dedicated 1X-10X Harmonic Order Spectrum Bar View
-      if (activeTab === 'harmonic') {
-        const harmonics = [
-          { order: '1X', amp: (parseFloat(telemetry.metrics.rms_vel_mm_s) * 0.7).toFixed(2), color: '#00FF00' },
-          { order: '2X', amp: (parseFloat(telemetry.metrics.rms_vel_mm_s) * 0.3).toFixed(2), color: '#FFFF00' },
-          { order: '3X', amp: (parseFloat(telemetry.metrics.rms_vel_mm_s) * 0.15).toFixed(2), color: '#FF9900' },
-          { order: '4X', amp: '0.35', color: '#00FFFF' },
-          { order: '5X', amp: '0.20', color: '#0088FF' },
-          { order: '6X', amp: '0.15', color: '#AA00FF' },
-          { order: '7X', amp: '0.10', color: '#FF00FF' },
-          { order: '8X', amp: '0.08', color: '#FF0055' },
-          { order: '9X', amp: '0.05', color: '#808080' },
-          { order: '10X', amp: '0.03', color: '#555555' }
-        ];
-
+      if (activeTab === 'harmonic' && telemetry.harmonic_orders) {
+        const harmonics = telemetry.harmonic_orders;
+        const colors = ['#00FF00', '#FFFF00', '#FF9900', '#00FFFF', '#0088FF', '#AA00FF', '#FF00FF', '#FF0055', '#808080', '#555555'];
         const barW = (W - 40) / harmonics.length;
-        const maxAmp = 4.0;
+        const maxAmp = Math.max(...harmonics.map(h => parseFloat(h.amplitude) || 0), 4.0);
 
         harmonics.forEach((h, idx) => {
           const x = 30 + idx * barW;
-          const valNum = parseFloat(h.amp);
+          const valNum = parseFloat(h.amplitude);
           const barH = Math.min(H - 40, (valNum / maxAmp) * (H - 40));
           const y = H - barH - 20;
 
           // Draw Bar Gradient Fill
-          ctx.fillStyle = h.color;
+          ctx.fillStyle = colors[idx % colors.length];
           ctx.fillRect(x + 4, y, barW - 8, barH);
           ctx.strokeStyle = '#FFFFFF';
           ctx.lineWidth = 1;
@@ -236,7 +219,7 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
 
           ctx.fillStyle = '#00FF00';
           ctx.font = 'bold 9px monospace';
-          ctx.fillText(`${h.amp}`, x + barW / 2 - 10, y - 4);
+          ctx.fillText(`${valNum.toFixed(2)}`, x + barW / 2 - 10, y - 4);
         });
 
         ctx.fillStyle = '#00FF00';
@@ -246,22 +229,24 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
       }
 
       // Continuous FFT / Envelope Line Spectrum Render
-      const freqs = activeTab === 'envelope' ? telemetry.envelope_freqs : telemetry.frequency;
-      const mags = activeTab === 'envelope' ? telemetry.envelope_mag : telemetry.spectrum_magnitude;
+      const freqs = activeTab === 'envelope' ? (telemetry.envelope_frequencies || []) : (telemetry.fft_frequencies || []);
+      const mags = activeTab === 'envelope' ? (telemetry.envelope_magnitude || []) : (telemetry.fft_magnitude_db || []);
       const maxF = freqs[freqs.length - 1] || 1000;
 
       ctx.strokeStyle = '#00FFFF'; ctx.lineWidth = 1.5; ctx.beginPath();
-      for (let i = 0; i < W; i++) {
-        const idx = Math.floor(i * mags.length / W);
-        const norm = (mags[idx] + 80) / 100;
-        const y = H - norm * (H - 20) - 10;
-        if (i === 0) ctx.moveTo(i, y); else ctx.lineTo(i, y);
+      if (mags.length > 0) {
+        for (let i = 0; i < W; i++) {
+          const idx = Math.floor(i * mags.length / W);
+          const norm = activeTab === 'envelope' ? (mags[idx] * 2) : ((mags[idx] + 80) / 100);
+          const y = H - norm * (H - 20) - 10;
+          if (i === 0) ctx.moveTo(i, y); else ctx.lineTo(i, y);
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
 
       // Draw Bearing Defect Markers (BPFO, BPFI, 1X)
       const drawMarker = (fVal, label, color) => {
-        if (fVal > maxF) return;
+        if (!fVal || fVal > maxF) return;
         const mx = (fVal / maxF) * W;
         ctx.strokeStyle = color; ctx.setLineDash([2, 2]);
         ctx.beginPath(); ctx.moveTo(mx, 0); ctx.lineTo(mx, H); ctx.stroke();
@@ -272,13 +257,15 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
 
       drawMarker(shaftFreqHz, '1X', '#FF0000');
       drawMarker(2 * shaftFreqHz, '2X', '#FFFF00');
-      drawMarker(bpfo, 'BPFO', '#00FF00');
-      drawMarker(bpfi, 'BPFI', '#FF5555');
+      
+      const bf = telemetry.bearing_frequencies || {};
+      drawMarker(bf.bpfo_hz, 'BPFO', '#00FF00');
+      drawMarker(bf.bpfi_hz, 'BPFI', '#FF5555');
 
       ctx.fillStyle = '#00FF00'; ctx.font = 'bold 11px monospace';
       ctx.fillText(activeTab === 'envelope' ? 'Hilbert Bearing Envelope Spectrum (Demodulated)' : 'Vibration FFT Spectrum (g RMS)', 8, 14);
     }
-  }, [telemetry, activeTab, shaftFreqHz, bpfo, bpfi]);
+  }, [telemetry, activeTab, shaftFreqHz]);
 
   // Polar Balancing Plot Render
   useEffect(() => {
@@ -329,13 +316,15 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
   }, [activeTab, balanceResult, v0Amp, v0Phase, v1Amp, v1Phase]);
 
   const generateReport = () => {
+    const bf = telemetry?.bearing_frequencies || {};
     const reportObj = {
       title: "REI Vibration Analysis & Rotor Balancing Diagnostic Report",
       timestamp: new Date().toISOString(),
       machine: { name: machineName, type: machineType, rpm: rpm, shaft_freq_hz: shaftFreqHz.toFixed(2) },
-      sensor: { type: sensorType, sensitivity: `${sensitivity} mV/g`, axis: sensorAxis },
-      bearing_defect_frequencies_hz: { FTF: ftf.toFixed(2), BPFO: bpfo.toFixed(2), BPFI: bpfi.toFixed(2), BSF: bsf.toFixed(2) },
-      overall_metrics: telemetry?.metrics,
+      sensor: { type: sensorType, sensitivity: `${sensitivity} ${sensitivityUnit}`, axis: sensorAxis },
+      bearing_defect_frequencies_hz: bf,
+      overall_metrics: telemetry?.time_metrics,
+      diagnostics: telemetry?.diagnostics,
       rotor_balancing: balanceResult,
       engine_version: "2.1.0"
     };
@@ -353,6 +342,9 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
         <div className="flex items-center gap-2">
           <Gauge size={14} className="text-[#FFFF00]" />
           <span>REI_Vibration_Analysis_Workbench_v2.1.exe - [Industrial Machinery Condition Monitoring & Balancing]</span>
+          {trustMode === 'API_VERIFIED' && <span className="ml-2 text-[10px] bg-[#00AA00] text-white px-2 py-0.5 font-bold">✓ API VERIFIED</span>}
+          {trustMode === 'DEMO_MODE' && <span className="ml-2 text-[10px] bg-[#FF8800] text-black px-2 py-0.5 font-bold">⚠ DEMO MODE</span>}
+          {trustMode === 'BACKEND_UNAVAILABLE' && <span className="ml-2 text-[10px] bg-[#FF0000] text-white px-2 py-0.5 font-bold">✗ BACKEND REQUIRED</span>}
         </div>
         <div className="flex gap-1">
           <div className="win98-btn-box">_</div>
@@ -371,6 +363,10 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
           <button onClick={calculateBalancing} className="win98-btn text-xs">
             <RotateCw size={12} className="text-[#0000FF]" /> SOLVE SINGLE-PLANE BALANCE
           </button>
+          <button className="win98-btn text-xs" onClick={() => vibFileInputRef.current?.click()}>
+            📂 Load Signal File
+          </button>
+          <input ref={vibFileInputRef} type="file" accept=".csv,.wav,.txt,.json" hidden onChange={handleVibrationFileUpload} />
         </div>
 
         <button onClick={generateReport} className="win98-btn text-xs">
@@ -398,6 +394,17 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
             <input type="number" value={rpm} onChange={e => setRpm(parseFloat(e.target.value))} className="font-mono text-xs" />
           </div>
 
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-bold">Sample Rate (Hz)</label>
+            <select value={sampleRate} onChange={e => setSampleRate(e.target.value)} className="text-xs font-mono w-full">
+              <option value={6400}>6,400</option>
+              <option value={12800}>12,800</option>
+              <option value={25600}>25,600</option>
+              <option value={51200}>51,200</option>
+              <option value={102400}>102,400</option>
+            </select>
+          </div>
+
           {/* Sensor Info */}
           <div className="flex flex-col gap-1 border-t border-[#808080] pt-1.5">
             <label className="font-bold">Sensor Type:</label>
@@ -411,6 +418,23 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
           <div className="flex flex-col gap-1">
             <label className="font-bold">Sensitivity (mV/g):</label>
             <input type="number" value={sensitivity} onChange={e => setSensitivity(parseFloat(e.target.value))} className="font-mono text-xs" />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-bold">Sensitivity Unit</label>
+            <select value={sensitivityUnit} onChange={e => setSensitivityUnit(e.target.value)} className="text-xs font-mono w-full">
+              <option value="mV/g">mV/g</option>
+              <option value="V/g">V/g</option>
+              <option value="mV/(m/s²)">mV/(m/s²)</option>
+            </select>
+          </div>
+          
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-bold">Location</label>
+            <select value={measurementLocation} onChange={e => setMeasurementLocation(e.target.value)} className="text-xs font-mono w-full">
+              <option value="DE">Drive End (DE)</option>
+              <option value="NDE">Non-Drive End (NDE)</option>
+            </select>
           </div>
 
           {/* Bearing Geometry */}
@@ -429,6 +453,10 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
                 <label className="text-[10px]">Pitch D(mm):</label>
                 <input type="number" step="0.1" value={pitchDiameter} onChange={e => setPitchDiameter(parseFloat(e.target.value))} className="w-full text-[10px] font-mono" />
               </div>
+            </div>
+            <div className="mt-1">
+              <label className="text-[10px] font-bold">Contact Angle (°)</label>
+              <input type="number" value={contactAngle} onChange={e => setContactAngle(e.target.value)} step="0.1" min="0" max="90" className="text-xs font-mono w-full" />
             </div>
           </div>
 
@@ -498,15 +526,15 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
             </div>
             <div className="bg-[#000000] text-[#00FF00] p-1 border border-[#808080]">
               <div className="text-[9px] text-[#808080]">BPFO (OUTER)</div>
-              <div className="font-bold">{bpfo.toFixed(1)} Hz</div>
+              <div className="font-bold">{telemetry?.bearing_frequencies?.bpfo_hz?.toFixed(1) || '-'} Hz</div>
             </div>
             <div className="bg-[#000000] text-[#FF5555] p-1 border border-[#808080]">
               <div className="text-[9px] text-[#808080]">BPFI (INNER)</div>
-              <div className="font-bold">{bpfi.toFixed(1)} Hz</div>
+              <div className="font-bold">{telemetry?.bearing_frequencies?.bpfi_hz?.toFixed(1) || '-'} Hz</div>
             </div>
             <div className="bg-[#000000] text-[#FFFF00] p-1 border border-[#808080]">
               <div className="text-[9px] text-[#808080]">BSF (BALL)</div>
-              <div className="font-bold">{bsf.toFixed(1)} Hz</div>
+              <div className="font-bold">{telemetry?.bearing_frequencies?.bsf_hz?.toFixed(1) || '-'} Hz</div>
             </div>
           </div>
         </div>
@@ -518,23 +546,23 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
           </div>
 
           {/* Overall Metrics */}
-          {telemetry && telemetry.metrics && (
+          {telemetry && telemetry.time_metrics && (
             <div className="flex flex-col gap-1.5 font-mono">
               <div className="flex justify-between items-center bg-[#000000] text-[#00FF00] p-1.5 border border-[#808080]">
                 <span>OVERALL VELOCITY:</span>
-                <span className="font-bold text-sm">{telemetry.metrics.rms_vel_mm_s} mm/s RMS</span>
+                <span className="font-bold text-sm">{telemetry.time_metrics.rms_vel_mm_s?.toFixed(2)} mm/s RMS</span>
               </div>
               <div className="flex justify-between items-center bg-[#000000] text-[#00FFFF] p-1.5 border border-[#808080]">
                 <span>PEAK ACCELERATION:</span>
-                <span className="font-bold">{telemetry.metrics.peak_acc_g} g pk</span>
+                <span className="font-bold">{telemetry.time_metrics.peak_acc_g?.toFixed(2)} g pk</span>
               </div>
               <div className="flex justify-between items-center bg-[#000000] text-[#FFFF00] p-1.5 border border-[#808080]">
                 <span>CREST FACTOR:</span>
-                <span className="font-bold">{telemetry.metrics.crest_factor}</span>
+                <span className="font-bold">{telemetry.time_metrics.crest_factor?.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center bg-[#000000] text-[#FF5555] p-1.5 border border-[#808080]">
                 <span>KURTOSIS:</span>
-                <span className="font-bold">{telemetry.metrics.kurtosis}</span>
+                <span className="font-bold">{telemetry.time_metrics.kurtosis?.toFixed(2)}</span>
               </div>
             </div>
           )}
@@ -557,16 +585,12 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
           <div className="flex flex-col gap-1 mt-1">
             <span className="font-bold text-[#000080]">Rule-Based Fault Classifier:</span>
             <div className="win98-crt-screen p-2 text-[10px] font-mono flex flex-col gap-1.5 bg-[#000000] text-[#00FF00] h-32 overflow-y-auto border border-[#808080]">
-              <div className="flex items-center gap-1 text-[#FFFF00] font-bold">
-                <AlertTriangle size={11} /> 1. Rotor Unbalance (Confidence: 88%)
-              </div>
-              <div className="pl-3 text-[9px] text-[#808080]">- 1X Fundamental ({shaftFreqHz.toFixed(1)}Hz) dominates at 3.2 mm/s RMS</div>
-
-              <div className="flex items-center gap-1 text-[#FF5555] font-bold mt-1">
-                <AlertTriangle size={11} /> 2. Bearing Outer Race Defect (BPFO)
-              </div>
-              <div className="pl-3 text-[9px] text-[#808080]">- Kurtosis elevated at 3.8 (Normal = 3.0)</div>
-              <div className="pl-3 text-[9px] text-[#808080]">- Envelope BPFO peak at {bpfo.toFixed(1)}Hz</div>
+              {telemetry?.diagnostics?.map((d, i) => (
+                <div key={i} className={`mb-1 ${d.severity === 'alarm' ? 'text-[#FF4444]' : d.severity === 'warning' ? 'text-[#FFAA00]' : 'text-[#00FF00]'}`}>
+                  <div className="font-bold">{i+1}. {d.fault_type} (Confidence: {(d.confidence * 100).toFixed(0)}%)</div>
+                  {d.evidence?.map((e, j) => <div key={j} className="text-[10px] ml-2">- {e}</div>)}
+                </div>
+              ))}
             </div>
           </div>
 
