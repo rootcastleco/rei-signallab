@@ -91,6 +91,7 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
   const [nodeCatalog, setNodeCatalog] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showCatalogModal, setShowCatalogModal] = useState(false);
 
   const [nodes, setNodes] = useState([
     { id: 'node_gen', type: 'generator.signal', name: 'Signal Generator (440Hz)', x: 40, y: 30, params: { waveform: 'sine', frequency: 440, amplitude: 1.0 } },
@@ -374,24 +375,32 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
       <div className="win98-outset p-2 flex flex-col gap-2 bg-[#C0C0C0]">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-xs">Node Palette:</span>
-            <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="text-xs font-mono">
-              {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+            <span className="font-bold text-xs flex items-center gap-1">
+              <Layers size={14} className="text-[#000080]" /> Canonical Node Palette ({filteredCatalog.length} of {nodeCatalog.length} nodes):
+            </span>
+            <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="text-xs font-mono border border-[#808080] bg-white px-1">
+              {categories.map(cat => {
+                const count = nodeCatalog.filter(n => cat === 'All' || n.category === cat).length;
+                return <option key={cat} value={cat}>{cat} ({count})</option>;
+              })}
             </select>
             <div className="flex items-center bg-[#FFFFFF] border border-[#808080] px-1 text-xs">
               <Search size={12} className="text-[#808080] mr-1" />
               <input
                 type="text"
-                placeholder="Search canonical nodes..."
+                placeholder="Search all nodes..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="bg-transparent border-none outline-none font-mono text-xs w-40"
+                className="bg-transparent border-none outline-none font-mono text-xs w-48"
               />
             </div>
           </div>
 
-          <div className="flex gap-1.5">
-            <button onClick={runGraphPipeline} disabled={isRunning} className="win98-btn text-xs bg-[#00AA00] text-[#FFFFFF]">
+          <div className="flex gap-1.5 items-center">
+            <button onClick={() => setShowCatalogModal(true)} className="win98-btn text-xs font-bold bg-[#FFFFCC] text-[#000080]">
+              📚 Full Node Library Explorer ({nodeCatalog.length})
+            </button>
+            <button onClick={runGraphPipeline} disabled={isRunning} className="win98-btn text-xs bg-[#00AA00] text-[#FFFFFF] font-bold">
               <Play size={12} /> {isRunning ? 'EXECUTING...' : 'RUN PIPELINE (KAHN 2.1)'}
             </button>
           </div>
@@ -399,24 +408,41 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
 
         {/* Category Quick Filter Chips */}
         <div className="flex gap-1 overflow-x-auto py-1 border-b border-[#808080] pb-1.5">
-          {categories.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`win98-btn text-[10px] px-2 py-0.5 whitespace-nowrap font-bold ${selectedCategory === cat ? 'bg-[#000080] text-[#FFFFFF] font-black' : ''}`}
-            >
-              {cat}
-            </button>
-          ))}
+          {categories.map(cat => {
+            const count = nodeCatalog.filter(n => cat === 'All' || n.category === cat).length;
+            return (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`win98-btn text-[10px] px-2 py-0.5 whitespace-nowrap font-bold ${selectedCategory === cat ? 'bg-[#000080] text-[#FFFFFF] font-black' : ''}`}
+              >
+                {cat} ({count})
+              </button>
+            );
+          })}
         </div>
 
-        {/* Catalog Items (All Nodes rendered without slice limit) */}
-        <div className="flex gap-1.5 overflow-x-auto py-1 max-h-24 flex-wrap">
+        {/* Multi-Column Node Palette Grid (Fully Scrollable) */}
+        <div className="win98-inset p-2 bg-[#FFFFFF] max-h-52 overflow-y-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5">
           {filteredCatalog.map((spec) => (
-            <button key={spec.type} onClick={() => addNode(spec)} className="win98-btn text-[10px] flex items-center gap-1 whitespace-nowrap py-1">
-              <Plus size={10} className="text-[#0000FF]" /> <span className="font-semibold">{spec.display_name}</span> <span className="text-[9px] opacity-70">({spec.category})</span>
+            <button
+              key={spec.type}
+              onClick={() => addNode(spec)}
+              className="win98-btn text-[10px] flex items-center justify-between gap-1 p-1 text-left bg-[#F8F8F8] hover:bg-[#FFFFCC] border border-[#808080]"
+              title={`${spec.display_name} (${spec.type})\nCategory: ${spec.category}`}
+            >
+              <div className="truncate">
+                <div className="font-bold text-[#000080] truncate">{spec.display_name}</div>
+                <div className="text-[9px] text-[#555555] font-mono truncate">{spec.type}</div>
+              </div>
+              <Plus size={12} className="text-[#00AA00] shrink-0 font-bold" />
             </button>
           ))}
+          {filteredCatalog.length === 0 && (
+            <div className="col-span-full text-center py-4 text-xs font-mono text-[#808080]">
+              No canonical nodes match filter "{searchQuery}".
+            </div>
+          )}
         </div>
       </div>
 
@@ -577,13 +603,91 @@ export default function NodeGraphStudio({ onGraphExecuted }) {
                 Execution Result [{executionMode}]:
               </span>
               <div className="win98-crt-screen p-1 text-[9px] font-mono h-24 overflow-y-auto">
-                <pre>{JSON.stringify(executionResult.results, null, 2)}</pre>
+                <pre>{JSON.stringify(executionResult, null, 2)}</pre>
               </div>
             </div>
           )}
         </div>
-
       </div>
+
+      {/* Full Canonical Node Library Explorer Modal */}
+      {showCatalogModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="win98-outset w-full max-w-4xl bg-[#C0C0C0] p-3 flex flex-col gap-3 max-h-[85vh] shadow-2xl">
+            <div className="win98-titlebar flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Layers size={14} className="text-[#FFFF00]" />
+                <span className="font-bold">📚 Canonical Node Catalog Explorer (Total: {nodeCatalog.length} Nodes)</span>
+              </div>
+              <button onClick={() => setShowCatalogModal(false)} className="win98-btn p-0.5 text-xs font-bold text-[#FF0000]">
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 bg-[#DFDFDF] p-2 border border-[#808080] flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-xs">Filter Category:</span>
+                <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="text-xs font-mono bg-white border border-[#808080] px-1">
+                  {categories.map(cat => <option key={cat} value={cat}>{cat} ({nodeCatalog.filter(n => cat === 'All' || n.category === cat).length})</option>)}
+                </select>
+              </div>
+              <div className="flex items-center bg-[#FFFFFF] border border-[#808080] px-2 text-xs w-64">
+                <Search size={12} className="text-[#808080] mr-1" />
+                <input
+                  type="text"
+                  placeholder="Search catalog specification..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="bg-transparent border-none outline-none font-mono text-xs w-full"
+                />
+              </div>
+            </div>
+
+            <div className="win98-inset bg-[#FFFFFF] p-3 overflow-y-auto max-h-[60vh] grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {filteredCatalog.map(spec => (
+                <div key={spec.type} className="win98-outset p-2.5 bg-[#F8F8F8] border border-[#808080] flex flex-col justify-between gap-2 hover:bg-[#FFFFEE]">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 border-b border-[#808080] pb-1 mb-1.5">
+                      <span className="font-bold text-xs text-[#000080]">{spec.display_name}</span>
+                      <span className="text-[10px] bg-[#000080] text-white px-1.5 py-0.5 font-mono">{spec.category}</span>
+                    </div>
+                    <div className="font-mono text-[10px] text-[#00AA00] font-bold mb-1">{spec.type}</div>
+                    <div className="text-[11px] text-[#333333] mb-2">{spec.documentation || 'Canonical DSP processing component.'}</div>
+
+                    <div className="grid grid-cols-2 gap-1 text-[10px] font-mono bg-[#E8E8E8] p-1.5 border border-[#B0B0B0]">
+                      <div>
+                        <span className="font-bold text-[#0000FF]">Inputs:</span>
+                        {spec.input_ports?.length > 0 ? (
+                          spec.input_ports.map(p => <div key={p.name} className="truncate">- {p.name}: {p.data_type}</div>)
+                        ) : <div className="text-[#808080]">None (Source)</div>}
+                      </div>
+                      <div>
+                        <span className="font-bold text-[#008800]">Outputs:</span>
+                        {spec.output_ports?.length > 0 ? (
+                          spec.output_ports.map(p => <div key={p.name} className="truncate">- {p.name}: {p.data_type}</div>)
+                        ) : <div className="text-[#808080]">None (Sink)</div>}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => { addNode(spec); setShowCatalogModal(false); }}
+                    className="win98-btn text-xs font-bold bg-[#00AA00] text-white flex items-center justify-center gap-1 py-1 mt-1"
+                  >
+                    <Plus size={12} /> Add {spec.display_name} to Graph Canvas
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end">
+              <button onClick={() => setShowCatalogModal(false)} className="win98-btn text-xs px-4 font-bold">
+                Close Explorer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
