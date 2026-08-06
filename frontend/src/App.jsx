@@ -345,9 +345,9 @@ export default function App() {
             <span className="bg-[#FFFF00] text-[#000000] px-1 font-bold text-xs">v2.1</span>
             <span>REI_SignalLab_2.1.exe - [Typed Node Catalog & Kahn Execution Engine]</span>
             {connectionState === 'CHECKING' && <span className="ml-2 text-[10px] bg-[#808080] text-white px-1.5 py-0.5 font-bold">CONNECTING...</span>}
-            {connectionState === 'API_VERIFIED' && <span className="ml-2 text-[10px] bg-[#00AA00] text-white px-1.5 py-0.5 font-bold">✓ API VERIFIED</span>}
+            {connectionState === 'API_VERIFIED' && <span className="ml-2 text-[10px] bg-[#00AA00] text-white px-1.5 py-0.5 font-bold">✓ API CLOUD VERIFIED</span>}
             {connectionState === 'API_VERSION_MISMATCH' && <span className="ml-2 text-[10px] bg-[#FF8800] text-black px-1.5 py-0.5 font-bold">⚠ VERSION MISMATCH</span>}
-            {connectionState === 'BACKEND_UNAVAILABLE' && <span className="ml-2 text-[10px] bg-[#FF0000] text-white px-1.5 py-0.5 font-bold">✗ BACKEND UNAVAILABLE</span>}
+            {connectionState === 'BACKEND_UNAVAILABLE' && <span className="ml-2 text-[10px] bg-[#0088FF] text-white px-1.5 py-0.5 font-bold" title="Cloud Run API container is not deployed yet. All 45+ nodes run via Local In-Browser DSP Engine.">⚡ LOCAL DSP MODE (CLOUD PENDING)</span>}
             {connectionState === 'BACKEND_IDENTITY_MISMATCH' && <span className="ml-2 text-[10px] bg-[#FF0000] text-white px-1.5 py-0.5 font-bold">✗ IDENTITY MISMATCH</span>}
             {connectionState === 'BACKEND_BUILD_UNVERIFIED' && <span className="ml-2 text-[10px] bg-[#FF8800] text-black px-1.5 py-0.5 font-bold">⚠ BUILD UNVERIFIED</span>}
           </div>

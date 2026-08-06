@@ -37,13 +37,6 @@
     ],
     "rewrites": [
       {
-        "source": "/api/**",
-        "run": {
-          "serviceId": "rei-signallab-api",
-          "region": "europe-west1"
-        }
-      },
-      {
         "source": "**",
         "destination": "/index.html"
       }
