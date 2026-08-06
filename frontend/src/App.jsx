@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText, Layers, AlertTriangle, Gauge, Zap, Radio } from 'lucide-react';
+import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText, Layers, AlertTriangle, Gauge, Zap, Radio, User, Folder } from 'lucide-react';
 import { safeFetchJson, verifyBackendHandshake } from './config';
+import { subscribeToAuthChanges } from './firebaseAuth';
 
 import Oscilloscope from './components/Oscilloscope';
 import SpectrumAnalyzer from './components/SpectrumAnalyzer';
@@ -17,6 +18,8 @@ import AntennaWorkbench from './components/AntennaWorkbench';
 import GpsWorkbench from './components/GpsWorkbench';
 import DspLab from './components/DspLab';
 import SrwWorkbench from './components/SrwWorkbench';
+import UserAuthModal from './components/UserAuthModal';
+import ProjectManagerModal from './components/ProjectManagerModal';
 
 const PRESETS = {
   SINE_440: {
@@ -70,12 +73,20 @@ export default function App() {
   const [uploadedFileName, setUploadedFileName] = useState(null);
   const [connectionState, setConnectionState] = useState('CHECKING'); // 'CHECKING' | 'API_VERIFIED' | 'API_VERSION_MISMATCH' | 'BACKEND_UNAVAILABLE' | 'BACKEND_IDENTITY_MISMATCH' | 'BACKEND_BUILD_UNVERIFIED'
 
+  const [currentUser, setCurrentUser] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [currentGraphState, setCurrentGraphState] = useState(null);
+
   useEffect(() => {
     let isMounted = true;
     verifyBackendHandshake().then(status => {
       if (isMounted) setConnectionState(status);
     });
-    return () => { isMounted = false; };
+    const unsubscribe = subscribeToAuthChanges((user) => {
+      if (isMounted) setCurrentUser(user);
+    });
+    return () => { isMounted = false; unsubscribe(); };
   }, []);
 
   const [customPresets, setCustomPresets] = useState(() => {
@@ -350,6 +361,13 @@ export default function App() {
             {connectionState === 'BACKEND_UNAVAILABLE' && <span className="ml-2 text-[10px] bg-[#0088FF] text-white px-1.5 py-0.5 font-bold" title="Cloud Run API container is not deployed yet. All 45+ nodes run via Local In-Browser DSP Engine.">⚡ LOCAL DSP MODE (CLOUD PENDING)</span>}
             {connectionState === 'BACKEND_IDENTITY_MISMATCH' && <span className="ml-2 text-[10px] bg-[#FF0000] text-white px-1.5 py-0.5 font-bold">✗ IDENTITY MISMATCH</span>}
             {connectionState === 'BACKEND_BUILD_UNVERIFIED' && <span className="ml-2 text-[10px] bg-[#FF8800] text-black px-1.5 py-0.5 font-bold">⚠ BUILD UNVERIFIED</span>}
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="win98-btn text-[10px] font-bold flex items-center gap-1 bg-[#FFFFFF] text-[#000080] ml-2 px-2 py-0.5"
+            >
+              <User size={10} className="text-[#0000FF]" />
+              {currentUser ? (currentUser.isAnonymous ? '🔑 Guest User' : `👤 ${currentUser.email}`) : '👤 Login / Sign Up'}
+            </button>
           </div>
           <div className="flex gap-1">
             <div className="win98-btn-box">_</div>
@@ -440,6 +458,9 @@ export default function App() {
           <div className="flex items-center gap-1">
             <button className="win98-btn" onClick={() => fileInputRef.current?.click()}>
               <FolderOpen size={13} className="text-[#0000FF]" /> Open File (.wav, .csv)
+            </button>
+            <button className="win98-btn font-bold bg-[#FFFFCC] text-[#000080]" onClick={() => setShowProjectModal(true)}>
+              <Folder size={13} className="text-[#0000FF]" /> Saved Projects & Cloud Sync
             </button>
             <button className="win98-btn" onClick={exportCSV}>
               <FileText size={13} className="text-[#00AA00]" /> Save CSV
@@ -606,11 +627,31 @@ export default function App() {
 
         {/* Windows Status Bar Footer */}
         <footer className="win98-inset p-1 flex justify-between text-xs font-mono text-[#000000]">
-          <span>Status: {dataTrustMode} Mode Active | Version 2.0.0</span>
+          <span>Status: {dataTrustMode} Mode Active | Version 2.1.0</span>
           <span>RootCastle &copy; 1998-2026</span>
         </footer>
 
       </div>
+
+      {/* Phase 4: User Authentication & Cloud Profile Modal */}
+      {showAuthModal && (
+        <UserAuthModal user={currentUser} onClose={() => setShowAuthModal(false)} />
+      )}
+
+      {/* Phase 4: Project Storage & Cloud Persistence Modal */}
+      {showProjectModal && (
+        <ProjectManagerModal
+          user={currentUser}
+          currentGraphState={currentGraphState}
+          onLoadProject={(proj) => {
+            if (proj.graph) {
+              setCurrentGraphState(proj.graph);
+              setActiveView('graph');
+            }
+          }}
+          onClose={() => setShowProjectModal(false)}
+        />
+      )}
     </div>
   );
 }
