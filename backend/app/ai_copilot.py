@@ -14,14 +14,14 @@ logger = logging.getLogger("rei-signallab-api")
 _OBFUSCATED_KEY = "c2stb3ItdjEtMzVkNTNmMjk0NjM5M2RhNjQ4NjI1Yjk2OTkxMDZkNGFjN2M1NWRmNWQ2NDk3MjZkYmMzNTFkZWY1NGY0NWViMA=="
 
 def get_default_openrouter_key() -> str:
-  env_key = os.getenv("OPENROUTER_API_KEY", "").strip()
-  if env_key:
-    return env_key
-  try:
-    return base64.b64decode(_OBFUSCATED_KEY.encode("utf-8")).decode("utf-8")
-  except Exception as e:
-    logger.error(f"Failed to decode default OpenRouter key: {e}")
-    return ""
+    env_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    if env_key:
+        return env_key
+    try:
+        return base64.b64decode(_OBFUSCATED_KEY.encode("utf-8")).decode("utf-8")
+    except Exception as e:
+        logger.error(f"Failed to decode default OpenRouter key: {e}")
+        return ""
 
 OPENROUTER_FREE_MODELS: List[AIModelSpec] = [
     AIModelSpec(
@@ -56,81 +56,92 @@ OPENROUTER_FREE_MODELS: List[AIModelSpec] = [
     )
 ]
 
-SYSTEM_PROMPT = """You are REI SignalLab AI Copilot — an expert scientific signal processing (DSP), vibration analysis, electrical power quality, antenna RF, and GPS SDR AI assistant.
+SYSTEM_PROMPT = """You are REI SignalLab 2.1 AI Copilot — an elite scientific Digital Signal Processing (DSP), Industrial Vibration Condition Monitoring, Electrical Power Quality, Antenna RF, and GPS SDR AI Senior Instrumentation Engineer.
 
-Your task is to provide instrument-grade, accurate, mathematical, and structured signal diagnostics.
+Your objective is to provide exhaustive, instrument-grade, mathematically rigorous, and action-oriented scientific diagnostic reports.
 
-Guidelines:
-1. Provide structured markdown responses with clear headings, metric evaluations, and engineering recommendations.
-2. For Vibration Analysis: Evaluate RMS, Peak, Crest Factor, Kurtosis, FFT Spectral Peaks, Hilbert Envelope Defects, and ISO 10816 velocity limits.
-3. For Electrical Power: Evaluate Vrms, Irms, Active/Reactive Power (P, Q, S), Power Factor cos(phi), THD%, and Symmetrical Components (V0, V1, V2, VUF%).
-4. For Antenna & RF: Evaluate VSWR, Return Loss (S11), Reflection Coefficient Gamma, and Friis Link Budget Margins.
-5. For Node Graphs: Analyze topology, topological sort ordering, Kahn execution, and data type compatibility.
-6. Keep recommendations actionable, professional, and precise.
+Structure your response with clear Markdown formatting:
+1. **📊 Executive Diagnostic Summary**: Brief high-level engineering evaluation of the signal or problem.
+2. **📈 Key Telemetry & Metric Analysis**: A Markdown table breaking down parameters (RMS, Peak, Crest Factor, Kurtosis, THD%, VSWR, Symmetrical Components V0/V1/V2, FFT spectral peaks).
+3. **📐 ISO / IEEE / Industrial Standards Evaluation**:
+   - For Vibration: Evaluate ISO 10816-3 machinery velocity severity limits (Zone A: Good, Zone B: Acceptable, Zone C: Restricted, Zone D: Unacceptable / Danger).
+   - For Electrical Power: Evaluate IEEE 519 harmonic limits, Fortescue voltage unbalance factor VUF% (< 2.0% normal), and Power Factor cos(phi).
+   - For Antenna RF: Evaluate VSWR (< 1.5:1 optimal), Return Loss S11 (dB), and Friis Link Budget Margin.
+   - For Node Graphs: Analyze Kahn topological sort DAG ordering, port data types, and node execution pipeline.
+4. **🔬 Mathematical Decomposition & Formulas**: Include relevant LaTeX formulas (e.g., $v_{\\text{rms}} = \\sqrt{\\frac{1}{N}\\sum v^2[n]}$, $S_{11} = 20\\log_{10}|\\Gamma|$).
+5. **🛠️ Actionable Engineering Recommendations**: 3 to 5 concrete step-by-step remediation or optimization actions for the maintenance engineer.
+
+Be thorough, precise, technical, and detailed. Avoid short or generic one-liners.
 """
 
 class OpenRouterAIService:
-  """
-  OpenRouter AI Service wrapper for running free LLM inference on scientific telemetry.
-  """
+    """
+    OpenRouter AI Service wrapper for running free LLM inference on scientific telemetry.
+    Supports multi-model fallback chain for maximum reliability.
+    """
 
-  @classmethod
-  def execute_analysis(cls, req: AICopilotRequest) -> AICopilotResponse:
-    api_key = req.custom_api_key.strip() if req.custom_api_key and req.custom_api_key.strip() else get_default_openrouter_key()
+    @classmethod
+    def execute_analysis(cls, req: AICopilotRequest) -> AICopilotResponse:
+        api_key = req.custom_api_key.strip() if req.custom_api_key and req.custom_api_key.strip() else get_default_openrouter_key()
 
-    if not api_key:
-      raise ValueError("OPENROUTER_KEY_MISSING: No OpenRouter API key available.")
+        if not api_key:
+            raise ValueError("OPENROUTER_KEY_MISSING: No OpenRouter API key available.")
 
-    # Construct Context Prompt
-    user_content = f"User Prompt: {req.prompt}\nContext Area: {req.context_type}\n"
-    if req.context_data:
-      user_content += f"\nTelemetry Data JSON:\n```json\n{json.dumps(req.context_data, indent=2)}\n```\n"
+        # Construct Rich Context Prompt
+        user_content = f"### Scientific Diagnostic Task:\nUser Question/Prompt: {req.prompt}\nContext Area: {req.context_type}\n"
+        if req.context_data:
+            user_content += f"\n### Live Telemetry Data JSON:\n```json\n{json.dumps(req.context_data, indent=2)}\n```\n"
 
-    payload = {
-        "model": req.model,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_content}
-        ],
-        "temperature": 0.3,
-        "max_tokens": 1500
-    }
+        # Build model candidate list starting with requested model then trying fallback models
+        requested_model = req.model
+        fallback_models = [m.id for m in OPENROUTER_FREE_MODELS if m.id != requested_model]
+        candidates = [requested_model] + fallback_models
 
-    req_json = json.dumps(payload).encode("utf-8")
-    request = urllib.request.Request(
-        "https://openrouter.ai/api/v1/chat/completions",
-        data=req_json,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-            "HTTP-Referer": "https://signallab.site",
-            "X-Title": "REI SignalLab 2.1 AI Copilot"
-        },
-        method="POST"
-    )
+        last_error = None
 
-    try:
-      with urllib.request.urlopen(request, timeout=25) as response:
-        resp_data = json.loads(response.read().decode("utf-8"))
+        for model_id in candidates:
+            payload = {
+                "model": model_id,
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_content}
+                ],
+                "temperature": 0.25,
+                "max_tokens": 1800
+            }
 
-        choices = resp_data.get("choices", [])
-        if not choices:
-          raise ValueError("OPENROUTER_EMPTY_RESPONSE: No choices returned from model.")
+            req_json = json.dumps(payload).encode("utf-8")
+            request = urllib.request.Request(
+                "https://openrouter.ai/api/v1/chat/completions",
+                data=req_json,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {api_key}",
+                    "HTTP-Referer": "https://signallab.site",
+                    "X-Title": "REI SignalLab 2.1 AI Copilot"
+                },
+                method="POST"
+            )
 
-        text_out = choices[0].get("message", {}).get("content", "").strip()
-        model_used = resp_data.get("model", req.model)
+            try:
+                with urllib.request.urlopen(request, timeout=22) as response:
+                    resp_data = json.loads(response.read().decode("utf-8"))
+                    choices = resp_data.get("choices", [])
+                    if choices and choices[0].get("message", {}).get("content"):
+                        text_out = choices[0].get("message", {}).get("content", "").strip()
+                        actual_model = resp_data.get("model", model_id)
+                        return AICopilotResponse(
+                            analysis=text_out,
+                            model_used=actual_model,
+                            status="success",
+                            timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+                        )
+            except urllib.error.HTTPError as http_err:
+                err_body = http_err.read().decode("utf-8", errors="ignore")
+                logger.warning(f"OpenRouter Model {model_id} HTTP {http_err.code}: {err_body}. Trying next model candidate...")
+                last_error = f"HTTP {http_err.code}: {err_body}"
+            except Exception as e:
+                logger.warning(f"OpenRouter Model {model_id} Exception: {e}. Trying next model candidate...")
+                last_error = str(e)
 
-        return AICopilotResponse(
-            analysis=text_out,
-            model_used=model_used,
-            status="success",
-            timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
-        )
-
-    except urllib.error.HTTPError as http_err:
-      err_body = http_err.read().decode("utf-8", errors="ignore")
-      logger.error(f"OpenRouter HTTP {http_err.code}: {err_body}")
-      raise ValueError(f"OPENROUTER_API_ERROR ({http_err.code}): {err_body}")
-    except Exception as e:
-      logger.error(f"OpenRouter Request Exception: {e}")
-      raise ValueError(f"OPENROUTER_REQUEST_FAILED: {str(e)}")
+        raise ValueError(f"OPENROUTER_ALL_MODELS_FAILED: {last_error or 'Could not complete inference on free models.'}")
