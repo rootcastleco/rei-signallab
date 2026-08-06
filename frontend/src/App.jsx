@@ -23,6 +23,7 @@ import ProjectManagerModal from './components/ProjectManagerModal';
 import AboutModal from './components/AboutModal';
 import AiSettingsModal from './components/AiSettingsModal';
 import AiCopilotPanel from './components/AiCopilotPanel';
+import MatlabAddonModal from './components/MatlabAddonModal';
 
 const PRESETS = {
   SINE_440: {
@@ -82,6 +83,7 @@ export default function App() {
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [showAiCopilot, setShowAiCopilot] = useState(false);
   const [showAiSettings, setShowAiSettings] = useState(false);
+  const [showMatlabModal, setShowMatlabModal] = useState(false);
   const [aiContextType, setAiContextType] = useState('general');
   const [aiContextData, setAiContextData] = useState(null);
   const [currentGraphState, setCurrentGraphState] = useState(null);
@@ -476,6 +478,9 @@ export default function App() {
             <button className="win98-btn font-bold bg-[#E8E8E8] text-[#000080]" onClick={() => setShowAiSettings(true)} title="AI Model & Key Settings">
               <Settings size={13} className="text-[#0000FF]" /> AI Settings
             </button>
+            <button className="win98-btn font-bold bg-[#CC3300] text-white" onClick={() => setShowMatlabModal(true)}>
+              <Code size={13} className="text-[#FFFF00]" /> 📊 MATLAB Add-On
+            </button>
             <button className="win98-btn font-bold bg-[#E8E8E8] text-[#000080]" onClick={() => setShowAboutModal(true)}>
               <Info size={13} className="text-[#00AA00]" /> About & Credits
             </button>
@@ -691,6 +696,11 @@ export default function App() {
           onClose={() => setShowAiSettings(false)}
           onSave={() => {}}
         />
+      )}
+
+      {/* MATLAB Add-On Integration Modal */}
+      {showMatlabModal && (
+        <MatlabAddonModal onClose={() => setShowMatlabModal(false)} />
       )}
     </div>
   );

@@ -41,6 +41,8 @@ GET_ROUTES = [
     "/api/vibration/bearing-search?q=6205",
     "/api/gps/gold-code/1",
     "/api/ai/models",
+    "/api/matlab/client",
+    "/api/matlab/installer",
 ]
 
 SIGNAL_REQUEST = {
@@ -91,6 +93,7 @@ POST_ROUTES = [
     ("/api/antenna/analyze", {}),
     ("/api/gps/simulate", {}),
     ("/api/srw/simulate", {}),
+    ("/api/matlab/export-m", {"graph_name": "TestGraph"}),
     ("/api/dsp-lab/sampling-aliasing", {}),
     ("/api/dsp-lab/fir-parks-mcclellan", {}),
     ("/api/dsp-lab/autocorrelation", {}),
