@@ -38,6 +38,7 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
   const [vibrationFile, setVibrationFile] = useState(null);
 
   const [selectedBrand, setSelectedBrand] = useState('ALL');
+  const [bearingSearchQuery, setBearingSearchQuery] = useState('');
   const [bearingDbList, setBearingDbList] = useState([
     { brand: "SKF", model: "SKF 6205", num_elements: 9, ball_diameter_mm: 7.94, pitch_diameter_mm: 38.5, contact_angle_deg: 0.0 },
     { brand: "SKF", model: "SKF 6208", num_elements: 9, ball_diameter_mm: 11.91, pitch_diameter_mm: 51.0, contact_angle_deg: 0.0 },
@@ -977,6 +978,15 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
               <option value="Dodge">Dodge Mounted Bearings</option>
             </select>
 
+            {/* Search Query Input */}
+            <input
+              type="text"
+              placeholder="Search 3,500+ bearings (e.g. NTN 16001, SKF 6205)..."
+              value={bearingSearchQuery}
+              onChange={e => setBearingSearchQuery(e.target.value)}
+              className="text-[10px] font-mono w-full bg-[#FFFFFF] border border-[#808080] px-1 py-0.5"
+            />
+
             {/* Quick Model Select */}
             <select
               onChange={e => {
@@ -995,7 +1005,8 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
               <option value="">-- Select Bearing Preset ({selectedBrand}) --</option>
               {bearingDbList
                 .filter(b => selectedBrand === 'ALL' || b.brand === selectedBrand)
-                .slice(0, 100)
+                .filter(b => !bearingSearchQuery || b.model.toLowerCase().includes(bearingSearchQuery.toLowerCase()))
+                .slice(0, 300)
                 .map((b, idx) => (
                   <option key={idx} value={b.model}>
                     {b.model} ({b.brand}) - N:{b.num_elements}, d:{b.ball_diameter_mm}mm
