@@ -89,6 +89,32 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
   const [sdofDamping, setSdofDamping] = useState(50);
   const [sdofX0, setSdofX0] = useState(10);
 
+  // Orbit Plot Advanced Simulator States (RITEC Interactive Orbit Simulator)
+  const [orbF1, setOrbF1] = useState(60.0);
+  const [orbF2, setOrbF2] = useState(120.0);
+  const [orbF3, setOrbF3] = useState(28.2);
+
+  const [orbAmp1X, setOrbAmp1X] = useState(5.0);
+  const [orbAmp1Y, setOrbAmp1Y] = useState(5.0);
+  const [orbPhase1X, setOrbPhase1X] = useState(0.0);
+  const [orbPhase1Y, setOrbPhase1Y] = useState(90.0);
+
+  const [orbAmp2X, setOrbAmp2X] = useState(0.0);
+  const [orbAmp2Y, setOrbAmp2Y] = useState(0.0);
+  const [orbPhase2X, setOrbPhase2X] = useState(0.0);
+  const [orbPhase2Y, setOrbPhase2Y] = useState(0.0);
+
+  const [orbAmp3X, setOrbAmp3X] = useState(0.0);
+  const [orbAmp3Y, setOrbAmp3Y] = useState(0.0);
+  const [orbPhase3X, setOrbPhase3X] = useState(0.0);
+  const [orbPhase3Y, setOrbPhase3Y] = useState(0.0);
+
+  const [phaseSensorTdc, setPhaseSensorTdc] = useState(0.0);
+  const [probeOrientation, setProbeOrientation] = useState('45R_45L'); // '90R_0TDC', '45R_45L', '0TDC_90L', etc.
+  const [rotationDir, setRotationDir] = useState('CCW'); // 'CCW', 'CW'
+  const [orbXScale, setOrbXScale] = useState(10.0);
+  const [orbYScale, setOrbYScale] = useState(10.0);
+
   const [convVal, setConvVal] = useState(5.0);
   const [convUnit, setConvUnit] = useState('g_pk');
   const [convFreq, setConvFreq] = useState(50);
@@ -698,49 +724,96 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
 
     ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, H);
 
-    // Draw Proximity Probe Axes (X @ 45 deg, Y @ 135 deg)
-    ctx.strokeStyle = '#005500'; ctx.lineWidth = 1;
+    // Draw Clearance Circle & Concentric Calibration Rings
+    ctx.strokeStyle = '#004400'; ctx.lineWidth = 1;
     [0.33, 0.66, 1.0].forEach(rRatio => {
       ctx.beginPath(); ctx.arc(cx, cy, R * rRatio, 0, 2 * Math.PI); ctx.stroke();
     });
 
+    // Probe Orientation Angles (w.r.t TDC = 0 deg)
+    let pXAngleDeg = 45, pYAngleDeg = 135;
+    if (probeOrientation === '90R_0TDC') { pXAngleDeg = 90; pYAngleDeg = 0; }
+    else if (probeOrientation === '45R_45L') { pXAngleDeg = 45; pYAngleDeg = 135; }
+    else if (probeOrientation === '0TDC_90L') { pXAngleDeg = 0; pYAngleDeg = 270; }
+    else if (probeOrientation === '45L_135L') { pXAngleDeg = 315; pYAngleDeg = 225; }
+    else if (probeOrientation === '90L_180BDC') { pXAngleDeg = 270; pYAngleDeg = 180; }
+
+    const radX = (pXAngleDeg * Math.PI) / 180.0;
+    const radY = (pYAngleDeg * Math.PI) / 180.0;
+
     // Probe X Line
-    const radX = (45 * Math.PI) / 180;
+    ctx.strokeStyle = '#006600'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(cx - R * Math.cos(radX), cy + R * Math.sin(radX)); ctx.lineTo(cx + R * Math.cos(radX), cy - R * Math.sin(radX)); ctx.stroke();
     ctx.fillStyle = '#00FF00'; ctx.font = 'bold 9px monospace';
-    ctx.fillText('Probe X (45°)', cx + R * Math.cos(radX) + 5, cy - R * Math.sin(radX));
+    ctx.fillText(`Probe X (${pXAngleDeg}°)`, cx + R * Math.cos(radX) + 4, cy - R * Math.sin(radX));
 
     // Probe Y Line
-    const radY = (135 * Math.PI) / 180;
     ctx.beginPath(); ctx.moveTo(cx - R * Math.cos(radY), cy + R * Math.sin(radY)); ctx.lineTo(cx + R * Math.cos(radY), cy - R * Math.sin(radY)); ctx.stroke();
-    ctx.fillText('Probe Y (135°)', cx + R * Math.cos(radY) - 60, cy - R * Math.sin(radY));
+    ctx.fillText(`Probe Y (${pYAngleDeg}°)`, cx + R * Math.cos(radY) - 55, cy - R * Math.sin(radY));
 
-    // Lissajous Orbit Trajectory: 1X + 2X misalignment + 0.5X sub-sync
+    // Frequencies (F1, F2, F3) & Amplitudes / Phases
+    const f1 = parseFloat(orbF1) || (rpm / 60.0);
+    const f2 = parseFloat(orbF2) || (2 * f1);
+    const f3 = parseFloat(orbF3) || (0.47 * f1);
+
+    const a1x = parseFloat(orbAmp1X) || 5.0, a1y = parseFloat(orbAmp1Y) || 5.0;
+    const ph1x = (parseFloat(orbPhase1X) || 0.0) * Math.PI / 180.0;
+    const ph1y = (parseFloat(orbPhase1Y) || 90.0) * Math.PI / 180.0;
+
+    const a2x = parseFloat(orbAmp2X) || 0.0, a2y = parseFloat(orbAmp2Y) || 0.0;
+    const ph2x = (parseFloat(orbPhase2X) || 0.0) * Math.PI / 180.0;
+    const ph2y = (parseFloat(orbPhase2Y) || 0.0) * Math.PI / 180.0;
+
+    const a3x = parseFloat(orbAmp3X) || 0.0, a3y = parseFloat(orbAmp3Y) || 0.0;
+    const ph3x = (parseFloat(orbPhase3X) || 0.0) * Math.PI / 180.0;
+    const ph3y = (parseFloat(orbPhase3Y) || 0.0) * Math.PI / 180.0;
+
+    const maxScale = Math.max(parseFloat(orbXScale) || 10.0, parseFloat(orbYScale) || 10.0, 1.0);
+
+    // Compute Orbit Curve (Lissajous superposition of F1 + F2 + F3)
+    const dirSign = rotationDir === 'CW' ? -1 : 1;
+    const duration = Math.max(2.0 / (f1 || 1), 0.1);
+    const N = 600;
+
     ctx.strokeStyle = '#00FFFF'; ctx.lineWidth = 1.8; ctx.beginPath();
-    const f1 = shaftFreqHz;
-    const N = 400;
+
+    const getPositionAtTime = (t) => {
+      const xSig = a1x * Math.cos(2 * Math.PI * f1 * t * dirSign + ph1x) +
+                   a2x * Math.cos(2 * Math.PI * f2 * t * dirSign + ph2x) +
+                   a3x * Math.cos(2 * Math.PI * f3 * t * dirSign + ph3x);
+
+      const ySig = a1y * Math.sin(2 * Math.PI * f1 * t * dirSign + ph1y) +
+                   a2y * Math.sin(2 * Math.PI * f2 * t * dirSign + ph2y) +
+                   a3y * Math.sin(2 * Math.PI * f3 * t * dirSign + ph3y);
+
+      const px = cx + (xSig / maxScale) * (R * 0.85);
+      const py = cy - (ySig / maxScale) * (R * 0.85);
+      return { px, py, xSig, ySig };
+    };
 
     for (let i = 0; i <= N; i++) {
-      const t = (i / N) * (2.0 / f1); // 2 full revolutions
-      // X & Y Proximity probe signals
-      const xVal = 0.6 * Math.cos(2 * Math.PI * f1 * t) + 0.2 * Math.cos(4 * Math.PI * f1 * t + 0.5);
-      const yVal = 0.6 * Math.sin(2 * Math.PI * f1 * t + 0.3) + 0.2 * Math.sin(4 * Math.PI * f1 * t + 0.8);
-
-      const px = cx + xVal * R * 0.9;
-      const py = cy - yVal * R * 0.9;
-
+      const t = (i / N) * duration;
+      const { px, py } = getPositionAtTime(t);
       if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
     }
     ctx.stroke();
 
-    // Keyphasor Dot once per revolution (t = 0)
-    const kpX = cx + (0.6 * Math.cos(0) + 0.2 * Math.cos(0.5)) * R * 0.9;
-    const kpY = cy - (0.6 * Math.sin(0.3) + 0.2 * Math.sin(0.8)) * R * 0.9;
-    ctx.fillStyle = '#FF0000'; ctx.beginPath(); ctx.arc(kpX, kpY, 5, 0, 2 * Math.PI); ctx.fill();
+    // Keyphasor Timing Marks (Blanking / Bright dot per 1X revolution)
+    const revs = Math.max(1, Math.round(duration * f1));
+    const tdcOffsetRad = (parseFloat(phaseSensorTdc) || 0.0) * Math.PI / 180.0;
+
+    for (let r = 0; r < revs; r++) {
+      const tKp = (r / f1) + (tdcOffsetRad / (2 * Math.PI * f1));
+      const { px: kpX, py: kpY } = getPositionAtTime(tKp);
+
+      // Bright Red Keyphasor Dot + Outer Ring
+      ctx.fillStyle = '#FF0000'; ctx.beginPath(); ctx.arc(kpX, kpY, 5, 0, 2 * Math.PI); ctx.fill();
+      ctx.strokeStyle = '#FFFF00'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(kpX, kpY, 7, 0, 2 * Math.PI); ctx.stroke();
+    }
 
     ctx.fillStyle = '#00FF00'; ctx.font = 'bold 11px monospace';
-    ctx.fillText('Proximity Probe Shaft Orbit Plot (Lissajous X-Y + Keyphasor Dot)', 8, 14);
-  }, [activeTab, shaftFreqHz]);
+    ctx.fillText(`Shaft Orbit Plot (F1:${f1.toFixed(1)}Hz, F2:${f2.toFixed(1)}Hz, F3:${f3.toFixed(1)}Hz) | Keyphasor Red Dots: 1/rev`, 8, 14);
+  }, [activeTab, orbF1, orbF2, orbF3, orbAmp1X, orbAmp1Y, orbPhase1X, orbPhase1Y, orbAmp2X, orbAmp2Y, orbPhase2X, orbPhase2Y, orbAmp3X, orbAmp3Y, orbPhase3X, orbPhase3Y, phaseSensorTdc, probeOrientation, rotationDir, orbXScale, orbYScale, rpm]);
 
   // SDOF Mass-Spring-Damper Free Response Canvas Render
   useEffect(() => {
@@ -1343,8 +1416,79 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
               <canvas ref={polarCanvasRef} style={{ width: '100%', display: 'block' }} />
             </div>
           ) : activeTab === 'orbit' ? (
-            <div className="win98-outset p-1 bg-[#000000]">
-              <canvas ref={orbitCanvasRef} style={{ width: '100%', display: 'block' }} />
+            <div className="win98-outset p-2 bg-[#C0C0C0] text-xs font-mono flex flex-col gap-2">
+              <div className="font-bold text-[#000080] border-b border-[#808080] pb-1 flex items-center justify-between">
+                <span>Interactive Shaft Orbit Plot Simulator (RITEC Tool)</span>
+                <span className="text-[10px] text-[#008800]">Simulates 1X, 2X, Sub/Super-Synchronous Orbits & Keyphasor Timing Marks</span>
+              </div>
+
+              {/* Orbit Plot Canvas */}
+              <div className="win98-outset p-1 bg-[#000000]">
+                <canvas ref={orbitCanvasRef} style={{ width: '100%', display: 'block' }} />
+              </div>
+
+              {/* Orbit Parameters Panel */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 bg-[#E0E0E0] p-2 border border-[#808080] text-[11px]">
+                {/* Frequency 1 (F1) */}
+                <div className="flex flex-col gap-1 bg-[#FFFFFF] p-1.5 border border-[#808080]">
+                  <div className="font-bold text-[#0000FF] border-b border-[#D4D0C8] pb-0.5">Component 1 (F1 1X):</div>
+                  <div className="flex justify-between items-center"><label>Freq (Hz):</label><input type="number" step="0.1" value={orbF1} onChange={e => setOrbF1(parseFloat(e.target.value))} className="w-16 font-mono px-1 border" /></div>
+                  <div className="flex justify-between items-center"><label>X Amp (mils):</label><input type="number" step="0.1" value={orbAmp1X} onChange={e => setOrbAmp1X(parseFloat(e.target.value))} className="w-16 font-mono px-1 border" /></div>
+                  <div className="flex justify-between items-center"><label>Y Amp (mils):</label><input type="number" step="0.1" value={orbAmp1Y} onChange={e => setOrbAmp1Y(parseFloat(e.target.value))} className="w-16 font-mono px-1 border" /></div>
+                  <div className="flex justify-between items-center"><label>X Phase (°):</label><input type="number" step="1" value={orbPhase1X} onChange={e => setOrbPhase1X(parseFloat(e.target.value))} className="w-16 font-mono px-1 border" /></div>
+                  <div className="flex justify-between items-center"><label>Y Phase (°):</label><input type="number" step="1" value={orbPhase1Y} onChange={e => setOrbPhase1Y(parseFloat(e.target.value))} className="w-16 font-mono px-1 border" /></div>
+                </div>
+
+                {/* Frequency 2 (F2) */}
+                <div className="flex flex-col gap-1 bg-[#FFFFFF] p-1.5 border border-[#808080]">
+                  <div className="font-bold text-[#0000FF] border-b border-[#D4D0C8] pb-0.5">Component 2 (F2 2X / Super):</div>
+                  <div className="flex justify-between items-center"><label>Freq (Hz):</label><input type="number" step="0.1" value={orbF2} onChange={e => setOrbF2(parseFloat(e.target.value))} className="w-16 font-mono px-1 border" /></div>
+                  <div className="flex justify-between items-center"><label>X Amp (mils):</label><input type="number" step="0.1" value={orbAmp2X} onChange={e => setOrbAmp2X(parseFloat(e.target.value))} className="w-16 font-mono px-1 border" /></div>
+                  <div className="flex justify-between items-center"><label>Y Amp (mils):</label><input type="number" step="0.1" value={orbAmp2Y} onChange={e => setOrbAmp2Y(parseFloat(e.target.value))} className="w-16 font-mono px-1 border" /></div>
+                  <div className="flex justify-between items-center"><label>X Phase (°):</label><input type="number" step="1" value={orbPhase2X} onChange={e => setOrbPhase2X(parseFloat(e.target.value))} className="w-16 font-mono px-1 border" /></div>
+                  <div className="flex justify-between items-center"><label>Y Phase (°):</label><input type="number" step="1" value={orbPhase2Y} onChange={e => setOrbPhase2Y(parseFloat(e.target.value))} className="w-16 font-mono px-1 border" /></div>
+                </div>
+
+                {/* Frequency 3 (F3) */}
+                <div className="flex flex-col gap-1 bg-[#FFFFFF] p-1.5 border border-[#808080]">
+                  <div className="font-bold text-[#0000FF] border-b border-[#D4D0C8] pb-0.5">Component 3 (F3 Sub-Sync):</div>
+                  <div className="flex justify-between items-center"><label>Freq (Hz):</label><input type="number" step="0.1" value={orbF3} onChange={e => setOrbF3(parseFloat(e.target.value))} className="w-16 font-mono px-1 border" /></div>
+                  <div className="flex justify-between items-center"><label>X Amp (mils):</label><input type="number" step="0.1" value={orbAmp3X} onChange={e => setOrbAmp3X(parseFloat(e.target.value))} className="w-16 font-mono px-1 border" /></div>
+                  <div className="flex justify-between items-center"><label>Y Amp (mils):</label><input type="number" step="0.1" value={orbAmp3Y} onChange={e => setOrbAmp3Y(parseFloat(e.target.value))} className="w-16 font-mono px-1 border" /></div>
+                  <div className="flex justify-between items-center"><label>X Phase (°):</label><input type="number" step="1" value={orbPhase3X} onChange={e => setOrbPhase3X(parseFloat(e.target.value))} className="w-16 font-mono px-1 border" /></div>
+                  <div className="flex justify-between items-center"><label>Y Phase (°):</label><input type="number" step="1" value={orbPhase3Y} onChange={e => setOrbPhase3Y(parseFloat(e.target.value))} className="w-16 font-mono px-1 border" /></div>
+                </div>
+              </div>
+
+              {/* Sensor Orientation & Timing Mark Config */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 bg-[#E0E0E0] p-2 border border-[#808080] text-[11px]">
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[#000080]">Probe Orientation:</label>
+                  <select value={probeOrientation} onChange={e => setProbeOrientation(e.target.value)} className="w-full font-mono bg-white border border-[#808080] p-0.5">
+                    <option value="45R_45L">45° Right & 45° Left (Standard X-Y)</option>
+                    <option value="90R_0TDC">90° Right & 0° TDC</option>
+                    <option value="0TDC_90L">0° TDC & 90° Left</option>
+                    <option value="45L_135L">-45° Left & -135° Left</option>
+                    <option value="90L_180BDC">-90° Left & -180° BDC</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[#000080]">Keyphasor Position from TDC (°):</label>
+                  <input type="number" step="5" value={phaseSensorTdc} onChange={e => setPhaseSensorTdc(parseFloat(e.target.value))} className="w-full font-mono bg-white border border-[#808080] px-1" />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[#000080]">Rotation Direction & Scale:</label>
+                  <div className="flex gap-2">
+                    <select value={rotationDir} onChange={e => setRotationDir(e.target.value)} className="w-1/2 font-mono bg-white border border-[#808080] p-0.5">
+                      <option value="CCW">Counter-Clockwise (CCW)</option>
+                      <option value="CW">Clockwise (CW)</option>
+                    </select>
+                    <input type="number" value={orbXScale} onChange={e => { setOrbXScale(parseFloat(e.target.value)); setOrbYScale(parseFloat(e.target.value)); }} className="w-1/2 font-mono bg-white border border-[#808080] px-1" placeholder="Scale (mils)" />
+                  </div>
+                </div>
+              </div>
             </div>
           ) : activeTab === 'sdof' ? (
             <div className="win98-outset p-1 bg-[#000000]">
