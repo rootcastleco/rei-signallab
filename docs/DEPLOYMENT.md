@@ -102,6 +102,23 @@ Required GitHub repository secrets:
 | `GCP_SERVICE_ACCOUNT` | Google service account email for WIF |
 | `GCP_PROJECT_ID` | GCP project ID (`signallab-3305b`) |
 
+#### First-time setup
+
+[`scripts/setup-github-wif.sh`](../scripts/setup-github-wif.sh) provisions all
+of this in one run — deployer service account, roles, WIF pool and OIDC provider
+scoped to this repository — and prints the three secret values:
+
+```bash
+gcloud auth login
+./scripts/setup-github-wif.sh
+```
+
+The provider is created with an `attribute-condition` pinning it to
+`rootcastleco/rei-signallab`. Without that condition any GitHub repository could
+mint tokens for the deployer account, so do not remove it.
+
+The script is idempotent and safe to re-run.
+
 ---
 
 ## 🚀 3. Manual Cloud Run Deployment
