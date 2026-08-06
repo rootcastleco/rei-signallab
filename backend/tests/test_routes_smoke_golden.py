@@ -40,6 +40,7 @@ GET_ROUTES = [
     "/api/vibration/bearing-database",
     "/api/vibration/bearing-search?q=6205",
     "/api/gps/gold-code/1",
+    "/api/ai/models",
 ]
 
 SIGNAL_REQUEST = {
@@ -131,6 +132,7 @@ def test_every_registered_route_is_covered():
         "/api/electrical/upload",       # multipart
         "/api/gps/export-iq-bin",       # binary response
         "/api/python/execute",          # covered by test_security_golden
+        "/api/ai/analyze",              # external LLM API call
     }
 
     registered = {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText, Layers, AlertTriangle, Gauge, Zap, Radio, User, Folder, Info } from 'lucide-react';
+import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText, Layers, AlertTriangle, Gauge, Zap, Radio, User, Folder, Info, Sparkles, Settings } from 'lucide-react';
 import { safeFetchJson, verifyBackendHandshake } from './config';
 import { subscribeToAuthChanges } from './firebaseAuth';
 
@@ -21,6 +21,8 @@ import SrwWorkbench from './components/SrwWorkbench';
 import UserAuthModal from './components/UserAuthModal';
 import ProjectManagerModal from './components/ProjectManagerModal';
 import AboutModal from './components/AboutModal';
+import AiSettingsModal from './components/AiSettingsModal';
+import AiCopilotPanel from './components/AiCopilotPanel';
 
 const PRESETS = {
   SINE_440: {
@@ -78,6 +80,10 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
+  const [showAiCopilot, setShowAiCopilot] = useState(false);
+  const [showAiSettings, setShowAiSettings] = useState(false);
+  const [aiContextType, setAiContextType] = useState('general');
+  const [aiContextData, setAiContextData] = useState(null);
   const [currentGraphState, setCurrentGraphState] = useState(null);
 
   useEffect(() => {
@@ -464,6 +470,12 @@ export default function App() {
             <button className="win98-btn font-bold bg-[#FFFFCC] text-[#000080]" onClick={() => setShowProjectModal(true)}>
               <Folder size={13} className="text-[#0000FF]" /> Saved Projects & Cloud Sync
             </button>
+            <button className="win98-btn font-bold bg-[#000080] text-white" onClick={() => { setAiContextType('general'); setShowAiCopilot(true); }}>
+              <Sparkles size={13} className="text-[#FFFF00]" /> 🤖 AI Copilot
+            </button>
+            <button className="win98-btn font-bold bg-[#E8E8E8] text-[#000080]" onClick={() => setShowAiSettings(true)} title="AI Model & Key Settings">
+              <Settings size={13} className="text-[#0000FF]" /> AI Settings
+            </button>
             <button className="win98-btn font-bold bg-[#E8E8E8] text-[#000080]" onClick={() => setShowAboutModal(true)}>
               <Info size={13} className="text-[#00AA00]" /> About & Credits
             </button>
@@ -661,6 +673,24 @@ export default function App() {
       {/* System Architecture & Credits Modal */}
       {showAboutModal && (
         <AboutModal onClose={() => setShowAboutModal(false)} />
+      )}
+
+      {/* OpenRouter AI Copilot Panel */}
+      {showAiCopilot && (
+        <AiCopilotPanel
+          contextType={aiContextType}
+          contextData={aiContextData}
+          onClose={() => setShowAiCopilot(false)}
+          onOpenSettings={() => { setShowAiCopilot(false); setShowAiSettings(true); }}
+        />
+      )}
+
+      {/* OpenRouter AI Settings & Model Selector Modal */}
+      {showAiSettings && (
+        <AiSettingsModal
+          onClose={() => setShowAiSettings(false)}
+          onSave={() => {}}
+        />
       )}
     </div>
   );
