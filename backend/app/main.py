@@ -1,12 +1,16 @@
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, JSONResponse
-import numpy as np
+import uuid
+import logging
+import time
 import io
 import wave
-import logging
+import numpy as np
 from typing import Dict, Any, Optional, List
 
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response, JSONResponse
+
+from app.config import settings
 from app.schemas import (
     SignalProcessingRequest,
     LispProcessingRequest,
@@ -21,6 +25,8 @@ from app.graph.registry import NodeRegistry, NodeSpec
 from app.graph.validator import GraphValidator
 from app.graph.engine import GraphExecutionEngine
 from app.graph.migration import ProjectMigrationManager
+
+from app.health import router as health_router
 from app.vibration_routes import router as vibration_router
 from app.electrical_routes import router as electrical_router
 from app.antenna_routes import router as antenna_router
@@ -28,37 +34,127 @@ from app.gps_routes import router as gps_router
 from app.unpingco_routes import router as unpingco_router
 from app.srw_routes import router as srw_router
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("signallab")
+# Configure Structured Logging
+logging.basicConfig(
+    level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+)
+logger = logging.getLogger("rei-signallab-api")
 
 app = FastAPI(
     title="REI SignalLab 2.1 Engine API",
     description="Instrument-Grade Typed Signal Processing, Node Graph Engine & Sandbox Suite",
-    version="2.1.0"
+    version=settings.APP_VERSION
 )
 
+# 1. Production CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+
+# 2. Request ID & Structured Logging Middleware
+@app.middleware("http")
+async def request_middleware(request: Request, call_next):
+    request_id = str(uuid.uuid4())
+    request.state.request_id = request_id
+    start_time = time.time()
+
+    # Content-Length check for upload limit
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > settings.MAX_UPLOAD_BYTES:
+        return JSONResponse(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            content={
+                "code": "PAYLOAD_TOO_LARGE",
+                "message": f"Request body exceeds maximum allowed size of {settings.MAX_UPLOAD_BYTES} bytes.",
+                "details": {"max_bytes": settings.MAX_UPLOAD_BYTES},
+                "requestId": request_id
+            }
+        )
+
+    response = await call_next(request)
+    duration_ms = round((time.time() - start_time) * 1000, 2)
+
+    response.headers["X-Request-ID"] = request_id
+    logger.info(f"event=api_request_completed requestId={request_id} method={request.method} path={request.url.path} status={response.status_code} durationMs={duration_ms} commitSha={settings.COMMIT_SHA}")
+
+    return response
+
+
+# 3. Structured Error Exception Handlers
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    request_id = getattr(request.state, "request_id", str(uuid.uuid4()))
+    detail = exc.detail
+
+    if isinstance(detail, dict):
+        code = detail.get("code", f"HTTP_{exc.status_code}")
+        message = detail.get("message", detail.get("detail", str(detail)))
+        details = detail.get("details", None)
+    else:
+        code = f"HTTP_{exc.status_code}"
+        message = str(detail)
+        details = None
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "code": code,
+            "message": message,
+            "details": details,
+            "requestId": request_id
+        }
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    request_id = getattr(request.state, "request_id", str(uuid.uuid4()))
+    logger.error(f"Unhandled exception requestId={request_id}: {str(exc)}", exc_info=True)
+
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "code": "INTERNAL_SERVER_ERROR",
+            "message": "An internal server error occurred.",
+            "details": None if settings.APP_ENV == "production" else str(exc),
+            "requestId": request_id
+        }
+    )
+
+
+# 4. Mount Health & Feature Routers
+app.include_router(health_router)
+app.include_router(vibration_router, prefix="/api/vibration")
+app.include_router(electrical_router, prefix="/api/electrical")
+app.include_router(antenna_router, prefix="/api/antenna")
+app.include_router(gps_router, prefix="/api/gps")
+app.include_router(unpingco_router, prefix="/api/dsp-lab")
+app.include_router(srw_router, prefix="/api/srw")
+
 
 @app.get("/")
 def read_root():
     return {
         "app": "REI SignalLab 2.1 DSP Engine",
-        "version": "2.1.0",
+        "service": "rei-signallab-api",
+        "version": settings.APP_VERSION,
         "status": "online",
         "engine": "SciPy/FastAPI",
         "registered_nodes_count": len(NodeRegistry.list_all())
     }
 
-# 1. Node Catalog Registry Endpoints
+
+# 5. Node Catalog Registry Endpoints
 @app.get("/api/nodes")
 def list_nodes():
     return [spec.model_dump() for spec in NodeRegistry.list_all()]
+
 
 @app.get("/api/nodes/{node_type}")
 def get_node_spec(node_type: str):
@@ -67,7 +163,8 @@ def get_node_spec(node_type: str):
         raise HTTPException(status_code=404, detail=f"Node type '{node_type}' not found in registry.")
     return spec.model_dump()
 
-# 2. Graph Validation & Execution Endpoints
+
+# 6. Graph Validation & Execution Endpoints
 @app.post("/api/graph/validate")
 def validate_graph(request_data: Dict[str, Any]):
     project = request_data.get("project", request_data)
@@ -76,6 +173,7 @@ def validate_graph(request_data: Dict[str, Any]):
     if not val_result.valid:
         return JSONResponse(status_code=422, content=val_result.model_dump())
     return val_result.model_dump()
+
 
 @app.post("/api/graph/execute")
 def execute_graph(request_data: Dict[str, Any]):
@@ -90,11 +188,18 @@ def execute_graph(request_data: Dict[str, Any]):
 
     return exec_result
 
-# 3. Time-Domain / Spectral DSP Endpoint
+
+# 7. Time-Domain / Spectral DSP Endpoint
 @app.post("/api/process", response_model=SignalProcessingResponse)
 def process_signal(req: SignalProcessingRequest):
     try:
         t, raw_sig = DSPEngine.generate_signal(req.generator)
+
+        if len(raw_sig) > settings.MAX_SIGNAL_SAMPLES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Signal length {len(raw_sig)} exceeds maximum sample limit of {settings.MAX_SIGNAL_SAMPLES}."
+            )
 
         if req.math.dc_remove:
             raw_sig = raw_sig - np.mean(raw_sig)
@@ -132,11 +237,14 @@ def process_signal(req: SignalProcessingRequest):
             spectrogram_times=times_spec.tolist(),
             spectrogram_frequencies=freqs_spec.tolist()
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error processing signal: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"DSP Engine Processing Failure: {str(e)}")
 
-# 4. Signal File Upload
+
+# 8. Signal File Upload Endpoint
 @app.post("/api/upload/signal")
 async def upload_signal(
     file: UploadFile = File(...),
@@ -147,7 +255,19 @@ async def upload_signal(
 ):
     try:
         content = await file.read()
+        if len(content) > settings.MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Uploaded file size ({len(content)} bytes) exceeds limit of {settings.MAX_UPLOAD_BYTES} bytes."
+            )
+
         fs, raw_sig = DSPEngine.parse_signal_file(file.filename, content)
+
+        if len(raw_sig) > settings.MAX_SIGNAL_SAMPLES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Decoded signal samples ({len(raw_sig)}) exceeds limit of {settings.MAX_SIGNAL_SAMPLES}."
+            )
 
         t = np.linspace(0, len(raw_sig) / fs, len(raw_sig), endpoint=False)
 
@@ -177,11 +297,14 @@ async def upload_signal(
             "spectrogram_times": times_spec.tolist(),
             "spectrogram_frequencies": freqs_spec.tolist()
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error parsing uploaded file: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=f"Signal File Parse Error: {str(e)}")
 
-# 5. Python Sandbox Script Execution
+
+# 9. Python Sandbox Script Execution
 @app.post("/api/python/execute")
 def execute_python_script(req: PythonScriptRequest):
     res = PythonSandboxEngine.execute_script(req.python_code)
@@ -189,7 +312,8 @@ def execute_python_script(req: PythonScriptRequest):
         raise HTTPException(status_code=400, detail=res.get("error"))
     return res
 
-# 6. S-Expression DSL Execution
+
+# 10. S-Expression DSL Execution
 @app.post("/api/lisp/process")
 def process_lisp_expression(req: LispProcessingRequest):
     try:
@@ -216,10 +340,13 @@ def process_lisp_expression(req: LispProcessingRequest):
             "spectrogram_frequencies": freqs_spec.tolist(),
             "lisp_logs": lisp_logs
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"S-Expression DSL Execution Error: {str(e)}")
 
-# 7. Downloadable WAV Stream
+
+# 11. Downloadable WAV Stream
 @app.post("/api/export/wav")
 def export_wav(req: SignalProcessingRequest):
     try:
@@ -238,12 +365,7 @@ def export_wav(req: SignalProcessingRequest):
 
         wav_io.seek(0)
         return Response(content=wav_io.read(), media_type="audio/wav", headers={"Content-Disposition": "attachment; filename=signallab21.wav"})
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"WAV Export Failure: {str(e)}")
-
-app.include_router(vibration_router, prefix="/api/vibration")
-app.include_router(electrical_router, prefix="/api/electrical")
-app.include_router(antenna_router, prefix="/api/antenna")
-app.include_router(gps_router, prefix="/api/gps")
-app.include_router(unpingco_router, prefix="/api/dsp-lab")
-app.include_router(srw_router, prefix="/api/srw")

@@ -1,0 +1,119 @@
+name: CD Production Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  test-and-build:
+    name: Build & Test Artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt pytest
+
+      - name: Run Pytest
+        env:
+          PYTHONPATH: backend
+        run: pytest backend/tests/ -v
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+  deploy-cloud-run:
+    name: Deploy to Google Cloud Run
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Authorize Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ secrets.GCP_REGION || 'europe-west1' }}-docker.pkg.dev --quiet
+
+      - name: Build & Deploy to Cloud Run
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ secrets.GCP_REGION || 'europe-west1' }}
+          CLOUD_RUN_SERVICE: rei-signallab-api
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          bash scripts/deploy-cloud-run.sh
+
+  deploy-firebase:
+    name: Deploy to Firebase Hosting
+    needs: deploy-cloud-run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install & Build Frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SIGNALLAB_3305B }}
+          channelId: live
+          projectId: signallab-3305b
+
+  production-smoke-test:
+    name: Production Smoke Test
+    needs: deploy-firebase
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Live Health Endpoints
+        run: |
+          echo "🔍 Checking live health endpoints on Firebase Proxy..."
+          curl -fsS https://signallab-3305b.web.app/api/health/live
+          curl -fsS https://signallab-3305b.web.app/api/health/ready
+          curl -fsS https://signallab-3305b.web.app/api/version
+
+          echo "🔍 Verifying DSP API endpoint..."
+          curl -fsS -X POST https://signallab-3305b.web.app/api/vibration/analyze \
+            -H "Content-Type: application/json" \
+            -d '{"sample_rate": 25600, "rpm": {"manual_rpm": 1500.0}}'

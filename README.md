@@ -53,7 +53,37 @@
 2. **Kahn Topological Execution Engine (`POST /api/graph/execute`)**: Deterministic graph validation and execution engine with 10-point port compatibility checks, cycle detection, and Kahn's topological scheduler.
 3. **REI Vibration Analysis Workbench**: End-to-end industrial machinery condition monitoring, single-plane complex vector rotor balancing, kinematic bearing defect frequency tracking (BPFO, BPFI, BSF, FTF), Hilbert envelope demodulation, 1X-10X harmonic order spectrum bar view, and rule-based fault classification.
 4. **Numerical Golden Verification Suite**: Comprehensive Pytest suite enforcing IEEE double-precision float64 error $\le 10^{-12}$, FFT/IFFT reconstruction RMS error $\le 10^{-9}$, DCT Type II error $\le 10^{-12}$, and Haar wavelet error $\le 10^{-12}$.
-5. **Safe AST Math Expression Evaluator**: Custom expression filter (`generic.real_value_filter`) evaluated safely using Python AST parsing without `exec()` or `eval()`.
+5. **Safe AST Math Expression Evaluator**: Custom expression filter (`generic.real_value_filter`) evaluated safely using Python AST parsing without `exec()` or `eval()`
+
+---
+
+## 🚀 Production Deployment & Cloud Run Integration
+
+REI SignalLab is deployed using **Google Cloud Run** (`rei-signallab-api` in `europe-west1`) and **Firebase Hosting** (`signallab-3305b`). Firebase CDN proxies all `/api/**` calls directly to the Cloud Run FastAPI container.
+
+For complete setup, health probes, and rollback procedures, refer to [**`docs/DEPLOYMENT.md`**](docs/DEPLOYMENT.md).
+
+### Quick Deployment
+
+```bash
+# 1. Authenticate with Google Cloud
+gcloud auth login
+gcloud config set project signallab-3305b
+
+# 2. Execute Cloud Run Deployment Script
+GCP_PROJECT_ID=signallab-3305b GCP_REGION=europe-west1 ./scripts/deploy-cloud-run.sh
+
+# 3. Deploy Frontend Assets & API Rewrites to Firebase Hosting
+npx firebase deploy --only hosting
+```
+
+### Health Verification Commands
+
+```bash
+curl -fsS https://signallab-3305b.web.app/api/health/live
+curl -fsS https://signallab-3305b.web.app/api/health/ready
+curl -fsS https://signallab-3305b.web.app/api/version
+```
 
 ---
 
