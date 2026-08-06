@@ -69,7 +69,6 @@ export const loginWithGoogle = async () => {
       popupErr.code === 'auth/popup-closed-by-user' ||
       popupErr.code === 'auth/cancelled-popup-request'
     ) {
-      // Fallback to full page redirect if popup is blocked
       await signInWithRedirect(auth, provider);
       return null;
     }
@@ -94,30 +93,30 @@ export const subscribeToAuthChanges = (callback) => {
   return onAuthStateChanged(auth, callback);
 };
 
-// Friendly Error Translator
+// Professional English Error Translator
 export const formatAuthError = (err) => {
   const code = err.code || '';
   switch (code) {
     case 'auth/invalid-credential':
     case 'auth/user-not-found':
     case 'auth/wrong-password':
-      return 'E-posta veya şifre hatalı. Lütfen bilgilerinizi kontrol ediniz.';
+      return 'Invalid email or password. Please verify your credentials and try again.';
     case 'auth/email-already-in-use':
-      return 'Bu e-posta adresi zaten kullanımda. Giriş yapmayı deneyin veya şifrenizi sıfırlayın.';
+      return 'An account with this email address already exists. Please sign in or reset your password.';
     case 'auth/weak-password':
-      return 'Şifre çok zayıf. Şifreniz en az 6 karakter olmalıdır.';
+      return 'Password is too weak. Password must be at least 6 characters long.';
     case 'auth/invalid-email':
-      return 'Geçersiz e-posta adresi biçimi.';
+      return 'Invalid email address format.';
     case 'auth/popup-blocked':
-      return 'Google giriş penceresi engellendi. Lütfen tarayıcı açılır pencere engelleyicisini kapatın.';
+      return 'Google sign-in popup was blocked by your browser. Please allow popups or use email sign-in.';
     case 'auth/popup-closed-by-user':
-      return 'Google giriş penceresi kapatıldı.';
+      return 'Google sign-in popup was closed before completing authentication.';
     case 'auth/unauthorized-domain':
-      return 'Bu alan adı (domain) Firebase Auth kabul listesinde onaylanmamış. Firebase Console > Authentication > Settings bölümünden bu domaini ekleyin.';
+      return 'This domain is not in the Firebase Auth authorized domains list. Please add signallab.site in Firebase Console > Auth > Settings.';
     case 'auth/operation-not-allowed':
-      return 'Google/E-posta ile giriş yöntemi Firebase Console üzerinde henüz aktif edilmemiş. Lütfen Firebase Console > Authentication bölümünden oturum sağlayıcıyı aktif edin.';
+      return 'Sign-in method is not enabled in Firebase Console. Please enable Email/Password and Google in Firebase Console > Authentication.';
     default:
-      return err.message ? err.message.replace('Firebase: ', '') : 'Oturum açma hatası oluştu.';
+      return err.message ? err.message.replace('Firebase: ', '') : 'Authentication failed. Please check your network connection.';
   }
 };
 
