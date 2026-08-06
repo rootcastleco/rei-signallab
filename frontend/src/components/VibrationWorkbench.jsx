@@ -1461,38 +1461,120 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
               </div>
             </div>
           ) : activeTab === 'converter' ? (
-            <div className="win98-outset p-3 bg-[#C0C0C0] text-xs font-mono flex flex-col gap-2">
-              <div className="font-bold text-[#000080] border-b border-[#808080] pb-1">Vibration Unit Converter (RITEC Tool)</div>
-              <div className="grid grid-cols-3 gap-2">
-                <div><label>Value:</label><input type="number" step="0.1" value={convVal} onChange={e => setConvVal(parseFloat(e.target.value))} className="w-full font-mono" /></div>
-                <div>
-                  <label>Input Unit:</label>
-                  <select value={convUnit} onChange={e => setConvUnit(e.target.value)} className="w-full font-mono">
-                    <option value="g_pk">Acceleration (g pk)</option>
-                    <option value="m_s2_rms">Acceleration (m/s² RMS)</option>
-                    <option value="mm_s_rms">Velocity (mm/s RMS)</option>
-                    <option value="um_pk_pk">Displacement (μm pk-pk)</option>
-                  </select>
-                </div>
-                <div><label>Frequency (Hz):</label><input type="number" value={convFreq} onChange={e => setConvFreq(parseFloat(e.target.value))} className="w-full font-mono" /></div>
+            <div className="win98-outset p-3 bg-[#C0C0C0] text-xs font-mono flex flex-col gap-2.5">
+              <div className="font-bold text-[#000080] border-b border-[#808080] pb-1 flex items-center justify-between">
+                <span>Vibration Unit Converter (RITEC Tool)</span>
+                <span className="text-[10px] text-[#008800]">Converts Sine Wave Amplitude across 13 Acceleration, Velocity & Displacement Units</span>
               </div>
-              {(() => {
-                const w = 2 * Math.PI * convFreq;
-                let accRms = 1.0;
-                if (convUnit === 'g_pk') accRms = (convVal * 9.80665) / Math.SQRT2;
-                else if (convUnit === 'm_s2_rms') accRms = convVal;
-                else if (convUnit === 'mm_s_rms') accRms = (convVal / 1000) * w;
-                else if (convUnit === 'um_pk_pk') accRms = ((convVal / 1e6) / (2 * Math.SQRT2)) * (w ** 2);
 
-                const gPk = (accRms * Math.SQRT2) / 9.80665;
-                const velRms = (accRms / w) * 1000;
-                const dispUm = (velRms * Math.SQRT2 / w) * 1000 * 2;
+              {/* Step 1 & Step 2 Layout */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {/* Step 1: Frequency & Amplitude Input */}
+                <div className="bg-[#E0E0E0] p-2 border border-[#808080] flex flex-col gap-1.5">
+                  <div className="font-bold text-[#0000FF] border-b border-[#808080] pb-0.5">Step 1: Enter Frequency & Amplitude</div>
+                  <div className="flex items-center gap-2">
+                    <label className="w-28 text-[11px]">Frequency (Hz):</label>
+                    <input type="number" step="0.1" value={convFreq} onChange={e => setConvFreq(parseFloat(e.target.value) || 50)} className="w-full font-mono text-xs px-1" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="w-28 text-[11px]">Equivalent (RPM):</label>
+                    <input type="text" value={(convFreq * 60).toFixed(1)} disabled className="w-full font-mono text-xs px-1 bg-[#CCCCCC]" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="w-28 text-[11px]">Amplitude Value:</label>
+                    <input type="number" step="0.001" value={convVal} onChange={e => setConvVal(parseFloat(e.target.value) || 1.0)} className="w-full font-mono text-xs px-1" />
+                  </div>
+                </div>
+
+                {/* Step 2: Select Unit & Submit */}
+                <div className="bg-[#E0E0E0] p-2 border border-[#808080] flex flex-col gap-1.5 justify-between">
+                  <div className="font-bold text-[#0000FF] border-b border-[#808080] pb-0.5">Step 2: Select Input Vibration Unit</div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px]">Select Unit of Input Value:</label>
+                    <select value={convUnit} onChange={e => setConvUnit(e.target.value)} className="w-full font-mono text-xs bg-[#FFFFFF] border border-[#808080] p-1">
+                      <option value="acc_g_rms">Acceleration - g's RMS</option>
+                      <option value="acc_g_pk">Acceleration - g's Peak</option>
+                      <option value="acc_in_s2_rms">Acceleration - in/sec² RMS</option>
+                      <option value="acc_in_s2_pk">Acceleration - in/sec² Peak</option>
+                      <option value="acc_mm_s2_rms">Acceleration - mm/sec² RMS</option>
+                      <option value="acc_mm_s2_pk">Acceleration - mm/sec² Peak</option>
+                      <option value="vel_in_s_rms">Velocity - in/s RMS</option>
+                      <option value="vel_in_s_pk">Velocity - in/s Peak</option>
+                      <option value="vel_mm_s_rms">Velocity - mm/s RMS</option>
+                      <option value="vel_mm_s_pk">Velocity - mm/s Peak</option>
+                      <option value="disp_mils_pk_pk">Displacement - mils Peak-Peak</option>
+                      <option value="disp_mm_pk_pk">Displacement - mm Peak-Peak</option>
+                      <option value="disp_um_pk_pk">Displacement - µm Peak-Peak</option>
+                    </select>
+                  </div>
+
+                  <div className="text-[10px] text-[#555555]">
+                    Note: Peak = 1.414 RMS, RMS = 0.707 Peak, Peak-to-Peak = 2×Peak for sine waves.
+                  </div>
+                </div>
+              </div>
+
+              {/* Conversion Results Table for all 13 Units */}
+              {(() => {
+                const w = 2 * Math.PI * (convFreq || 50);
+                const sqrt2 = Math.SQRT2;
+                const val = convVal || 1.0;
+                let accRms = 1.0;
+
+                if (convUnit === 'acc_g_rms') accRms = val * 9.80665;
+                else if (convUnit === 'acc_g_pk') accRms = (val * 9.80665) / sqrt2;
+                else if (convUnit === 'acc_in_s2_rms') accRms = val * 0.0254;
+                else if (convUnit === 'acc_in_s2_pk') accRms = (val * 0.0254) / sqrt2;
+                else if (convUnit === 'acc_mm_s2_rms') accRms = val / 1000.0;
+                else if (convUnit === 'acc_mm_s2_pk') accRms = (val / 1000.0) / sqrt2;
+                else if (convUnit === 'vel_in_s_rms') accRms = (val * 0.0254) * w;
+                else if (convUnit === 'vel_in_s_pk') accRms = ((val * 0.0254) / sqrt2) * w;
+                else if (convUnit === 'vel_mm_s_rms') accRms = (val / 1000.0) * w;
+                else if (convUnit === 'vel_mm_s_pk') accRms = ((val / 1000.0) / sqrt2) * w;
+                else if (convUnit === 'disp_mils_pk_pk') accRms = (((val * 0.0254 / 1000.0) / 2.0) / sqrt2) * (w ** 2);
+                else if (convUnit === 'disp_mm_pk_pk') accRms = (((val / 1000.0) / 2.0) / sqrt2) * (w ** 2);
+                else if (convUnit === 'disp_um_pk_pk') accRms = (((val / 1e6) / 2.0) / sqrt2) * (w ** 2);
+
+                const vRms = accRms / w;
+                const dRms = vRms / w;
+
+                const res = {
+                  acc_g_rms: accRms / 9.80665,
+                  acc_g_pk: (accRms / 9.80665) * sqrt2,
+                  acc_in_s2_rms: accRms / 0.0254,
+                  acc_in_s2_pk: (accRms / 0.0254) * sqrt2,
+                  acc_mm_s2_rms: accRms * 1000.0,
+                  acc_mm_s2_pk: (accRms * 1000.0) * sqrt2,
+                  vel_in_s_rms: vRms / 0.0254,
+                  vel_in_s_pk: (vRms / 0.0254) * sqrt2,
+                  vel_mm_s_rms: vRms * 1000.0,
+                  vel_mm_s_pk: (vRms * 1000.0) * sqrt2,
+                  disp_mils_pk_pk: (dRms * sqrt2 * 2.0) * (1000.0 / 0.0254),
+                  disp_mm_pk_pk: (dRms * sqrt2 * 2.0) * 1000.0,
+                  disp_um_pk_pk: (dRms * sqrt2 * 2.0) * 1e6,
+                };
 
                 return (
-                  <div className="bg-[#000000] text-[#00FF00] p-2 border border-[#808080] grid grid-cols-2 gap-1 mt-1 text-[11px]">
-                    <div>Acceleration: <span className="font-bold text-[#FFFF00]">{gPk.toFixed(3)} g pk</span> ({accRms.toFixed(2)} m/s² RMS)</div>
-                    <div>Velocity: <span className="font-bold text-[#00FFFF]">{velRms.toFixed(2)} mm/s RMS</span> ({(velRms * Math.SQRT2 / 25.4).toFixed(3)} in/s pk)</div>
-                    <div className="col-span-2">Displacement: <span className="font-bold text-[#FF5555]">{dispUm.toFixed(1)} μm pk-pk</span> ({(dispUm / 25.4).toFixed(2)} mils pk-pk)</div>
+                  <div className="bg-[#000000] text-[#00FF00] p-2 border border-[#808080] flex flex-col gap-1.5">
+                    <div className="font-bold text-[#00FFFF] border-b border-[#333333] pb-1 text-[11px]">
+                      Conversion Results for {val} {convUnit} at {convFreq} Hz ({(convFreq * 60).toFixed(0)} RPM):
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] font-mono">
+                      <div className="flex justify-between border-b border-[#222222] py-0.5"><span>Acceleration - g's RMS:</span><span className="font-bold text-[#FFFF00]">{res.acc_g_rms.toFixed(5)} g</span></div>
+                      <div className="flex justify-between border-b border-[#222222] py-0.5"><span>Acceleration - g's Peak:</span><span className="font-bold text-[#FFFF00]">{res.acc_g_pk.toFixed(5)} g</span></div>
+                      <div className="flex justify-between border-b border-[#222222] py-0.5"><span>Acceleration - in/sec² RMS:</span><span className="font-bold">{res.acc_in_s2_rms.toFixed(3)} in/s²</span></div>
+                      <div className="flex justify-between border-b border-[#222222] py-0.5"><span>Acceleration - in/sec² Peak:</span><span className="font-bold">{res.acc_in_s2_pk.toFixed(3)} in/s²</span></div>
+                      <div className="flex justify-between border-b border-[#222222] py-0.5"><span>Acceleration - mm/sec² RMS:</span><span className="font-bold">{res.acc_mm_s2_rms.toFixed(2)} mm/s²</span></div>
+                      <div className="flex justify-between border-b border-[#222222] py-0.5"><span>Acceleration - mm/sec² Peak:</span><span className="font-bold">{res.acc_mm_s2_pk.toFixed(2)} mm/s²</span></div>
+                      <div className="flex justify-between border-b border-[#222222] py-0.5"><span>Velocity - in/s RMS:</span><span className="font-bold text-[#00FFFF]">{res.vel_in_s_rms.toFixed(4)} in/s</span></div>
+                      <div className="flex justify-between border-b border-[#222222] py-0.5"><span>Velocity - in/s Peak:</span><span className="font-bold text-[#00FFFF]">{res.vel_in_s_pk.toFixed(4)} in/s</span></div>
+                      <div className="flex justify-between border-b border-[#222222] py-0.5"><span>Velocity - mm/s RMS:</span><span className="font-bold text-[#00FFFF]">{res.vel_mm_s_rms.toFixed(3)} mm/s</span></div>
+                      <div className="flex justify-between border-b border-[#222222] py-0.5"><span>Velocity - mm/s Peak:</span><span className="font-bold text-[#00FFFF]">{res.vel_mm_s_pk.toFixed(3)} mm/s</span></div>
+                      <div className="flex justify-between border-b border-[#222222] py-0.5"><span>Displacement - mils Pk-Pk:</span><span className="font-bold text-[#FF5555]">{res.disp_mils_pk_pk.toFixed(3)} mils</span></div>
+                      <div className="flex justify-between border-b border-[#222222] py-0.5"><span>Displacement - mm Pk-Pk:</span><span className="font-bold text-[#FF5555]">{res.disp_mm_pk_pk.toFixed(4)} mm</span></div>
+                      <div className="col-span-2 flex justify-between pt-0.5"><span>Displacement - µm Pk-Pk:</span><span className="font-bold text-[#FF5555]">{res.disp_um_pk_pk.toFixed(2)} µm</span></div>
+                    </div>
                   </div>
                 );
               })()}

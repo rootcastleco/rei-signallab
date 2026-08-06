@@ -482,40 +482,92 @@ class VibrationEngine:
         value: float,
         input_unit: str,
         freq_hz: float
-    ) -> Dict[str, float]:
+    ) -> Dict[str, Any]:
         """
-        Vibration Amplitude Unit Converter (RITEC Tool):
-        Converts between Acceleration (g, m/s²), Velocity (mm/s, in/s), and Displacement (μm, mils) at frequency f.
+        Full RITEC Vibration Unit Converter:
+        Converts between 13 standard Vibration Units (Acceleration, Velocity, Displacement in RMS, Peak, Pk-Pk).
         """
         if freq_hz <= 0:
             raise ValueError("CONVERTER_FREQ_INVALID: Frequency must be greater than zero.")
 
         w = 2.0 * np.pi * freq_hz
+        sqrt2 = np.sqrt(2.0)
+        unit_key = input_unit.lower().strip()
 
-        # First convert input value to acceleration in m/s² RMS
-        if input_unit in ["g_pk", "g"]:
-            acc_m_s2_rms = (value * 9.80665) / np.sqrt(2.0)
-        elif input_unit == "m_s2_rms":
+        # Step 1: Convert input value to acceleration in m/s² RMS
+        if unit_key in ["acc_g_rms", "g_rms"]:
+            acc_m_s2_rms = value * 9.80665
+        elif unit_key in ["acc_g_pk", "g_pk", "g"]:
+            acc_m_s2_rms = (value * 9.80665) / sqrt2
+        elif unit_key in ["acc_in_s2_rms"]:
+            acc_m_s2_rms = value * 0.0254
+        elif unit_key in ["acc_in_s2_pk"]:
+            acc_m_s2_rms = (value * 0.0254) / sqrt2
+        elif unit_key in ["acc_mm_s2_rms"]:
+            acc_m_s2_rms = value / 1000.0
+        elif unit_key in ["acc_mm_s2_pk"]:
+            acc_m_s2_rms = (value / 1000.0) / sqrt2
+        elif unit_key in ["acc_m_s2_rms", "m_s2_rms"]:
             acc_m_s2_rms = value
-        elif input_unit == "mm_s_rms":
+        elif unit_key in ["vel_in_s_rms"]:
+            acc_m_s2_rms = (value * 0.0254) * w
+        elif unit_key in ["vel_in_s_pk"]:
+            acc_m_s2_rms = ((value * 0.0254) / sqrt2) * w
+        elif unit_key in ["vel_mm_s_rms", "mm_s_rms"]:
             acc_m_s2_rms = (value / 1000.0) * w
-        elif input_unit == "um_pk_pk":
-            disp_m_rms = (value / 1e6) / (2.0 * np.sqrt(2.0))
+        elif unit_key in ["vel_mm_s_pk"]:
+            acc_m_s2_rms = ((value / 1000.0) / sqrt2) * w
+        elif unit_key in ["disp_mils_pk_pk"]:
+            disp_m_rms = ((value * 0.0254 / 1000.0) / 2.0) / sqrt2
+            acc_m_s2_rms = disp_m_rms * (w**2)
+        elif unit_key in ["disp_mm_pk_pk"]:
+            disp_m_rms = ((value / 1000.0) / 2.0) / sqrt2
+            acc_m_s2_rms = disp_m_rms * (w**2)
+        elif unit_key in ["disp_um_pk_pk", "um_pk_pk"]:
+            disp_m_rms = ((value / 1e6) / 2.0) / sqrt2
             acc_m_s2_rms = disp_m_rms * (w**2)
         else:
             acc_m_s2_rms = value
 
-        acc_g_pk = (acc_m_s2_rms * np.sqrt(2.0)) / 9.80665
-        vel_mm_s_rms = (acc_m_s2_rms / w) * 1000.0
-        disp_um_pk_pk = (vel_mm_s_rms * np.sqrt(2.0) / w) * 1000.0 * 2.0
+        vel_m_s_rms = acc_m_s2_rms / w
+        disp_m_rms = vel_m_s_rms / w
+
+        acc_g_rms = acc_m_s2_rms / 9.80665
+        acc_g_pk = acc_g_rms * sqrt2
+        acc_in_s2_rms = acc_m_s2_rms / 0.0254
+        acc_in_s2_pk = acc_in_s2_rms * sqrt2
+        acc_mm_s2_rms = acc_m_s2_rms * 1000.0
+        acc_mm_s2_pk = acc_mm_s2_rms * sqrt2
+
+        vel_in_s_rms = vel_m_s_rms / 0.0254
+        vel_in_s_pk = vel_in_s_rms * sqrt2
+        vel_mm_s_rms = vel_m_s_rms * 1000.0
+        vel_mm_s_pk = vel_mm_s_rms * sqrt2
+
+        disp_mils_pk_pk = (disp_m_rms * sqrt2 * 2.0) * (1000.0 / 0.0254)
+        disp_mm_pk_pk = (disp_m_rms * sqrt2 * 2.0) * 1000.0
+        disp_um_pk_pk = (disp_m_rms * sqrt2 * 2.0) * 1e6
 
         return {
-            "acceleration_g_pk": round(acc_g_pk, 3),
-            "acceleration_m_s2_rms": round(acc_m_s2_rms, 3),
-            "velocity_mm_s_rms": round(vel_mm_s_rms, 3),
-            "velocity_in_s_pk": round(vel_mm_s_rms * np.sqrt(2.0) / 25.4, 3),
-            "displacement_um_pk_pk": round(disp_um_pk_pk, 2),
-            "displacement_mils_pk_pk": round(disp_um_pk_pk / 25.4, 2)
+            "freq_hz": round(freq_hz, 4),
+            "equivalent_rpm": round(freq_hz * 60.0, 2),
+            "input_value": value,
+            "input_unit": input_unit,
+            "results": {
+                "acc_g_rms": round(acc_g_rms, 6),
+                "acc_g_pk": round(acc_g_pk, 6),
+                "acc_in_s2_rms": round(acc_in_s2_rms, 6),
+                "acc_in_s2_pk": round(acc_in_s2_pk, 6),
+                "acc_mm_s2_rms": round(acc_mm_s2_rms, 6),
+                "acc_mm_s2_pk": round(acc_mm_s2_pk, 6),
+                "vel_in_s_rms": round(vel_in_s_rms, 6),
+                "vel_in_s_pk": round(vel_in_s_pk, 6),
+                "vel_mm_s_rms": round(vel_mm_s_rms, 6),
+                "vel_mm_s_pk": round(vel_mm_s_pk, 6),
+                "disp_mils_pk_pk": round(disp_mils_pk_pk, 6),
+                "disp_mm_pk_pk": round(disp_mm_pk_pk, 6),
+                "disp_um_pk_pk": round(disp_um_pk_pk, 6),
+            }
         }
 
     @classmethod
