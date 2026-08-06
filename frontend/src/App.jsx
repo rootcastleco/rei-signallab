@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText, Layers, AlertTriangle, Gauge } from 'lucide-react';
+import { Activity, BarChart2, Waves, Download, FileSpreadsheet, Cpu, Upload, FileAudio, Code, FolderOpen, Save, FileText, Layers, AlertTriangle, Gauge, Zap, Radio } from 'lucide-react';
 import { safeFetchJson } from './config';
 
 import Oscilloscope from './components/Oscilloscope';
@@ -12,6 +12,8 @@ import LispPluginEditor from './components/LispPluginEditor';
 import PythonLabEditor from './components/PythonLabEditor';
 import NodeGraphStudio from './components/NodeGraphStudio';
 import VibrationWorkbench from './components/VibrationWorkbench';
+import ElectricalWorkbench from './components/ElectricalWorkbench';
+import AntennaWorkbench from './components/AntennaWorkbench';
 
 const PRESETS = {
   SINE_440: {
@@ -360,6 +362,24 @@ export default function App() {
               <Layers size={14} className="text-[#0000FF]" /> 🎛️ Signal Flow Studio <span className="badge-blink">v2.1</span>
             </button>
             <button
+              onClick={() => setActiveView('vibration')}
+              className={`win98-tab font-bold text-xs flex items-center gap-1 ${activeView === 'vibration' ? 'active font-black text-[#000080] bg-[#FFFFCC]' : ''}`}
+            >
+              <Gauge size={14} className="text-[#0000FF]" /> ⚙️ Vibration
+            </button>
+            <button
+              onClick={() => setActiveView('electrical')}
+              className={`win98-tab font-bold text-xs flex items-center gap-1 ${activeView === 'electrical' ? 'active font-black text-[#000080] bg-[#FFFFCC]' : ''}`}
+            >
+              <Zap size={14} className="text-[#FFFF00]" /> ⚡ Electrical
+            </button>
+            <button
+              onClick={() => setActiveView('antenna')}
+              className={`win98-tab font-bold text-xs flex items-center gap-1 ${activeView === 'antenna' ? 'active font-black text-[#000080] bg-[#FFFFCC]' : ''}`}
+            >
+              <Radio size={14} className="text-[#0088FF]" /> 📡 Antenna & RF
+            </button>
+            <button
               onClick={() => setActiveView('python')}
               className={`win98-tab font-bold text-xs flex items-center gap-1 ${activeView === 'python' ? 'active font-black text-[#000080]' : ''}`}
             >
@@ -369,13 +389,13 @@ export default function App() {
               onClick={() => setActiveView('waterfall')}
               className={`win98-tab font-bold text-xs ${activeView === 'waterfall' ? 'active font-black text-[#000080]' : ''}`}
             >
-              🌊 2D Waterfall Spectrogram
+              🌊 Waterfall
             </button>
             <button
               onClick={() => setActiveView('lisp')}
               className={`win98-tab font-bold text-xs ${activeView === 'lisp' ? 'active font-black text-[#000080]' : ''}`}
             >
-              📜 S-Expression DSP DSL
+              📜 Lisp DSL
             </button>
           </div>
 
@@ -494,6 +514,14 @@ export default function App() {
 
             {activeView === 'vibration' && (
               <VibrationWorkbench onVibrationProcessed={(vibData) => setDsp(vibData)} />
+            )}
+
+            {activeView === 'electrical' && (
+              <ElectricalWorkbench />
+            )}
+
+            {activeView === 'antenna' && (
+              <AntennaWorkbench />
             )}
 
             {activeView === 'graph' && (
