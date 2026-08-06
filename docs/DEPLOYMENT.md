@@ -1,6 +1,9 @@
 # REI SignalLab 2.1 — Live Cloud Run & Firebase Deployment Guide
 
-This guide documents the production deployment architecture, GCP Cloud Run containerization, Firebase Hosting `/api/**` proxy rewrites, health monitoring probes, and revision rollback procedures for **REI SignalLab**.
+This guide documents the production deployment architecture, GCP Cloud Run containerization, Firebase Hosting `/api/**` proxy rewrites, health monitoring probes, auto-rollback procedures, and CI/CD quality gates for **REI SignalLab**.
+
+> [!IMPORTANT]
+> Cloud Run and Firebase Hosting deployment infrastructure is configured. Production deployment requires the documented GCP/Firebase secrets and a successful deployment workflow run.
 
 ---
 
@@ -50,7 +53,20 @@ FastAPI Application (Python 3.11 / Uvicorn)
 | Variable | Value | Purpose |
 | :--- | :--- | :--- |
 | `VITE_API_BASE_URL` | `` (empty in prod, `http://localhost:8000` in dev) | Base API path (relative `/api/**` in prod for Firebase proxying) |
-| `VITE_EXPECTED_API_VERSION` | `2.1.0` | Handshake version verification |
+| `VITE_EXPECTED_APP_VERSION` | `2.1.0` | Backend application release version check |
+| `VITE_EXPECTED_API_VERSION` | `v1` | Backend API version check |
+
+### Authentication & Secrets
+
+The deployment pipeline uses **Workload Identity Federation** (WIF) for both Cloud Run and Firebase deployments — no long-lived service account JSON keys are stored in secrets.
+
+Required GitHub repository secrets:
+
+| Secret | Purpose |
+| :--- | :--- |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | WIF provider resource name |
+| `GCP_SERVICE_ACCOUNT` | Google service account email for WIF |
+| `GCP_PROJECT_ID` | GCP project ID (`signallab-3305b`) |
 
 ---
 
@@ -69,11 +85,14 @@ GCP_PROJECT_ID=signallab-3305b GCP_REGION=europe-west1 ./scripts/deploy-cloud-ru
 
 The script automatically:
 1. Validates GCP authentication.
-2. Ensures Artifact Registry repository `rei-signallab` exists.
-3. Builds the production Docker container from [`backend/Dockerfile`](file:///c:/Appdev/rei-signallab/backend/Dockerfile).
-4. Pushes container tags to Artifact Registry.
-5. Deploys to Google Cloud Run with 2 GiB RAM, 2 CPUs, 300s timeout, max 5 instances, non-root user.
-6. Verifies `/api/health/live` and `/api/health/ready` endpoints.
+2. Captures the previous active Cloud Run revision for auto-rollback.
+3. Ensures Artifact Registry repository `rei-signallab` exists.
+4. Builds the production Docker container from [`backend/Dockerfile`](file:///c:/Appdev/rei-signallab/backend/Dockerfile).
+5. Pushes container tags to Artifact Registry.
+6. Passes environment variables via `--env-vars-file` (YAML) to avoid comma-delimiter conflicts.
+7. Deploys to Google Cloud Run with 2 GiB RAM, 2 CPUs, 300s timeout, max 5 instances, non-root user.
+8. Verifies `/api/health/live`, `/api/health/ready`, and `/api/version` with JSON content-type validation.
+9. **Automatically rolls back to the previous revision** if any smoke test fails.
 
 ---
 
@@ -90,7 +109,8 @@ In [`firebase.json`](file:///c:/Appdev/rei-signallab/firebase.json), the `/api/*
         "source": "/api/**",
         "run": {
           "serviceId": "rei-signallab-api",
-          "region": "europe-west1"
+          "region": "europe-west1",
+          "pinTag": true
         }
       },
       {
@@ -105,43 +125,76 @@ In [`firebase.json`](file:///c:/Appdev/rei-signallab/firebase.json), the `/api/*
 Deploy hosting updates:
 
 ```bash
-npx firebase deploy --only hosting
+npx firebase-tools deploy --only hosting --project signallab-3305b --non-interactive
 ```
 
 ---
 
 ## 🧪 5. Health Monitoring & Smoke Test Verification
 
-After deployment, verify the live endpoints via curl:
+After deployment, verify the live endpoints with **JSON content-type validation**:
 
 ```bash
+# JSON-validated health check function
+check_json_endpoint() {
+  local url="$1"
+  local expected_status="$2"
+  local headers body
+
+  headers="$(mktemp)"
+  body="$(mktemp)"
+  trap 'rm -f "${headers}" "${body}"' RETURN
+
+  curl --fail --silent --show-error --location \
+    --dump-header "${headers}" --output "${body}" "${url}"
+
+  grep -qi '^content-type:.*application/json' "${headers}" || {
+    echo "NON_JSON_RESPONSE: ${url}"
+    exit 1
+  }
+
+  jq -e --arg status "${expected_status}" '.status == $status' "${body}" >/dev/null
+}
+
 # 1. Live Probe
-curl -i https://signallab-3305b.web.app/api/health/live
+check_json_endpoint "https://signallab-3305b.web.app/api/health/live" "ok"
 
 # 2. Ready Probe
-curl -i https://signallab-3305b.web.app/api/health/ready
+check_json_endpoint "https://signallab-3305b.web.app/api/health/ready" "ready"
 
-# 3. Version Manifest
-curl -i https://signallab-3305b.web.app/api/version
-
-# 4. Vibration Demo Analysis API Test
-curl -i -X POST https://signallab-3305b.web.app/api/vibration/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"sample_rate": 25600, "rpm": {"manual_rpm": 1500.0}}'
+# 3. Version Manifest (full identity + version + commit validation)
+VERSION_JSON="$(curl --fail --silent --show-error https://signallab-3305b.web.app/api/version)"
+jq -e '
+  .service == "rei-signallab-api" and
+  .version == "2.1.0" and
+  .apiVersion == "v1" and
+  (.commitSha | length > 0)
+' <<<"${VERSION_JSON}" >/dev/null
 ```
 
 ### Verification Criteria
 - Status: `HTTP 200 OK`
-- Header: `Content-Type: application/json`
-- Body: Valid JSON payload (no `<!DOCTYPE html>` or `index.html`).
+- Header: `Content-Type: application/json` (not `text/html`)
+- Body: Valid JSON payload (no `<!DOCTYPE html>` or `index.html`)
+- Version manifest: `service == "rei-signallab-api"`, `version == "2.1.0"`, `apiVersion == "v1"`, `commitSha` is non-empty
 
 ---
 
-## 🔄 6. Revision Rollback Procedures
+## 🔄 6. Auto-Rollback & Manual Rollback Procedures
 
-### Google Cloud Run Rollback
+### Automatic Rollback (CI/CD Pipeline)
 
-If a backend revision exhibits runtime failures:
+The deployment script captures the previous active Cloud Run revision before deploying. If smoke tests fail (HTTP error, non-JSON content-type, or assertion failure), the script automatically shifts 100% traffic back to the previous revision:
+
+```bash
+# Automatic during deploy script:
+gcloud run services update-traffic rei-signallab-api \
+  --region=europe-west1 \
+  --project=signallab-3305b \
+  --to-revisions="${PREVIOUS_REVISION}=100"
+```
+
+### Manual Cloud Run Rollback
 
 ```bash
 # 1. List previous revisions
@@ -156,12 +209,50 @@ gcloud run services update-traffic rei-signallab-api \
 
 ### Firebase Hosting Rollback
 
-If a frontend bundle release breaks compatibility:
-
 ```bash
-# 1. View deployment history in Firebase Console or CLI
-firebase hosting:channels:list
-
-# 2. Roll back to previous hosting version via Firebase Console
+# Roll back to previous hosting version via Firebase Console
 # Console: Hosting -> Release History -> Rollback
 ```
+
+---
+
+## 🛡️ 7. Frontend Handshake State Machine
+
+The frontend runs `verifyBackendHandshake()` on application mount, which validates:
+
+1. **Readiness** — `GET /api/health/ready` returns `{ "status": "ready" }`
+2. **Service identity** — `GET /api/version` returns `{ "service": "rei-signallab-api" }`
+3. **Version compatibility** — `version` and `apiVersion` match expected values
+4. **Build provenance** — `commitSha` is set and not `"environment-derived"`
+
+The titlebar displays one of these states:
+
+| State | Badge | Meaning |
+| :--- | :--- | :--- |
+| `CHECKING` | `CONNECTING...` (grey) | Handshake in progress |
+| `API_VERIFIED` | `✓ API VERIFIED` (green) | All checks passed |
+| `API_VERSION_MISMATCH` | `⚠ VERSION MISMATCH` (orange) | Version incompatibility |
+| `BACKEND_IDENTITY_MISMATCH` | `✗ IDENTITY MISMATCH` (red) | Wrong service identity |
+| `BACKEND_BUILD_UNVERIFIED` | `⚠ BUILD UNVERIFIED` (orange) | Missing commit SHA |
+| `BACKEND_UNAVAILABLE` | `✗ BACKEND UNAVAILABLE` (red) | Backend unreachable |
+
+---
+
+## 🔧 8. CI/CD Quality Gates
+
+### Pull Request CI (`.github/workflows/ci.yml`)
+
+Runs on every pull request to `main`:
+
+1. **Backend Pytest Suite** — 42 golden precision tests
+2. **Frontend Vite Build** — Production bundle compilation
+3. **Docker Container Startup Test** — Builds image, starts container, polls `/api/health/ready`
+
+### Production CD (`.github/workflows/deploy.yml`)
+
+Runs on push to `main`:
+
+1. **Build & Test** — Pytest + Docker startup test + Vite build
+2. **Deploy Cloud Run** — Captures previous revision, deploys new image
+3. **Deploy Firebase** — Builds frontend, deploys hosting with API rewrites
+4. **Production Smoke Test** — JSON content-type validated health checks with auto-rollback on failure

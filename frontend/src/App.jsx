@@ -68,7 +68,7 @@ export default function App() {
   const [dsp, setDsp] = useState(null);
   const [dataTrustMode, setDataTrustMode] = useState('LOCAL_DSP'); // 'API_VERIFIED' | 'LOCAL_DSP' | 'DEMO_MODE'
   const [uploadedFileName, setUploadedFileName] = useState(null);
-  const [connectionState, setConnectionState] = useState('CHECKING'); // 'CHECKING' | 'API_VERIFIED' | 'API_VERSION_MISMATCH' | 'BACKEND_UNAVAILABLE'
+  const [connectionState, setConnectionState] = useState('CHECKING'); // 'CHECKING' | 'API_VERIFIED' | 'API_VERSION_MISMATCH' | 'BACKEND_UNAVAILABLE' | 'BACKEND_IDENTITY_MISMATCH' | 'BACKEND_BUILD_UNVERIFIED'
 
   useEffect(() => {
     let isMounted = true;
@@ -348,6 +348,8 @@ export default function App() {
             {connectionState === 'API_VERIFIED' && <span className="ml-2 text-[10px] bg-[#00AA00] text-white px-1.5 py-0.5 font-bold">✓ API VERIFIED</span>}
             {connectionState === 'API_VERSION_MISMATCH' && <span className="ml-2 text-[10px] bg-[#FF8800] text-black px-1.5 py-0.5 font-bold">⚠ VERSION MISMATCH</span>}
             {connectionState === 'BACKEND_UNAVAILABLE' && <span className="ml-2 text-[10px] bg-[#FF0000] text-white px-1.5 py-0.5 font-bold">✗ BACKEND UNAVAILABLE</span>}
+            {connectionState === 'BACKEND_IDENTITY_MISMATCH' && <span className="ml-2 text-[10px] bg-[#FF0000] text-white px-1.5 py-0.5 font-bold">✗ IDENTITY MISMATCH</span>}
+            {connectionState === 'BACKEND_BUILD_UNVERIFIED' && <span className="ml-2 text-[10px] bg-[#FF8800] text-black px-1.5 py-0.5 font-bold">⚠ BUILD UNVERIFIED</span>}
           </div>
           <div className="flex gap-1">
             <div className="win98-btn-box">_</div>

@@ -4,6 +4,12 @@ on:
   push:
     branches: [ main ]
 
+env:
+  GCP_REGION: europe-west1
+  CLOUD_RUN_SERVICE: rei-signallab-api
+  FIREBASE_PROJECT: signallab-3305b
+  LIVE_URL: https://signallab-3305b.web.app
+
 jobs:
   test-and-build:
     name: Build & Test Artifacts
@@ -38,6 +44,7 @@ jobs:
           echo "🔍 Waiting for container health readiness..."
           for attempt in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:8000/api/health/ready; then
+              echo ""
               echo "✓ Local Docker container startup test passed!"
               exit 0
             fi
@@ -68,6 +75,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    outputs:
+      previous_revision: ${{ steps.capture.outputs.previous_revision }}
     steps:
       - uses: actions/checkout@v4
 
@@ -80,14 +89,24 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Capture previous revision
+        id: capture
+        run: |
+          PREV="$(gcloud run services describe ${{ env.CLOUD_RUN_SERVICE }} \
+            --region=${{ env.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --format='value(status.traffic[0].revisionName)' 2>/dev/null || echo '')"
+          echo "previous_revision=${PREV}" >> "$GITHUB_OUTPUT"
+          echo "📌 Previous revision: ${PREV:-'(first deploy)'}"
+
       - name: Authorize Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ secrets.GCP_REGION || 'europe-west1' }}-docker.pkg.dev --quiet
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
       - name: Build & Deploy to Cloud Run
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-          GCP_REGION: ${{ secrets.GCP_REGION || 'europe-west1' }}
-          CLOUD_RUN_SERVICE: rei-signallab-api
+          GCP_REGION: ${{ env.GCP_REGION }}
+          CLOUD_RUN_SERVICE: ${{ env.CLOUD_RUN_SERVICE }}
           COMMIT_SHA: ${{ github.sha }}
         run: |
           bash scripts/deploy-cloud-run.sh
@@ -96,8 +115,17 @@ jobs:
     name: Deploy to Firebase Hosting
     needs: deploy-cloud-run
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -112,27 +140,126 @@ jobs:
           npm ci
           npm run build
 
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SIGNALLAB_3305B }}
-          channelId: live
-          projectId: signallab-3305b
+      - name: Deploy to Firebase Hosting via ADC
+        run: |
+          npx firebase-tools deploy \
+            --only hosting \
+            --project ${{ env.FIREBASE_PROJECT }} \
+            --non-interactive
 
   production-smoke-test:
-    name: Production Smoke Test
-    needs: deploy-firebase
+    name: Production Smoke Test (JSON-Validated)
+    needs: [deploy-firebase, deploy-cloud-run]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - name: Verify Live Health Endpoints
-        run: |
-          echo "🔍 Checking live health endpoints on Firebase Proxy..."
-          curl -fsS https://signallab-3305b.web.app/api/health/live
-          curl -fsS https://signallab-3305b.web.app/api/health/ready
-          curl -fsS https://signallab-3305b.web.app/api/version
+      - uses: actions/checkout@v4
 
-          echo "🔍 Verifying Vibration API endpoint..."
-          curl -fsS -X POST https://signallab-3305b.web.app/api/vibration/analyze \
-            -H "Content-Type: application/json" \
-            -d '{"sample_rate": 25600, "rpm": {"manual_rpm": 1500.0}}'
+      - name: Authenticate to Google Cloud (for rollback)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK (for rollback)
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Verify Live Health Endpoints (JSON Content-Type + jq Assertions)
+        env:
+          PREVIOUS_REVISION: ${{ needs.deploy-cloud-run.outputs.previous_revision }}
+        run: |
+          set -euo pipefail
+          SMOKE_FAILED=0
+
+          check_json_endpoint() {
+            local url="$1"
+            local expected_status="$2"
+            local label="$3"
+            local headers body
+
+            headers="$(mktemp)"
+            body="$(mktemp)"
+            trap 'rm -f "${headers}" "${body}"' RETURN
+
+            echo "🧪 Verifying ${label} (${url})..."
+
+            if ! curl \
+              --fail \
+              --silent \
+              --show-error \
+              --location \
+              --dump-header "${headers}" \
+              --output "${body}" \
+              "${url}"; then
+              echo "❌ ${label}: HTTP request failed."
+              return 1
+            fi
+
+            if ! grep -qi '^content-type:.*application/json' "${headers}"; then
+              echo "❌ ${label}: NON_JSON_RESPONSE"
+              head -c 500 "${body}"
+              return 1
+            fi
+
+            if ! jq -e --arg status "${expected_status}" '.status == $status' "${body}" >/dev/null 2>&1; then
+              echo "❌ ${label}: Expected status='${expected_status}', got:"
+              jq '.' "${body}" 2>/dev/null || cat "${body}"
+              return 1
+            fi
+
+            echo "✓ ${label} passed."
+          }
+
+          check_json_endpoint \
+            "${{ env.LIVE_URL }}/api/health/live" \
+            "ok" \
+            "Liveness Probe" || SMOKE_FAILED=1
+
+          check_json_endpoint \
+            "${{ env.LIVE_URL }}/api/health/ready" \
+            "ready" \
+            "Readiness Probe" || SMOKE_FAILED=1
+
+          echo "🧪 Verifying Version Manifest..."
+          VERSION_JSON="$(curl --fail --silent --show-error "${{ env.LIVE_URL }}/api/version" 2>/dev/null || echo "")"
+          if [ -z "${VERSION_JSON}" ]; then
+            echo "❌ Version Manifest: HTTP request failed."
+            SMOKE_FAILED=1
+          elif ! jq -e '
+            .service == "rei-signallab-api" and
+            .version == "2.1.0" and
+            .apiVersion == "v1" and
+            (.commitSha | length > 0)
+          ' <<<"${VERSION_JSON}" >/dev/null 2>&1; then
+            echo "❌ Version Manifest assertion failed:"
+            echo "${VERSION_JSON}" | jq '.' 2>/dev/null || echo "${VERSION_JSON}"
+            SMOKE_FAILED=1
+          else
+            echo "✓ Version Manifest passed."
+          fi
+
+          if [ "${SMOKE_FAILED}" -ne 0 ]; then
+            echo ""
+            echo "================================================================="
+            echo " ❌ SMOKE TEST FAILED — INITIATING AUTO-ROLLBACK"
+            echo "================================================================="
+
+            if [ -n "${PREVIOUS_REVISION}" ]; then
+              echo "🔄 Rolling back Cloud Run to: ${PREVIOUS_REVISION}..."
+              gcloud run services update-traffic ${{ env.CLOUD_RUN_SERVICE }} \
+                --region=${{ env.GCP_REGION }} \
+                --project=${{ secrets.GCP_PROJECT_ID }} \
+                --to-revisions="${PREVIOUS_REVISION}=100" || true
+              echo "⚠️  Cloud Run rollback attempted."
+            else
+              echo "⚠️  No previous revision for rollback (first deploy)."
+            fi
+
+            exit 1
+          fi
+
+          echo "================================================================="
+          echo " 🎉 ALL SMOKE TESTS PASSED — PRODUCTION VERIFIED"
+          echo "================================================================="

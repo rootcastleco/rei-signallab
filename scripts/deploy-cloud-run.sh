@@ -37,11 +37,41 @@ if ! gcloud auth print-access-token >/dev/null 2>&1; then
 fi
 echo "✓ Authenticated with GCP."
 
-# 2. Configure Docker Authentication for Artifact Registry
+# 2. Capture Previous Revision for Auto-Rollback
+PREVIOUS_REVISION=""
+if gcloud run services describe "${CLOUD_RUN_SERVICE}" \
+     --region="${GCP_REGION}" \
+     --project="${GCP_PROJECT_ID}" \
+     --format='value(status.traffic[0].revisionName)' >/dev/null 2>&1; then
+  PREVIOUS_REVISION="$(
+    gcloud run services describe "${CLOUD_RUN_SERVICE}" \
+      --region="${GCP_REGION}" \
+      --project="${GCP_PROJECT_ID}" \
+      --format='value(status.traffic[0].revisionName)'
+  )"
+  echo "📌 Previous active revision: ${PREVIOUS_REVISION}"
+else
+  echo "ℹ️  No existing service found; this is a first deployment."
+fi
+
+rollback_cloud_run() {
+  if [ -n "${PREVIOUS_REVISION}" ]; then
+    echo "🔄 Rolling back traffic to previous revision: ${PREVIOUS_REVISION}..."
+    gcloud run services update-traffic "${CLOUD_RUN_SERVICE}" \
+      --region="${GCP_REGION}" \
+      --project="${GCP_PROJECT_ID}" \
+      --to-revisions="${PREVIOUS_REVISION}=100" || true
+    echo "⚠️  Rollback attempted to: ${PREVIOUS_REVISION}"
+  else
+    echo "⚠️  No previous revision available for rollback."
+  fi
+}
+
+# 3. Configure Docker Authentication for Artifact Registry
 echo "🔑 Configuring Docker authentication for Artifact Registry..."
 gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
 
-# 3. Ensure Artifact Registry Repository Exists
+# 4. Ensure Artifact Registry Repository Exists
 IMAGE_TAG="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${REPOSITORY_NAME}/${IMAGE_NAME}:${COMMIT_SHA}"
 IMAGE_LATEST="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${REPOSITORY_NAME}/${IMAGE_NAME}:latest"
 
@@ -55,7 +85,7 @@ if ! gcloud artifacts repositories describe "${REPOSITORY_NAME}" --location="${G
     --project="${GCP_PROJECT_ID}"
 fi
 
-# 4. Build Docker Image
+# 5. Build Docker Image
 echo "🐳 Building backend Docker image..."
 docker build \
   -t "${IMAGE_TAG}" \
@@ -63,12 +93,12 @@ docker build \
   -f backend/Dockerfile \
   backend/
 
-# 5. Push Image to Artifact Registry
+# 6. Push Image to Artifact Registry
 echo "⬆️ Pushing image to Artifact Registry..."
 docker push "${IMAGE_TAG}"
 docker push "${IMAGE_LATEST}"
 
-# 6. Create Temporary Environment Variables YAML File
+# 7. Create Temporary Environment Variables YAML File
 ENV_FILE="$(mktemp)"
 trap 'rm -f "${ENV_FILE}"' EXIT
 
@@ -86,7 +116,7 @@ REQUEST_TIMEOUT_SECONDS: "300"
 LOG_LEVEL: "INFO"
 EOF
 
-# 7. Deploy to Google Cloud Run with --env-vars-file
+# 8. Deploy to Google Cloud Run with --env-vars-file
 echo "☁️ Deploying service to Google Cloud Run (${CLOUD_RUN_SERVICE})..."
 gcloud run deploy "${CLOUD_RUN_SERVICE}" \
   --image="${IMAGE_TAG}" \
@@ -102,26 +132,93 @@ gcloud run deploy "${CLOUD_RUN_SERVICE}" \
   --max-instances=5 \
   --env-vars-file="${ENV_FILE}"
 
-# 8. Get Deployed Service URL
+# 9. Get Deployed Service URL
 SERVICE_URL="$(gcloud run services describe "${CLOUD_RUN_SERVICE}" --region="${GCP_REGION}" --project="${GCP_PROJECT_ID}" --format='value(status.url)')"
 echo "🌐 Deployed Cloud Run Service URL: ${SERVICE_URL}"
 
-# 9. Run Live Health Checks
-echo "🧪 Verifying service liveness (/api/health/live)..."
-LIVE_RES="$(curl -fsS "${SERVICE_URL}/api/health/live" || echo "failed")"
-if [[ "${LIVE_RES}" != *"status"* ]] || [[ "${LIVE_RES}" != *"ok"* ]]; then
-  echo "❌ Health Liveness Check Failed! Response: ${LIVE_RES}"
-  exit 1
-fi
-echo "✓ Liveness check passed."
+# 10. JSON-Validated Health Checks with Auto-Rollback
+check_json_endpoint() {
+  local url="$1"
+  local expected_status="$2"
+  local label="$3"
+  local headers body
 
-echo "🧪 Verifying service readiness (/api/health/ready)..."
-READY_RES="$(curl -fsS "${SERVICE_URL}/api/health/ready" || echo "failed")"
-if [[ "${READY_RES}" != *"status"* ]] || [[ "${READY_RES}" != *"ready"* ]]; then
-  echo "❌ Health Readiness Check Failed! Response: ${READY_RES}"
+  headers="$(mktemp)"
+  body="$(mktemp)"
+  trap 'rm -f "${headers}" "${body}"' RETURN
+
+  echo "🧪 Verifying ${label} (${url})..."
+
+  if ! curl \
+    --fail \
+    --silent \
+    --show-error \
+    --location \
+    --dump-header "${headers}" \
+    --output "${body}" \
+    "${url}"; then
+    echo "❌ ${label}: HTTP request failed."
+    cat "${headers}" 2>/dev/null || true
+    return 1
+  fi
+
+  if ! grep -qi '^content-type:.*application/json' "${headers}"; then
+    echo "❌ ${label}: NON_JSON_RESPONSE — expected application/json."
+    echo "Response headers:"
+    cat "${headers}"
+    echo "Response body (first 500 chars):"
+    head -c 500 "${body}"
+    return 1
+  fi
+
+  if ! jq -e --arg status "${expected_status}" '.status == $status' "${body}" >/dev/null 2>&1; then
+    echo "❌ ${label}: Expected status='${expected_status}', got:"
+    jq '.' "${body}" 2>/dev/null || cat "${body}"
+    return 1
+  fi
+
+  echo "✓ ${label} passed (status=${expected_status}, Content-Type=application/json)."
+}
+
+SMOKE_FAILED=0
+
+check_json_endpoint \
+  "${SERVICE_URL}/api/health/live" \
+  "ok" \
+  "Liveness Probe" || SMOKE_FAILED=1
+
+check_json_endpoint \
+  "${SERVICE_URL}/api/health/ready" \
+  "ready" \
+  "Readiness Probe" || SMOKE_FAILED=1
+
+# Version manifest: validate service identity, version, and commitSha
+echo "🧪 Verifying Version Manifest (${SERVICE_URL}/api/version)..."
+VERSION_JSON="$(curl --fail --silent --show-error "${SERVICE_URL}/api/version" 2>/dev/null || echo "")"
+if [ -z "${VERSION_JSON}" ]; then
+  echo "❌ Version Manifest: HTTP request failed."
+  SMOKE_FAILED=1
+elif ! jq -e '
+  .service == "rei-signallab-api" and
+  .version == "2.1.0" and
+  .apiVersion == "v1" and
+  (.commitSha | length > 0)
+' <<<"${VERSION_JSON}" >/dev/null 2>&1; then
+  echo "❌ Version Manifest: Identity or version assertion failed."
+  echo "${VERSION_JSON}" | jq '.' 2>/dev/null || echo "${VERSION_JSON}"
+  SMOKE_FAILED=1
+else
+  echo "✓ Version Manifest passed."
+fi
+
+if [ "${SMOKE_FAILED}" -ne 0 ]; then
+  echo ""
+  echo "================================================================="
+  echo " ❌ SMOKE TEST FAILED — INITIATING AUTO-ROLLBACK"
+  echo "================================================================="
+  rollback_cloud_run
   exit 1
 fi
-echo "✓ Readiness check passed."
 
 echo "================================================================="
 echo " 🎉 DEPLOYMENT SUCCESSFUL!"
@@ -129,4 +226,5 @@ echo "   - Service URL:     ${SERVICE_URL}"
 echo "   - Live Probe:      ${SERVICE_URL}/api/health/live"
 echo "   - Ready Probe:     ${SERVICE_URL}/api/health/ready"
 echo "   - Version Probe:   ${SERVICE_URL}/api/version"
+echo "   - Previous Rev:    ${PREVIOUS_REVISION:-'(first deploy)'}"
 echo "================================================================="

@@ -48,3 +48,31 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+
+  docker-startup-test:
+    name: Docker Container Startup Test
+    needs: backend-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build & Start Container
+        run: |
+          echo "🐳 Building local test container..."
+          docker build -t rei-signallab-api:test -f backend/Dockerfile backend
+
+          echo "🚀 Starting test container on port 8000..."
+          docker run -d --name rei-api-test -p 8000:8000 -e PORT=8000 rei-signallab-api:test
+          trap 'docker logs rei-api-test; docker rm -f rei-api-test' EXIT
+
+          echo "🔍 Waiting for container health readiness..."
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/api/health/ready; then
+              echo ""
+              echo "✓ Docker container startup test passed!"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "❌ Container startup health check timed out!"
+          exit 1

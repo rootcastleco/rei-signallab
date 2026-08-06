@@ -104,26 +104,61 @@ export const safeFetchJson = async (endpoint, options = {}, timeoutMs = 30000) =
 
 /**
  * Frontend Backend Connection Handshake & State Machine.
- * Validates backend readiness (/api/health/ready) and release version (/api/version).
+ * Validates backend readiness (/api/health/ready), service identity,
+ * release version, API version, and build commit SHA.
  *
- * @returns {Promise<'API_VERIFIED' | 'API_VERSION_MISMATCH' | 'BACKEND_UNAVAILABLE'>} Handshake status
+ * State transitions:
+ *   CHECKING → API_VERIFIED
+ *   CHECKING → BACKEND_UNAVAILABLE
+ *   CHECKING → BACKEND_IDENTITY_MISMATCH
+ *   CHECKING → API_VERSION_MISMATCH
+ *   CHECKING → BACKEND_BUILD_UNVERIFIED
+ *
+ * @returns {Promise<string>} Handshake status
  */
 export const verifyBackendHandshake = async () => {
   try {
-    const expectedVersion = import.meta.env.VITE_EXPECTED_API_VERSION?.trim() || '2.1.0';
+    const expectedAppVersion =
+      import.meta.env.VITE_EXPECTED_APP_VERSION?.trim() || '2.1.0';
 
-    const [readyRes, versionRes] = await Promise.all([
+    const expectedApiVersion =
+      import.meta.env.VITE_EXPECTED_API_VERSION?.trim() || 'v1';
+
+    const [ready, manifest] = await Promise.all([
       safeFetchJson('/api/health/ready', {}, 5000),
-      safeFetchJson('/api/version', {}, 5000)
+      safeFetchJson('/api/version', {}, 5000),
     ]);
 
-    if (readyRes?.status !== 'ready') {
+    // 1. Readiness gate
+    if (ready?.status !== 'ready') {
       return 'BACKEND_UNAVAILABLE';
     }
 
-    if (versionRes?.version && versionRes.version !== expectedVersion) {
-      console.warn(`[Handshake] Version mismatch: expected ${expectedVersion}, got ${versionRes.version}`);
+    // 2. Service identity gate
+    if (manifest?.service !== 'rei-signallab-api') {
+      console.warn('[Handshake] Service identity mismatch:', manifest?.service);
+      return 'BACKEND_IDENTITY_MISMATCH';
+    }
+
+    // 3. Version compatibility gate
+    if (
+      manifest?.version !== expectedAppVersion ||
+      manifest?.apiVersion !== expectedApiVersion
+    ) {
+      console.warn(
+        `[Handshake] Version mismatch: expected app=${expectedAppVersion} api=${expectedApiVersion}, ` +
+        `got app=${manifest?.version} api=${manifest?.apiVersion}`
+      );
       return 'API_VERSION_MISMATCH';
+    }
+
+    // 4. Build provenance gate
+    if (
+      !manifest?.commitSha ||
+      manifest.commitSha === 'environment-derived'
+    ) {
+      console.warn('[Handshake] Build commit SHA not set:', manifest?.commitSha);
+      return 'BACKEND_BUILD_UNVERIFIED';
     }
 
     return 'API_VERIFIED';
