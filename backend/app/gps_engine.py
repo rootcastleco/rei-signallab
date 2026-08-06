@@ -279,7 +279,7 @@ class GpsEngine:
         lon_dm = f"{int(lon_deg_abs):03d}{(lon_deg_abs % 1.0)*60.0:07.4f}"
         lon_hemi = "E" if lon_deg >= 0 else "W"
 
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.timezone.utc)
         time_str = now.strftime("%H%M%S.00")
         num_vis = len(visible_sats)
 

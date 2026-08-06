@@ -2,6 +2,7 @@ from typing import Dict, List, Any, Optional, Set
 from collections import defaultdict, deque
 from pydantic import BaseModel, Field
 
+from ..config import settings
 from .registry import NodeRegistry, NodeSpec
 from .types import CanonicalPortType
 
@@ -43,6 +44,29 @@ class GraphValidator:
             ))
             return ValidationResult(valid=False, errors=errors)
 
+        # 1b. Resource Limits — bounded before any per-node work is done, so an
+        # oversized graph is rejected without consuming scheduler time.
+        if len(nodes_raw) > settings.MAX_GRAPH_NODES:
+            errors.append(ValidationError(
+                code="GRAPH_NODE_LIMIT_EXCEEDED",
+                message=(
+                    f"Graph declares {len(nodes_raw)} nodes, exceeding the maximum "
+                    f"of {settings.MAX_GRAPH_NODES}."
+                )
+            ))
+
+        if len(connections_raw) > settings.MAX_GRAPH_CONNECTIONS:
+            errors.append(ValidationError(
+                code="GRAPH_CONNECTION_LIMIT_EXCEEDED",
+                message=(
+                    f"Graph declares {len(connections_raw)} connections, exceeding the "
+                    f"maximum of {settings.MAX_GRAPH_CONNECTIONS}."
+                )
+            ))
+
+        if errors:
+            return ValidationResult(valid=False, errors=errors)
+
         # 2. Node ID Uniqueness & 3. Node Type Existence
         node_map: Dict[str, Dict[str, Any]] = {}
         spec_map: Dict[str, NodeSpec] = {}
@@ -69,6 +93,20 @@ class GraphValidator:
                 ))
             else:
                 spec_map[nid] = spec
+
+        # 3b. Sandbox Node Budget — one graph must not be able to fan out into an
+        # unbounded number of interpreter subprocesses.
+        sandbox_node_count = sum(
+            1 for spec in spec_map.values() if spec.type == "sandbox.python_exec"
+        )
+        if sandbox_node_count > settings.MAX_SANDBOX_NODES_PER_GRAPH:
+            errors.append(ValidationError(
+                code="GRAPH_SANDBOX_NODE_LIMIT_EXCEEDED",
+                message=(
+                    f"Graph contains {sandbox_node_count} sandbox execution nodes, exceeding "
+                    f"the maximum of {settings.MAX_SANDBOX_NODES_PER_GRAPH}."
+                )
+            ))
 
         if errors:
             return ValidationResult(valid=False, errors=errors)

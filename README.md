@@ -13,7 +13,7 @@
 
 <br/>
 
-[![Live App on Firebase](https://img.shields.io/badge/Live%20App-signallab--3305b.web.app-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://signallab-3305b.web.app)
+[![Live App](https://img.shields.io/badge/Live%20App-signallab.site-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://signallab.site)
 [![PDF User Manual](https://img.shields.io/badge/PDF%20Manual-16--Page%20Wiki-FF0000?style=for-the-badge&logo=adobeacrobatreader&logoColor=white)](docs/wiki/REI_SignalLab_2_1_Product_Wiki.tex)
 [![GitHub Wiki](https://img.shields.io/badge/GitHub-Wiki-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/rootcastleco/rei-signallab/wiki)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
@@ -22,7 +22,7 @@
 [![React 18](https://img.shields.io/badge/React-18.2-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
-[Live Demo](https://signallab-3305b.web.app) | [16-Page PDF User Manual](docs/wiki/REI_SignalLab_2_1_Product_Wiki.tex) | [GitHub Wiki](https://github.com/rootcastleco/rei-signallab/wiki) | [Overview](#overview) | [Screenshots](#application-screenshots) | [Vibration Workbench](#rei-vibration-analysis-workbench) | [Canonical Node Library](#canonical-dsp-node-library) | [Numerical Golden Precision](#numerical-golden-precision-suite) | [API Spec](#api-endpoints-summary) | [Quick Start](#quick-start)
+[Live Demo](https://signallab.site) | [16-Page PDF User Manual](docs/wiki/REI_SignalLab_2_1_Product_Wiki.tex) | [GitHub Wiki](https://github.com/rootcastleco/rei-signallab/wiki) | [Overview](#overview) | [Screenshots](#application-screenshots) | [Vibration Workbench](#rei-vibration-analysis-workbench) | [Canonical Node Library](#canonical-dsp-node-library) | [Numerical Golden Precision](#numerical-golden-precision-suite) | [API Spec](#api-endpoints-summary) | [Quick Start](#quick-start)
 
 </div>
 
@@ -36,8 +36,8 @@
 | :--- | :--- |
 | **Developer** | [Batuhan Ayribas](https://batuhanayribas.com) |
 | **Company** | [RootCastle](https://rootcastle.com) — Engineering Beyond Boundaries |
-| **Live Application** | [signallab-3305b.web.app](https://signallab-3305b.web.app) |
-| **Firebase Mirror** | [signallab-3305b.firebaseapp.com](https://signallab-3305b.firebaseapp.com) |
+| **Live Application** | [signallab.site](https://signallab.site) |
+| **Firebase Mirrors** | [signallab-3305b.web.app](https://signallab-3305b.web.app) · [signallab-3305b.firebaseapp.com](https://signallab-3305b.firebaseapp.com) |
 | **Source Repository** | [github.com/rootcastleco/rei-signallab](https://github.com/rootcastleco/rei-signallab) |
 | **GitHub Wiki** | [github.com/rootcastleco/rei-signallab/wiki](https://github.com/rootcastleco/rei-signallab/wiki) |
 | **Version** | 2.1.0 |
@@ -49,7 +49,7 @@
 
 **REI SignalLab 2.1** is an instrument-grade digital signal processing, spectral analysis, visual node graph flow studio, and industrial vibration analysis workbench. Developed by **[Batuhan Ayribas](https://batuhanayribas.com)** at **[RootCastle](https://rootcastle.com)**, it provides:
 
-1. **Canonical Typed Node Library (`.rei-signal 2.1`)**: Versioned node registry (`GET /api/nodes`) exposing 35+ canonical DSP and Vibration nodes with strictly enforced port data types (`Signal<Real64>`, `Signal<Complex128>`, `SpectrumFrame`, `Scalar<Real64>`, `PatternEvent`).
+1. **Canonical Typed Node Library (`.rei-signal 2.1`)**: Versioned node registry (`GET /api/nodes`) exposing 69 canonical DSP and Vibration nodes with strictly enforced port data types (`Signal<Real64>`, `Signal<Complex128>`, `SpectrumFrame`, `Scalar<Real64>`, `PatternEvent`).
 2. **Kahn Topological Execution Engine (`POST /api/graph/execute`)**: Deterministic graph validation and execution engine with 10-point port compatibility checks, cycle detection, and Kahn's topological scheduler.
 3. **REI Vibration Analysis Workbench**: End-to-end industrial machinery condition monitoring, single-plane complex vector rotor balancing, kinematic bearing defect frequency tracking (BPFO, BPFI, BSF, FTF), Hilbert envelope demodulation, 1X-10X harmonic order spectrum bar view, and rule-based fault classification.
 4. **Numerical Golden Verification Suite**: Comprehensive Pytest suite enforcing IEEE double-precision float64 error $\le 10^{-12}$, FFT/IFFT reconstruction RMS error $\le 10^{-9}$, DCT Type II error $\le 10^{-12}$, and Haar wavelet error $\le 10^{-12}$.
@@ -80,9 +80,9 @@ npx firebase deploy --only hosting
 ### Health Verification Commands
 
 ```bash
-curl -fsS https://signallab-3305b.web.app/api/health/live
-curl -fsS https://signallab-3305b.web.app/api/health/ready
-curl -fsS https://signallab-3305b.web.app/api/version
+curl -fsS https://signallab.site/api/health/live
+curl -fsS https://signallab.site/api/health/ready
+curl -fsS https://signallab.site/api/version
 ```
 
 ---
@@ -223,7 +223,6 @@ All mathematical nodes and algorithms are verified against NumPy/SciPy reference
 | `POST` | `/api/python/execute` | Restricted Python DSP sandbox engine |
 | `POST` | `/api/upload/signal` | Upload `.wav`, `.csv`, `.txt`, `.json` signal files |
 | `POST` | `/api/process` | Processing pipeline (Time, FFT, Metrics, Spectrogram) |
-| `POST` | `/api/render/plot` | Server-side Matplotlib PNG plot renderer |
 | `POST` | `/api/lisp/process` | S-Expression DSP DSL kernel execution |
 | `POST` | `/api/export/wav` | Downloadable 16-bit PCM WAV audio generator |
 

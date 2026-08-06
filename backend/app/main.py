@@ -6,11 +6,12 @@ import wave
 import numpy as np
 from typing import Dict, Any, Optional, List
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, status
+from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile, File, Form, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 
 from app.config import settings
+from app.ratelimit import compute_rate_limit, sandbox_rate_limit, enforce as enforce_rate_limit
 from app.schemas import (
     SignalProcessingRequest,
     LispProcessingRequest,
@@ -77,6 +78,25 @@ async def request_middleware(request: Request, call_next):
             }
         )
 
+    # Global per-caller budget. Route-level buckets narrow this further for
+    # compute and sandbox endpoints.
+    try:
+        enforce_rate_limit(request, "global", settings.RATE_LIMIT_DEFAULT_PER_WINDOW)
+    except HTTPException as exc:
+        # Middleware runs outside the exception-handler chain, so the structured
+        # error envelope is built here.
+        detail = exc.detail if isinstance(exc.detail, dict) else {}
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "code": detail.get("code", "RATE_LIMIT_EXCEEDED"),
+                "message": detail.get("message", "Rate limit exceeded."),
+                "details": detail.get("details"),
+                "requestId": request_id,
+            },
+            headers={**(exc.headers or {}), "X-Request-ID": request_id},
+        )
+
     response = await call_next(request)
     duration_ms = round((time.time() - start_time) * 1000, 2)
 
@@ -108,7 +128,10 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "message": message,
             "details": details,
             "requestId": request_id
-        }
+        },
+        # Preserved so protocol headers set by the raiser survive the envelope
+        # (e.g. Retry-After on a 429).
+        headers=exc.headers or None
     )
 
 
@@ -175,7 +198,7 @@ def validate_graph(request_data: Dict[str, Any]):
     return val_result.model_dump()
 
 
-@app.post("/api/graph/execute")
+@app.post("/api/graph/execute", dependencies=[Depends(compute_rate_limit)])
 def execute_graph(request_data: Dict[str, Any]):
     project = request_data.get("project", request_data)
     migrated_project = ProjectMigrationManager.migrate_to_2_1(project)
@@ -190,7 +213,7 @@ def execute_graph(request_data: Dict[str, Any]):
 
 
 # 7. Time-Domain / Spectral DSP Endpoint
-@app.post("/api/process", response_model=SignalProcessingResponse)
+@app.post("/api/process", response_model=SignalProcessingResponse, dependencies=[Depends(compute_rate_limit)])
 def process_signal(req: SignalProcessingRequest):
     try:
         t, raw_sig = DSPEngine.generate_signal(req.generator)
@@ -245,7 +268,7 @@ def process_signal(req: SignalProcessingRequest):
 
 
 # 8. Signal File Upload Endpoint
-@app.post("/api/upload/signal")
+@app.post("/api/upload/signal", dependencies=[Depends(compute_rate_limit)])
 async def upload_signal(
     file: UploadFile = File(...),
     filter_enabled: bool = Form(False),
@@ -305,16 +328,35 @@ async def upload_signal(
 
 
 # 9. Python Sandbox Script Execution
-@app.post("/api/python/execute")
+@app.post("/api/python/execute", dependencies=[Depends(sandbox_rate_limit)])
 def execute_python_script(req: PythonScriptRequest):
+    if not settings.ENABLE_PYTHON_SANDBOX:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "SANDBOX_DISABLED",
+                "message": (
+                    "The Python DSP Sandbox is disabled on this deployment. "
+                    "It executes user-supplied code and is opt-in via ENABLE_PYTHON_SANDBOX."
+                ),
+            },
+        )
+
     res = PythonSandboxEngine.execute_script(req.python_code)
     if res.get("status") == "error":
-        raise HTTPException(status_code=400, detail=res.get("error"))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "SANDBOX_EXECUTION_FAILED",
+                "message": (res.get("logs") or ["Script execution failed."])[0],
+                "details": {"logs": res.get("logs", [])},
+            },
+        )
     return res
 
 
 # 10. S-Expression DSL Execution
-@app.post("/api/lisp/process")
+@app.post("/api/lisp/process", dependencies=[Depends(compute_rate_limit)])
 def process_lisp_expression(req: LispProcessingRequest):
     try:
         t, raw_sig = DSPEngine.generate_signal(req.generator)
@@ -347,7 +389,7 @@ def process_lisp_expression(req: LispProcessingRequest):
 
 
 # 11. Downloadable WAV Stream
-@app.post("/api/export/wav")
+@app.post("/api/export/wav", dependencies=[Depends(compute_rate_limit)])
 def export_wav(req: SignalProcessingRequest):
     try:
         _, raw_sig = DSPEngine.generate_signal(req.generator)

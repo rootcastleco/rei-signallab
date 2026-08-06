@@ -7,7 +7,9 @@ from typing import Optional
 from app.vibration_schemas import (
     VibrationAnalysisRequest, VibrationAnalysisResponse,
     BalanceInputConfig, BearingConfig, SensorCalibrationConfig,
-    VibrationTimeMetrics, HarmonicOrder, RPMConfig
+    VibrationTimeMetrics, HarmonicOrder, RPMConfig,
+    TwoPlaneBalanceConfig, FourRunNoPhaseConfig, StaticCoupleConfig, SplitWeightConfig,
+    BeltCalculatorConfig, ShaftAlignmentConfig, UnitConversionConfig, SdofSimulatorConfig
 )
 from app.vibration_engine import VibrationEngine, BearingFrequencies
 from app.dsp_engine import DSPEngine
@@ -188,33 +190,33 @@ def balance(config: BalanceInputConfig):
 
 
 @router.post("/balance/two-plane")
-def balance_two_plane(req: dict):
+def balance_two_plane(req: TwoPlaneBalanceConfig):
     try:
-        return VibrationEngine.compute_two_plane_balance(**req)
+        return VibrationEngine.compute_two_plane_balance(**req.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.post("/balance/four-run-nophase")
-def balance_four_run(req: dict):
+def balance_four_run(req: FourRunNoPhaseConfig):
     try:
-        return VibrationEngine.compute_four_run_nophase_balance(**req)
+        return VibrationEngine.compute_four_run_nophase_balance(**req.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.post("/balance/static-couple")
-def balance_static_couple(req: dict):
+def balance_static_couple(req: StaticCoupleConfig):
     try:
-        return VibrationEngine.compute_static_couple_balance(**req)
+        return VibrationEngine.compute_static_couple_balance(**req.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.post("/balance/split-weight")
-def balance_split_weight(req: dict):
+def balance_split_weight(req: SplitWeightConfig):
     try:
-        return VibrationEngine.compute_split_weight_balance(**req)
+        return VibrationEngine.compute_split_weight_balance(**req.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
@@ -263,33 +265,33 @@ async def upload(
 
 
 @router.post("/belt-calculator")
-def compute_belt(req: dict):
+def compute_belt(req: BeltCalculatorConfig):
     try:
-        return VibrationEngine.compute_belt_frequencies(**req)
+        return VibrationEngine.compute_belt_frequencies(**req.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.post("/alignment-calculator")
-def compute_alignment(req: dict):
+def compute_alignment(req: ShaftAlignmentConfig):
     try:
-        return VibrationEngine.compute_shaft_alignment(**req)
+        return VibrationEngine.compute_shaft_alignment(**req.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.post("/unit-converter")
-def compute_unit_converter(req: dict):
+def compute_unit_converter(req: UnitConversionConfig):
     try:
-        return VibrationEngine.compute_vibration_unit_conversion(**req)
+        return VibrationEngine.compute_vibration_unit_conversion(**req.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.post("/sdof-simulator")
-def compute_sdof(req: dict):
+def compute_sdof(req: SdofSimulatorConfig):
     try:
-        return VibrationEngine.compute_sdof_mass_spring_damper(**req)
+        return VibrationEngine.compute_sdof_mass_spring_damper(**req.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 

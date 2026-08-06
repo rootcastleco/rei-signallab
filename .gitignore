@@ -8,6 +8,8 @@ backend/tests/__pycache__/
 # Build outputs
 frontend/dist/
 frontend/node_modules/
+frontend/coverage/
+.firebase/
 
 # OS / IDE
 .DS_Store

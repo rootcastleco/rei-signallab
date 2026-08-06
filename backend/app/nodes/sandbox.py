@@ -16,11 +16,14 @@ class PythonSandboxExecNode(BaseNodeRuntime):
             in_sig = [1.0, 2.0, 3.0, 4.0, 5.0]
             fs = 1000.0
 
-        full_code = f"input_signal = {in_sig}\n" + code
-        res = PythonSandboxEngine.execute_script(full_code)
+        res = PythonSandboxEngine.execute_script(
+            code, variables={"input_signal": in_sig, "sample_rate": fs}
+        )
         meta = FrameMetadata(sample_rate_hz=fs)
 
-        out_data = res.get("data", {}).get("output_signal", in_sig)
+        # The script assigns `output_signal`; if it produced nothing (or the
+        # sandbox rejected the script) the node passes its input through.
+        out_data = res.get("output_signal") or in_sig
         out_arr = np.asarray(out_data, dtype=np.float64)
 
         return {

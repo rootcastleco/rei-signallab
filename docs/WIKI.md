@@ -25,8 +25,8 @@ This wiki describes the public **REI SignalLab 2.1** application and repository.
 
 | Item | Location or Value |
 | :--- | :--- |
-| **Live Application** | [https://signallab-3305b.web.app/](https://signallab-3305b.web.app/) |
-| **Firebase Mirror** | [https://signallab-3305b.firebaseapp.com/](https://signallab-3305b.firebaseapp.com/) |
+| **Live Application** | [https://signallab.site/](https://signallab.site/) |
+| **Firebase Mirrors** | [https://signallab-3305b.web.app/](https://signallab-3305b.web.app/) · [https://signallab-3305b.firebaseapp.com/](https://signallab-3305b.firebaseapp.com/) |
 | **Source Repository** | [https://github.com/rootcastleco/rei-signallab](https://github.com/rootcastleco/rei-signallab) |
 | **Company** | RootCastle — [https://rootcastle.com](https://rootcastle.com) |
 | **License** | MIT License |
@@ -42,7 +42,7 @@ This wiki describes the public **REI SignalLab 2.1** application and repository.
 - FFT magnitude and phase analysis with selectable windows
 - RMS, peak-to-peak, DC, THD, SNR, SINAD, SFDR, ENOB, and fundamental estimates
 - Oscilloscope, spectrum, and spectrogram visualizations
-- 35+ canonical typed DSP and vibration nodes
+- 69 canonical typed DSP and vibration nodes
 - Deterministic Kahn-scheduled node-graph experiments
 - GPS L1 C/A SDR Signal Simulator (`gps-sdr-sim` integration): 1023-chip Gold code, WGS84 orbit kinematics, Doppler shifts, C/N0, GDOP/PDOP/HDOP/VDOP, NMEA stream, and SDR binary export (.bin)
 - Sensor calibration and conversion among acceleration, velocity, and displacement across 13 standard industrial vibration units
@@ -58,8 +58,8 @@ This wiki describes the public **REI SignalLab 2.1** application and repository.
 - Restricted experimental Python execution with plot capture
 - S-expression DSP macro execution
 - CSV and 16-bit mono PCM WAV export
-- Browser audio synthesis and WebSocket signal streaming
-- Server-rendered Matplotlib plot endpoints
+- Browser audio synthesis via the Web Audio API
+- Matplotlib figures rendered inside the Python scripting sandbox
 
 ---
 
@@ -68,7 +68,7 @@ This wiki describes the public **REI SignalLab 2.1** application and repository.
 ### 2.1 Logical Architecture
 
 ```text
-React 18 + Vite (Browser UI)  ──>  FastAPI 2.1 (HTTP + WebSocket)
+React 18 + Vite (Browser UI)  ──>  FastAPI 2.1 (HTTP / REST)
       │                                    │
       ├── Canvas Views + WebAudio          ├── NumPy / SciPy DSP Engine
       └── Local Browser DSP Fallback       ├── Canonical Nodes + Kahn Engine
@@ -117,7 +117,6 @@ Graph project format supporting double-precision canonical signal types (`Signal
 | `POST` | `/api/upload/signal` | File ingestion (.wav, .csv, .txt, .json) |
 | `POST` | `/api/graph/execute` | Kahn topological graph execution |
 | `POST` | `/api/python/execute` | Restricted Python script execution |
-| `POST` | `/api/render/plot` | Server-rendered Matplotlib PNG plot |
 | `POST` | `/api/export/wav` | Downloadable 16-bit PCM WAV audio buffer |
 | `POST` | `/api/dsp-lab/sampling-aliasing` | Sampling theorem & aliasing foldover simulation |
 | `POST` | `/api/dsp-lab/fir-parks-mcclellan` | Parks-McClellan equiripple FIR filter design |
@@ -125,7 +124,6 @@ Graph project format supporting double-precision canonical signal types (`Signal
 | `POST` | `/api/dsp-lab/lms-adaptive` | LMS adaptive noise canceller algorithm |
 | `POST` | `/api/dsp-lab/cwt-scalogram` | Continuous Wavelet Transform (CWT) scalogram |
 | `POST` | `/api/srw/simulate` | SRW Synchrotron & Undulator radiation optics simulation |
-| `WS` | `/ws/stream` | Real-time WebSocket signal streaming |
 
 ---
 

@@ -13,7 +13,7 @@ This guide documents the production deployment architecture, GCP Cloud Run conta
 Browser Client
    │
    ▼
-Firebase Hosting CDN (signallab-3305b.web.app)
+Firebase Hosting CDN (signallab.site)
    │
    ├── Static Web Assets (/assets/**, index.html) → Firebase CDN
    │
@@ -43,10 +43,44 @@ FastAPI Application (Python 3.11 / Uvicorn)
 | `APP_VERSION` | `2.1.0` | Application release version |
 | `COMMIT_SHA` | `${GITHUB_SHA}` | Git commit hash |
 | `BUILD_TIMESTAMP` | `${BUILD_TIMESTAMP}` | ISO UTC build timestamp |
-| `CORS_ALLOWED_ORIGINS` | `https://signallab-3305b.web.app,https://signallab-3305b.firebaseapp.com,http://localhost:5173` | Strict production CORS allowlist |
+| `CORS_ALLOWED_ORIGINS` | `https://signallab.site,https://www.signallab.site,https://signallab-3305b.web.app,https://signallab-3305b.firebaseapp.com` | Strict production CORS allowlist |
 | `MAX_UPLOAD_BYTES` | `26214400` (25 MB) | Maximum HTTP upload payload limit |
 | `MAX_SIGNAL_SAMPLES` | `2000000` | Maximum decoded signal length limit |
+| `MAX_GRAPH_NODES` | `200` | Node ceiling enforced by the graph validator |
+| `MAX_GRAPH_CONNECTIONS` | `500` | Connection ceiling enforced by the graph validator |
 | `REQUEST_TIMEOUT_SECONDS` | `300` | Cloud Run execution timeout cap |
+| `RATE_LIMIT_ENABLED` | `true` | Per-instance request throttling |
+| `RATE_LIMIT_WINDOW_SECONDS` | `60` | Rate limit window length |
+| `RATE_LIMIT_DEFAULT_PER_WINDOW` | `240` | Global budget per caller per window |
+| `RATE_LIMIT_COMPUTE_PER_WINDOW` | `60` | Budget for DSP / graph / export routes |
+| `RATE_LIMIT_SANDBOX_PER_WINDOW` | `10` | Budget for `/api/python/execute` |
+| `ENABLE_PYTHON_SANDBOX` | **`false`** | Executes user-supplied code — see below |
+| `PYTHON_SANDBOX_TIMEOUT_SECONDS` | `8` | Wall-clock kill deadline for a script |
+| `PYTHON_SANDBOX_MEMORY_MB` | `512` | `RLIMIT_AS` ceiling for the sandbox child |
+
+### ⚠️ Python Scripting Sandbox
+
+`POST /api/python/execute` runs code submitted by the caller. It is **disabled by
+default whenever `APP_ENV=production`** and must be opted into explicitly with
+`ENABLE_PYTHON_SANDBOX=true`.
+
+When enabled, each request is screened by a static AST policy
+(`app/sandbox/guard.py`) and then executed in a **separate short-lived process**
+with a wall-clock timeout, `RLIMIT_AS` / `RLIMIT_CPU` ceilings, socket creation
+disabled, and a restricted builtins namespace. No submitted code runs inside the
+API worker.
+
+Before enabling it on a public deployment:
+
+- Run it on a **dedicated Cloud Run service** with its own service account
+  holding no project permissions, so a sandbox escape gains no IAM reach.
+- Set `--memory` to at least `2Gi` — the child process loads its own NumPy /
+  SciPy / Matplotlib and needs headroom beyond `PYTHON_SANDBOX_MEMORY_MB`.
+- Set `--execution-environment=gen2` and mount the root filesystem read-only.
+- Keep `RATE_LIMIT_SANDBOX_PER_WINDOW` low and put authentication in front of it.
+
+The layered guard raises the cost of an escape substantially, but it is not an
+OS-level jail. Treat the service as untrusted and isolate it accordingly.
 
 ### Frontend Environment Variables (`frontend/.env.example`)
 
@@ -159,13 +193,13 @@ check_json_endpoint() {
 }
 
 # 1. Live Probe
-check_json_endpoint "https://signallab-3305b.web.app/api/health/live" "ok"
+check_json_endpoint "https://signallab.site/api/health/live" "ok"
 
 # 2. Ready Probe
-check_json_endpoint "https://signallab-3305b.web.app/api/health/ready" "ready"
+check_json_endpoint "https://signallab.site/api/health/ready" "ready"
 
 # 3. Version Manifest (full identity + version + commit validation)
-VERSION_JSON="$(curl --fail --silent --show-error https://signallab-3305b.web.app/api/version)"
+VERSION_JSON="$(curl --fail --silent --show-error https://signallab.site/api/version)"
 jq -e '
   .service == "rei-signallab-api" and
   .version == "2.1.0" and

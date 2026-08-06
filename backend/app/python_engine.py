@@ -1,167 +1,146 @@
+"""
+Parent-side driver for the Python DSP scripting sandbox.
+
+Scripts are screened by the AST guard and then executed in a short-lived child
+process (`app.sandbox.runner`) with a wall-clock timeout and OS resource limits.
+Nothing from a submitted script runs inside the API worker.
+"""
+
+import json
+import logging
+import os
+import subprocess
 import sys
-import io
-import numpy as np
-from scipy import signal as scipy_signal
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import base64
-from typing import Dict, Any
+from pathlib import Path
+from typing import Any, Dict, Optional
 
-ALLOWED_MODULES = {'numpy', 'np', 'scipy', 'matplotlib', 'plt', 'math', 'random'}
+from app.config import settings
+from app.sandbox.guard import SandboxPolicyError, validate_script
+from app.sandbox.runner import RESULT_SENTINEL
 
-def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
-    root_name = name.split('.')[0]
-    if root_name in ['os', 'sys', 'subprocess', 'socket', 'shutil', 'pathlib']:
-        raise ImportError(f"Importing module '{name}' is prohibited in Python DSP Sandbox.")
-    return __import__(name, globals, locals, fromlist, level)
+logger = logging.getLogger("python_sandbox_engine")
 
-SAFE_BUILTINS = {
-    'abs': abs,
-    'all': all,
-    'any': any,
-    'bin': bin,
-    'bool': bool,
-    'dict': dict,
-    'dir': dir,
-    'divmod': divmod,
-    'enumerate': enumerate,
-    'float': float,
-    'format': format,
-    'hex': hex,
-    'int': int,
-    'isinstance': isinstance,
-    'issubclass': issubclass,
-    'len': len,
-    'list': list,
-    'map': map,
-    'max': max,
-    'min': min,
-    'oct': oct,
-    'ord': ord,
-    'pow': pow,
-    'print': print,
-    'range': range,
-    'repr': repr,
-    'reversed': reversed,
-    'round': round,
-    'set': set,
-    'slice': slice,
-    'sorted': sorted,
-    'str': str,
-    'sum': sum,
-    'tuple': tuple,
-    'zip': zip,
-    'Exception': Exception,
-    'ValueError': ValueError,
-    'TypeError': TypeError,
-    '__import__': safe_import,
-}
+#: Directory containing the `app` package (i.e. `backend/`), used as the
+#: child's working directory so that `python -m app.sandbox.runner` resolves.
+_PACKAGE_PARENT = Path(__file__).resolve().parents[1]
+
+
+def _failure(message: str) -> Dict[str, Any]:
+    return {
+        "status": "error",
+        "logs": [message],
+        "plot_base64": None,
+        "time": [],
+        "raw_signal": [],
+        "filtered_signal": [],
+        "output_signal": None,
+    }
+
 
 class PythonDSPEngine:
     """
-    Hardened Python-based DSP Scripting & Simulation Sandbox Engine.
-    Executes user-defined Python scripts inside a restricted sandbox environment,
-    enforces memory & output quotas, captures console stdout, and generates Matplotlib figures.
+    Out-of-process Python DSP scripting sandbox.
+
+    Executes user scripts under a static AST policy, a wall-clock timeout, a
+    memory ceiling and a restricted namespace, then returns captured console
+    output, an optional rendered Matplotlib figure, and any signal vectors the
+    script assigned to `t`, `raw_signal` and `filtered_signal`.
     """
 
     @staticmethod
-    def execute_script(script_code: str) -> Dict[str, Any]:
-        return PythonDSPEngine.execute_python_script(script_code)
+    def execute_script(
+        script_code: str, variables: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        return PythonDSPEngine.execute_python_script(script_code, variables)
 
     @staticmethod
-    def execute_python_script(script_code: str) -> Dict[str, Any]:
-        forbidden_keywords = ['import os', 'import sys', 'import subprocess', 'import socket', 'shutil', 'eval', 'exec']
-        for kw in forbidden_keywords:
-            if kw in script_code:
-                return {
-                    "status": "error",
-                    "logs": [f"Security Violation: Use of restricted instruction '{kw}' is prohibited in Python DSP Sandbox."],
-                    "plot_base64": None,
-                    "time": [],
-                    "raw_signal": [],
-                    "filtered_signal": []
-                }
+    def execute_python_script(
+        script_code: str, variables: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Run ``script_code`` in the isolated interpreter.
 
-        stdout_buffer = io.StringIO()
-        old_stdout = sys.stdout
-        plt.close('all')
-        plt.figure(figsize=(9, 4), dpi=100)
-        plt.style.use('dark_background')
-
-        exec_globals = {
-            '__builtins__': SAFE_BUILTINS,
-            'np': np,
-            'numpy': np,
-            'scipy_signal': scipy_signal,
-            'signal': scipy_signal,
-            'plt': plt,
-            'matplotlib': matplotlib,
-            't': None,
-            'raw_signal': None,
-            'filtered_signal': None,
-            'sample_rate': 44100
-        }
-
-        logs = []
-        plot_base64 = None
-        time_vector = []
-        raw_signal_list = []
-        filtered_signal_list = []
+        ``variables`` are injected into the script's namespace as values — use
+        it instead of formatting data into the source, which both inflates the
+        script past the size cap and lets data influence parsing.
+        """
+        if not settings.ENABLE_PYTHON_SANDBOX:
+            return _failure(
+                "Python DSP Sandbox is disabled on this deployment. "
+                "Set ENABLE_PYTHON_SANDBOX=true on an isolated instance to enable it."
+            )
 
         try:
-            sys.stdout = stdout_buffer
-            exec(script_code, exec_globals)
-            sys.stdout = old_stdout
-            console_out = stdout_buffer.getvalue()
+            validate_script(script_code, max_bytes=settings.PYTHON_SANDBOX_MAX_CODE_BYTES)
+        except SandboxPolicyError as exc:
+            return _failure(f"Security Violation: {exc}")
 
-            if len(console_out) > 5 * 1024 * 1024:
-                console_out = console_out[:5 * 1024 * 1024] + "\n[Output Truncated: 5MB Cap Exceeded]"
+        job = json.dumps(
+            {
+                "code": script_code,
+                "variables": variables or {},
+                "memory_mb": settings.PYTHON_SANDBOX_MEMORY_MB,
+                "cpu_seconds": int(settings.PYTHON_SANDBOX_TIMEOUT_SECONDS) + 2,
+                "max_output_bytes": settings.PYTHON_SANDBOX_MAX_OUTPUT_BYTES,
+            }
+        )
 
-            if console_out:
-                for line in console_out.strip().splitlines()[:200]:
-                    logs.append(line)
-            else:
-                logs.append("Python DSP Script executed successfully.")
-
-            fig = plt.gcf()
-            if len(fig.axes) > 0:
-                fig.patch.set_facecolor('#0D1117')
-                buf = io.BytesIO()
-                plt.savefig(buf, format='png', bbox_inches='tight', facecolor=fig.get_facecolor())
-                buf.seek(0)
-                plot_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-
-            if exec_globals.get('t') is not None:
-                t_arr = np.array(exec_globals['t'], dtype=np.float64)
-                time_vector = t_arr.tolist()
-
-            if exec_globals.get('raw_signal') is not None:
-                raw_arr = np.array(exec_globals['raw_signal'], dtype=np.float64)
-                raw_signal_list = raw_arr.tolist()
-
-            if exec_globals.get('filtered_signal') is not None:
-                filt_arr = np.array(exec_globals['filtered_signal'], dtype=np.float64)
-                filtered_signal_list = filt_arr.tolist()
-            elif len(raw_signal_list) > 0:
-                filtered_signal_list = raw_signal_list
-
-            status = "success"
-
-        except Exception as e:
-            sys.stdout = old_stdout
-            logs.append(f"Python Execution Error: {str(e)}")
-            status = "error"
-        finally:
-            plt.close('all')
-
-        return {
-            "status": status,
-            "logs": logs,
-            "plot_base64": plot_base64,
-            "time": time_vector,
-            "raw_signal": raw_signal_list,
-            "filtered_signal": filtered_signal_list
+        child_env = {
+            key: value
+            for key, value in os.environ.items()
+            if key in ("PATH", "LANG", "LC_ALL", "SYSTEMROOT", "TEMP", "TMP", "TMPDIR")
         }
+        child_env["PYTHONPATH"] = str(_PACKAGE_PARENT)
+        child_env["PYTHONDONTWRITEBYTECODE"] = "1"
+        child_env["MPLBACKEND"] = "Agg"
+
+        try:
+            completed = subprocess.run(
+                [sys.executable, "-m", "app.sandbox.runner"],
+                input=job,
+                capture_output=True,
+                text=True,
+                cwd=str(_PACKAGE_PARENT),
+                env=child_env,
+                timeout=settings.PYTHON_SANDBOX_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            return _failure(
+                f"Execution Timeout: script exceeded the "
+                f"{settings.PYTHON_SANDBOX_TIMEOUT_SECONDS:g}s sandbox limit and was terminated."
+            )
+        except OSError as exc:
+            logger.error("Sandbox subprocess could not be started: %s", exc, exc_info=True)
+            return _failure("Sandbox Unavailable: the isolated interpreter could not be started.")
+
+        result = _parse_child_output(completed.stdout)
+        if result is not None:
+            return result
+
+        logger.error(
+            "Sandbox child produced no parsable result (exit=%s stderr=%s)",
+            completed.returncode,
+            completed.stderr[-2000:],
+        )
+        if completed.returncode and completed.returncode < 0:
+            return _failure(
+                f"Sandbox Terminated: the interpreter was killed by signal {-completed.returncode} "
+                "(most likely the memory or CPU limit)."
+            )
+        return _failure("Sandbox Failure: the isolated interpreter returned no result.")
+
+
+def _parse_child_output(stdout: str) -> Optional[Dict[str, Any]]:
+    """Extract the JSON payload written after the runner's sentinel line."""
+    marker = f"\n{RESULT_SENTINEL}\n"
+    index = stdout.rfind(marker)
+    if index == -1:
+        return None
+    try:
+        payload = json.loads(stdout[index + len(marker):])
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
 
 PythonSandboxEngine = PythonDSPEngine

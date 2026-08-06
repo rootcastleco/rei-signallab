@@ -117,6 +117,35 @@ class SplitWeightConfig(BaseModel):
     hole1_angle_deg: float
     hole2_angle_deg: float
 
+class BeltCalculatorConfig(BaseModel):
+    driver_pulley_d1_mm: float = Field(gt=0)
+    driven_pulley_d2_mm: float = Field(gt=0)
+    belt_length_l_mm: float = Field(gt=0)
+    driver_rpm: float = Field(gt=0, le=200000)
+
+class ShaftAlignmentConfig(BaseModel):
+    coupling_diameter_dr_mm: float = Field(gt=0)
+    dist_coupling_to_front_feet_l1_mm: float = Field(gt=0)
+    dist_coupling_to_rear_feet_l2_mm: float = Field(gt=0)
+    rim_top: float
+    rim_bottom: float
+    face_top: float
+    face_bottom: float
+
+class UnitConversionConfig(BaseModel):
+    value: float
+    input_unit: str = Field(min_length=1)
+    freq_hz: float = Field(gt=0)
+
+class SdofSimulatorConfig(BaseModel):
+    mass_kg: float = Field(gt=0)
+    stiffness_n_m: float = Field(gt=0)
+    damping_c_n_s_m: float = Field(ge=0)
+    x0_m: float = Field(default=0.01)
+    v0_m_s: float = Field(default=0.0)
+    duration_s: float = Field(default=1.0, gt=0, le=60)
+    fs: float = Field(default=1000.0, gt=0, le=200000)
+
 class VibrationAnalysisRequest(BaseModel):
     signal_data: Optional[List[float]] = Field(default=None)
     sample_rate: int = Field(default=25600, ge=100, le=200000)
