@@ -15,10 +15,22 @@ from .vibration import (
     OverallRMSNode, PeakNode, CrestFactorNode, KurtosisNode,
     BearingFrequenciesNode, EnvelopeAnalysisNode, SinglePlaneBalancingNode, FaultClassifierNode
 )
+from .electrical import ElectricalPowerMetricsNode, ElectricalSymmetricalComponentsNode
+from .antenna import AntennaVswrNode, AntennaFriisNode, AntennaWaveguideNode
+from .gps import GpsGoldCodeNode, GpsGeodeticToEcefNode, GpsConstellationSimNode
+from .srw import SrwBeamKinematicsNode, SrwWavefrontIntensityNode
+from .unpingco import (
+    DspLabAliasingNode, DspLabParksMcClellanNode, DspLabAutocorrPitchNode,
+    DspLabLmsAdaptiveCancellerNode, DspLabCwtScalogramNode
+)
+from .sandbox import PythonSandboxExecNode
 
 class NodeFactory:
     """
     Central Node Factory mapping canonical node type strings to NodeRuntime classes.
+    Supports all domain modules: Analysis, Arithmetic, Converters, Filters, Generic, Generators,
+    Meters, Timing, Transformations, Visualization, Vibration Analysis, Electrical Power Quality,
+    Antenna & RF Waveguide, GPS SDR Simulation, SRW Synchrotron Radiation, DSP Lab, and Python Sandbox.
     """
     _mapping: Dict[str, Type[BaseNodeRuntime]] = {
         # Analysis
@@ -94,7 +106,35 @@ class NodeFactory:
         "vibration.bearing_frequencies": BearingFrequenciesNode,
         "vibration.envelope_analysis": EnvelopeAnalysisNode,
         "vibration.balance.single_plane": SinglePlaneBalancingNode,
-        "vibration.fault_classifier": FaultClassifierNode
+        "vibration.fault_classifier": FaultClassifierNode,
+
+        # Electrical Power Engineering
+        "electrical.power_metrics": ElectricalPowerMetricsNode,
+        "electrical.symmetrical_components": ElectricalSymmetricalComponentsNode,
+
+        # Antenna & RF Waveguide
+        "antenna.vswr_return_loss": AntennaVswrNode,
+        "antenna.friis_link_budget": AntennaFriisNode,
+        "antenna.waveguide_cutoff": AntennaWaveguideNode,
+
+        # GPS SDR Simulation
+        "gps.gold_code_gen": GpsGoldCodeNode,
+        "gps.geodetic_to_ecef": GpsGeodeticToEcefNode,
+        "gps.constellation_sim": GpsConstellationSimNode,
+
+        # SRW Synchrotron Radiation
+        "srw.beam_kinematics": SrwBeamKinematicsNode,
+        "srw.wavefront_intensity": SrwWavefrontIntensityNode,
+
+        # DSP Lab / Unpingco Workbench
+        "dsp_lab.aliasing_simulator": DspLabAliasingNode,
+        "dsp_lab.parks_mcclellan_fir": DspLabParksMcClellanNode,
+        "dsp_lab.autocorr_pitch": DspLabAutocorrPitchNode,
+        "dsp_lab.lms_adaptive_canceller": DspLabLmsAdaptiveCancellerNode,
+        "dsp_lab.cwt_scalogram": DspLabCwtScalogramNode,
+
+        # Sandbox Python Execution
+        "sandbox.python_exec": PythonSandboxExecNode
     }
 
     @classmethod

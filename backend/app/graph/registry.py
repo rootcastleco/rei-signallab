@@ -331,7 +331,7 @@ def _init_registry():
             "output_max": {"type": "number", "default": 100.0},
             "clamp": {"type": "boolean", "default": True}
         },
-        documentation="Linear range mapping with optional clamping: out = out_min + ((x - in_min)/(in_max - in_min))*(out_max - out_min)."
+        documentation="Linear range mapping with optional clamping."
     ))
 
     # 4. Filters
@@ -398,12 +398,12 @@ def _init_registry():
     NodeRegistry.register(NodeSpec(
         type="filter.median",
         category="Filters",
-        display_name="Median Filter (Spike & Noise Removal)",
+        display_name="Median Filter (Spike Removal)",
         aliases=["SLMedian"],
         input_ports=[PortSpec(name="signal_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Noisy Signal")],
         output_ports=[PortSpec(name="signal_out", data_type=CanonicalPortType.SIGNAL_REAL64, description="Median Filtered Signal")],
         parameter_schema={"kernel_size": {"type": "integer", "default": 5}},
-        documentation="Non-linear median filter for spike and salt-and-pepper impulse noise removal."
+        documentation="Non-linear median filter for spike noise removal."
     ))
 
     NodeRegistry.register(NodeSpec(
@@ -429,7 +429,7 @@ def _init_registry():
         documentation="Stateful sample delay buffer."
     ))
 
-    # 5. Generic Restricted Expression Filter
+    # 5. Generic / Custom AST Expression
     NodeRegistry.register(NodeSpec(
         type="generic.real_value_filter",
         category="Custom",
@@ -438,7 +438,7 @@ def _init_registry():
         input_ports=[PortSpec(name="signal_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Input Signal x")],
         output_ports=[PortSpec(name="signal_out", data_type=CanonicalPortType.SIGNAL_REAL64, description="Evaluated Expression Output")],
         parameter_schema={"expression": {"type": "string", "default": "sin(2 * 3.14159 * 440 * t) + 0.5 * x"}},
-        documentation="Evaluates mathematical expressions safely using restricted AST evaluator (x, index, sample_rate, sin, cos, sqrt, abs, exp)."
+        documentation="Evaluates mathematical expressions safely using restricted AST evaluator."
     ))
 
     # 6. Generators
@@ -639,7 +639,7 @@ def _init_registry():
         input_ports=[PortSpec(name="acceleration_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Acceleration Signal (m/s² or g)")],
         output_ports=[PortSpec(name="velocity_out", data_type=CanonicalPortType.SIGNAL_REAL64, description="Velocity Signal (mm/s RMS)")],
         parameter_schema={"high_pass_cutoff_hz": {"type": "number", "default": 10.0}},
-        documentation="Frequency-domain high-pass regularized integration without low-frequency drift."
+        documentation="Frequency-domain high-pass regularized integration."
     ))
 
     NodeRegistry.register(NodeSpec(
@@ -651,6 +651,50 @@ def _init_registry():
         output_ports=[PortSpec(name="displacement_out", data_type=CanonicalPortType.SIGNAL_REAL64, description="Displacement Signal (μm)")],
         parameter_schema={"high_pass_cutoff_hz": {"type": "number", "default": 10.0}},
         documentation="Frequency-domain integration from velocity to displacement."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="vibration.overall_rms",
+        category="Vibration Analysis",
+        display_name="Vibration Overall RMS Meter",
+        aliases=["SLVibOverallRMS"],
+        input_ports=[PortSpec(name="signal_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Vibration Signal")],
+        output_ports=[PortSpec(name="rms", data_type=CanonicalPortType.SCALAR_REAL64, description="Overall RMS Value")],
+        parameter_schema={},
+        documentation="Computes overall RMS acceleration or velocity value."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="vibration.peak",
+        category="Vibration Analysis",
+        display_name="Vibration Peak Amplitude Meter",
+        aliases=["SLVibPeak"],
+        input_ports=[PortSpec(name="signal_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Vibration Signal")],
+        output_ports=[PortSpec(name="peak", data_type=CanonicalPortType.SCALAR_REAL64, description="Peak Amplitude Value")],
+        parameter_schema={},
+        documentation="Finds peak absolute amplitude value."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="vibration.crest_factor",
+        category="Vibration Analysis",
+        display_name="Vibration Crest Factor Meter",
+        aliases=["SLVibCrestFactor"],
+        input_ports=[PortSpec(name="signal_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Vibration Signal")],
+        output_ports=[PortSpec(name="crest_factor", data_type=CanonicalPortType.SCALAR_REAL64, description="Crest Factor (Peak/RMS)")],
+        parameter_schema={},
+        documentation="Computes Crest Factor (Peak/RMS) ratio for impact detection."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="vibration.kurtosis",
+        category="Vibration Analysis",
+        display_name="Vibration Kurtosis Indicator",
+        aliases=["SLVibKurtosis"],
+        input_ports=[PortSpec(name="signal_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Vibration Signal")],
+        output_ports=[PortSpec(name="kurtosis", data_type=CanonicalPortType.SCALAR_REAL64, description="Statistical Kurtosis")],
+        parameter_schema={},
+        documentation="Computes statistical kurtosis (4th standardized moment) for early fatigue/bearing fault detection."
     ))
 
     NodeRegistry.register(NodeSpec(
@@ -715,6 +759,304 @@ def _init_registry():
         output_ports=[PortSpec(name="diagnostics", data_type=CanonicalPortType.STRUCTURED_FRAME, description="Diagnostic Evidence List")],
         parameter_schema={"rpm": {"type": "number", "default": 1480.0}, "rms_vel_mm_s": {"type": "number", "default": 3.5}},
         documentation="Evaluates spectral evidence for Unbalance, Misalignment, Looseness, and Bearing Defect."
+    ))
+
+    # 12. Electrical Power Engineering Nodes
+    NodeRegistry.register(NodeSpec(
+        type="electrical.power_metrics",
+        category="Electrical Power",
+        display_name="Electrical Power Quality Analyzer",
+        aliases=["SLElecPowerMetrics"],
+        input_ports=[
+            PortSpec(name="voltage_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Voltage Waveform (V)"),
+            PortSpec(name="current_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Current Waveform (A)")
+        ],
+        output_ports=[
+            PortSpec(name="power_metrics", data_type=CanonicalPortType.STRUCTURED_FRAME, description="Power Metrics Object"),
+            PortSpec(name="v_rms", data_type=CanonicalPortType.SCALAR_REAL64, description="Voltage RMS (V)"),
+            PortSpec(name="i_rms", data_type=CanonicalPortType.SCALAR_REAL64, description="Current RMS (A)"),
+            PortSpec(name="active_power_w", data_type=CanonicalPortType.SCALAR_REAL64, description="Active Power (W)"),
+            PortSpec(name="reactive_power_var", data_type=CanonicalPortType.SCALAR_REAL64, description="Reactive Power (var)"),
+            PortSpec(name="apparent_power_va", data_type=CanonicalPortType.SCALAR_REAL64, description="Apparent Power (VA)"),
+            PortSpec(name="power_factor", data_type=CanonicalPortType.SCALAR_REAL64, description="Power Factor cos(φ)"),
+            PortSpec(name="thd_v_percent", data_type=CanonicalPortType.SCALAR_REAL64, description="THD Voltage (%)"),
+            PortSpec(name="thd_i_percent", data_type=CanonicalPortType.SCALAR_REAL64, description="THD Current (%)")
+        ],
+        parameter_schema={},
+        documentation="Calculates V_rms, I_rms, Active P, Reactive Q, Apparent S, Power Factor, and THD_v / THD_i."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="electrical.symmetrical_components",
+        category="Electrical Power",
+        display_name="Fortescue 3-Phase Symmetrical Components",
+        aliases=["SLElecSymComp"],
+        input_ports=[
+            PortSpec(name="va_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Phase A Voltage"),
+            PortSpec(name="vb_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Phase B Voltage"),
+            PortSpec(name="vc_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Phase C Voltage")
+        ],
+        output_ports=[
+            PortSpec(name="symmetrical_components", data_type=CanonicalPortType.STRUCTURED_FRAME, description="Symmetrical Components Frame"),
+            PortSpec(name="v0_magnitude", data_type=CanonicalPortType.SCALAR_REAL64, description="Zero Sequence V0 (V)"),
+            PortSpec(name="v1_magnitude", data_type=CanonicalPortType.SCALAR_REAL64, description="Positive Sequence V1 (V)"),
+            PortSpec(name="v2_magnitude", data_type=CanonicalPortType.SCALAR_REAL64, description="Negative Sequence V2 (V)"),
+            PortSpec(name="unbalance_factor_percent", data_type=CanonicalPortType.SCALAR_REAL64, description="Voltage Unbalance Factor VUF (%)")
+        ],
+        parameter_schema={},
+        documentation="Calculates Fortescue symmetrical components (V0, V1, V2) and Voltage Unbalance Factor (VUF)."
+    ))
+
+    # 13. Antenna & RF Waveguide Nodes
+    NodeRegistry.register(NodeSpec(
+        type="antenna.vswr_return_loss",
+        category="Antenna & RF",
+        display_name="VSWR & Return Loss Calculator",
+        aliases=["SLAntVswr"],
+        output_ports=[
+            PortSpec(name="vswr", data_type=CanonicalPortType.SCALAR_REAL64, description="Voltage Standing Wave Ratio (VSWR)"),
+            PortSpec(name="s11_db", data_type=CanonicalPortType.SCALAR_REAL64, description="Return Loss S11 (dB)"),
+            PortSpec(name="gamma_magnitude", data_type=CanonicalPortType.SCALAR_REAL64, description="Reflection Coefficient Mag |Γ|"),
+            PortSpec(name="gamma_phase_deg", data_type=CanonicalPortType.SCALAR_REAL64, description="Reflection Coefficient Phase (°)")
+        ],
+        parameter_schema={
+            "r_load": {"type": "number", "default": 75.0},
+            "x_load": {"type": "number", "default": 25.0},
+            "z0": {"type": "number", "default": 50.0}
+        },
+        documentation="Calculates VSWR, S11 Return Loss, and complex reflection coefficient Γ for load impedance Z_L = R + jX."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="antenna.friis_link_budget",
+        category="Antenna & RF",
+        display_name="Friis Transmission Link Budget",
+        aliases=["SLAntFriis"],
+        output_ports=[
+            PortSpec(name="link_budget", data_type=CanonicalPortType.STRUCTURED_FRAME, description="Full Link Budget Object"),
+            PortSpec(name="path_loss_db", data_type=CanonicalPortType.SCALAR_REAL64, description="Free Space Path Loss FSPL (dB)"),
+            PortSpec(name="received_power_dbm", data_type=CanonicalPortType.SCALAR_REAL64, description="Received Power Pr (dBm)"),
+            PortSpec(name="link_margin_db", data_type=CanonicalPortType.SCALAR_REAL64, description="Link Margin (dB)")
+        ],
+        parameter_schema={
+            "tx_power_dbm": {"type": "number", "default": 30.0},
+            "tx_gain_dbi": {"type": "number", "default": 2.15},
+            "rx_gain_dbi": {"type": "number", "default": 2.15},
+            "frequency_mhz": {"type": "number", "default": 2400.0},
+            "distance_km": {"type": "number", "default": 1.0},
+            "rx_sensitivity_dbm": {"type": "number", "default": -90.0}
+        },
+        documentation="Calculates Free Space Path Loss (FSPL), Received Power P_r, and Link Margin via Friis Equation."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="antenna.waveguide_cutoff",
+        category="Antenna & RF",
+        display_name="Rectangular Waveguide Cutoff Frequency",
+        aliases=["SLAntWaveguide"],
+        output_ports=[
+            PortSpec(name="cutoff_freq_ghz", data_type=CanonicalPortType.SCALAR_REAL64, description="Cutoff Frequency fc (GHz)"),
+            PortSpec(name="guide_wavelength_mm", data_type=CanonicalPortType.SCALAR_REAL64, description="Guide Wavelength λg (mm)")
+        ],
+        parameter_schema={
+            "a_dim_mm": {"type": "number", "default": 22.86},
+            "b_dim_mm": {"type": "number", "default": 10.16},
+            "mode_m": {"type": "integer", "default": 1},
+            "mode_n": {"type": "integer", "default": 0},
+            "operating_freq_ghz": {"type": "number", "default": 10.0}
+        },
+        documentation="Calculates cutoff frequency fc and guide wavelength λg for rectangular waveguide modes TE_mn / TM_mn."
+    ))
+
+    # 14. GPS SDR Simulation Nodes
+    NodeRegistry.register(NodeSpec(
+        type="gps.gold_code_gen",
+        category="GPS SDR",
+        display_name="GPS C/A Gold Code Generator (PRN 1-32)",
+        aliases=["SLGpsGoldCode"],
+        output_ports=[PortSpec(name="gold_code_signal", data_type=CanonicalPortType.SIGNAL_REAL64, description="1023-Chip Gold Code Sequence")],
+        parameter_schema={"prn": {"type": "integer", "default": 1}},
+        documentation="Generates 1023-chip GPS C/A Gold Code sequence (+1 / -1) for specified PRN (1 to 32)."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="gps.geodetic_to_ecef",
+        category="GPS SDR",
+        display_name="WGS-84 Geodetic to ECEF Coordinate Converter",
+        aliases=["SLGpsEcef"],
+        output_ports=[
+            PortSpec(name="ecef_coords", data_type=CanonicalPortType.STRUCTURED_FRAME, description="ECEF Coordinates Object"),
+            PortSpec(name="ecef_x_m", data_type=CanonicalPortType.SCALAR_REAL64, description="ECEF X (m)"),
+            PortSpec(name="ecef_y_m", data_type=CanonicalPortType.SCALAR_REAL64, description="ECEF Y (m)"),
+            PortSpec(name="ecef_z_m", data_type=CanonicalPortType.SCALAR_REAL64, description="ECEF Z (m)")
+        ],
+        parameter_schema={
+            "latitude_deg": {"type": "number", "default": 41.0082},
+            "longitude_deg": {"type": "number", "default": 28.9784},
+            "altitude_m": {"type": "number", "default": 50.0}
+        },
+        documentation="Converts WGS-84 Geodetic coordinates (lat, lon, alt) to Earth-Centered Earth-Fixed (ECEF X, Y, Z)."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="gps.constellation_sim",
+        category="GPS SDR",
+        display_name="GPS Constellation Orbital Simulator",
+        aliases=["SLGpsConstellation"],
+        output_ports=[
+            PortSpec(name="constellation_status", data_type=CanonicalPortType.STRUCTURED_FRAME, description="Constellation State Object"),
+            PortSpec(name="visible_satellites", data_type=CanonicalPortType.SCALAR_INT64, description="Visible Satellite Count"),
+            PortSpec(name="pdop", data_type=CanonicalPortType.SCALAR_REAL64, description="Position DOP (PDOP)"),
+            PortSpec(name="gdop", data_type=CanonicalPortType.SCALAR_REAL64, description="Geometric DOP (GDOP)")
+        ],
+        parameter_schema={
+            "user_lat": {"type": "number", "default": 41.0082},
+            "user_lon": {"type": "number", "default": 28.9784},
+            "user_alt": {"type": "number", "default": 50.0},
+            "num_satellites": {"type": "integer", "default": 8}
+        },
+        documentation="Simulates 24-satellite GPS constellation orbits, pseudoranges, and PDOP/GDOP dilution of precision."
+    ))
+
+    # 15. SRW Synchrotron Radiation Workshop Nodes
+    NodeRegistry.register(NodeSpec(
+        type="srw.beam_kinematics",
+        category="SRW Radiation",
+        display_name="Relativistic Electron Beam Kinematics",
+        aliases=["SLSrwBeamKinematics"],
+        output_ports=[
+            PortSpec(name="kinematics", data_type=CanonicalPortType.STRUCTURED_FRAME, description="Kinematics Frame"),
+            PortSpec(name="gamma", data_type=CanonicalPortType.SCALAR_REAL64, description="Lorentz Factor γ"),
+            PortSpec(name="deflection_k", data_type=CanonicalPortType.SCALAR_REAL64, description="Undulator Deflection K"),
+            PortSpec(name="fundamental_photon_ev", data_type=CanonicalPortType.SCALAR_REAL64, description="Fundamental Energy E1 (eV)"),
+            PortSpec(name="total_power_kw", data_type=CanonicalPortType.SCALAR_REAL64, description="Radiated Power P_rad (kW)")
+        ],
+        parameter_schema={
+            "energy_gev": {"type": "number", "default": 3.0},
+            "current_amp": {"type": "number", "default": 0.5},
+            "peak_field_tesla": {"type": "number", "default": 0.8},
+            "period_mm": {"type": "number", "default": 20.0},
+            "num_periods": {"type": "integer", "default": 50}
+        },
+        documentation="Calculates relativistic Lorentz factor γ, deflection parameter K, and fundamental photon energy E1."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="srw.wavefront_intensity",
+        category="SRW Radiation",
+        display_name="2D Transverse Wavefront Intensity Heatmap",
+        aliases=["SLSrwWavefront"],
+        output_ports=[
+            PortSpec(name="intensity_matrix", data_type=CanonicalPortType.STRUCTURED_FRAME, description="2D Intensity Grid Matrix"),
+            PortSpec(name="peak_flux", data_type=CanonicalPortType.SCALAR_REAL64, description="Peak Spectral Flux (ph/s/0.1%bw)")
+        ],
+        parameter_schema={
+            "energy_gev": {"type": "number", "default": 3.0},
+            "current_amp": {"type": "number", "default": 0.5},
+            "peak_field_tesla": {"type": "number", "default": 0.8},
+            "period_mm": {"type": "number", "default": 20.0},
+            "num_periods": {"type": "integer", "default": 50},
+            "obs_dist_m": {"type": "number", "default": 10.0}
+        },
+        documentation="Computes 2D transverse wavefront intensity matrix I(x,y) and peak spectral flux."
+    ))
+
+    # 16. DSP Lab / Unpingco Workbench Nodes
+    NodeRegistry.register(NodeSpec(
+        type="dsp_lab.aliasing_simulator",
+        category="DSP Lab",
+        display_name="Sampling & Aliasing Fold-Over Simulator",
+        aliases=["SLDspAliasing"],
+        output_ports=[
+            PortSpec(name="aliasing_result", data_type=CanonicalPortType.STRUCTURED_FRAME, description="Aliasing Frame"),
+            PortSpec(name="f_aliased_hz", data_type=CanonicalPortType.SCALAR_REAL64, description="Aliased Folded Freq (Hz)"),
+            PortSpec(name="is_aliased", data_type=CanonicalPortType.SCALAR_BOOL, description="Aliasing Occurred Status")
+        ],
+        parameter_schema={
+            "f_signal_hz": {"type": "number", "default": 1500.0},
+            "f_sample_hz": {"type": "number", "default": 2000.0},
+            "duration_s": {"type": "number", "default": 0.01}
+        },
+        documentation="Simulates Nyquist-Shannon sampling theorem, aliasing fold-over effect, and discrete reconstruction."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="dsp_lab.parks_mcclellan_fir",
+        category="DSP Lab",
+        display_name="Parks-McClellan Equiripple FIR Filter Design",
+        aliases=["SLDspRemezFir"],
+        output_ports=[PortSpec(name="fir_coefficients", data_type=CanonicalPortType.SIGNAL_REAL64, description="FIR Taps Vector")],
+        parameter_schema={
+            "num_taps": {"type": "integer", "default": 51},
+            "passband_hz": {"type": "number", "default": 1000.0},
+            "stopband_hz": {"type": "number", "default": 1500.0},
+            "sample_rate_hz": {"type": "number", "default": 8000.0}
+        },
+        documentation="Designs optimal equiripple FIR filter using Parks-McClellan (Remez Exchange) algorithm."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="dsp_lab.autocorr_pitch",
+        category="DSP Lab",
+        display_name="Autocorrelation Rxx[τ] Pitch Estimator",
+        aliases=["SLDspAutocorrPitch"],
+        input_ports=[PortSpec(name="signal_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Input Audio Signal")],
+        output_ports=[
+            PortSpec(name="pitch_result", data_type=CanonicalPortType.STRUCTURED_FRAME, description="Pitch Frame"),
+            PortSpec(name="fundamental_pitch_hz", data_type=CanonicalPortType.SCALAR_REAL64, description="Fundamental Pitch F0 (Hz)"),
+            PortSpec(name="autocorr_signal", data_type=CanonicalPortType.SIGNAL_REAL64, description="Autocorrelation Sequence Rxx[τ]")
+        ],
+        parameter_schema={"sample_rate_hz": {"type": "number", "default": 20000.0}},
+        documentation="Estimates fundamental pitch F0 via biased/unbiased autocorrelation Rxx[τ] peak detection."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="dsp_lab.lms_adaptive_canceller",
+        category="DSP Lab",
+        display_name="LMS Adaptive Noise Canceller Filter",
+        aliases=["SLDspLmsAdaptive"],
+        input_ports=[
+            PortSpec(name="primary_signal", data_type=CanonicalPortType.SIGNAL_REAL64, description="Primary Signal (Signal + Noise)"),
+            PortSpec(name="reference_noise", data_type=CanonicalPortType.SIGNAL_REAL64, description="Reference Noise Vector")
+        ],
+        output_ports=[
+            PortSpec(name="cleaned_signal", data_type=CanonicalPortType.SIGNAL_REAL64, description="Cleaned Output Signal"),
+            PortSpec(name="error_signal", data_type=CanonicalPortType.SIGNAL_REAL64, description="LMS Error Sequence")
+        ],
+        parameter_schema={
+            "filter_order": {"type": "integer", "default": 32},
+            "mu_step": {"type": "number", "default": 0.01}
+        },
+        documentation="Implements Least Mean Squares (LMS) adaptive noise cancellation filter."
+    ))
+
+    NodeRegistry.register(NodeSpec(
+        type="dsp_lab.cwt_scalogram",
+        category="DSP Lab",
+        display_name="CWT Continuous Wavelet Scalogram",
+        aliases=["SLDspCwtScalogram"],
+        input_ports=[PortSpec(name="signal_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Input Signal")],
+        output_ports=[PortSpec(name="scalogram_matrix", data_type=CanonicalPortType.STRUCTURED_FRAME, description="Time-Frequency Scalogram Matrix")],
+        parameter_schema={
+            "sample_rate_hz": {"type": "number", "default": 10000.0},
+            "num_scales": {"type": "integer", "default": 32}
+        },
+        documentation="Computes Continuous Wavelet Transform (CWT) time-frequency scalogram with Morlet wavelets."
+    ))
+
+    # 17. Sandbox Python Execution Node
+    NodeRegistry.register(NodeSpec(
+        type="sandbox.python_exec",
+        category="Custom",
+        display_name="Isolated Python Math Script Sandbox",
+        aliases=["SLPythonSandbox"],
+        input_ports=[PortSpec(name="signal_in", data_type=CanonicalPortType.SIGNAL_REAL64, description="Input Signal input_signal")],
+        output_ports=[
+            PortSpec(name="signal_out", data_type=CanonicalPortType.SIGNAL_REAL64, description="Output Signal output_signal"),
+            PortSpec(name="result_data", data_type=CanonicalPortType.STRUCTURED_FRAME, description="Execution Result Frame")
+        ],
+        parameter_schema={"python_code": {"type": "string", "default": "output_signal = [x * 2.0 for x in input_signal]"}},
+        documentation="Executes custom Python math and DSP scripts in an isolated execution sandbox."
     ))
 
 # Execute Registry Initialization

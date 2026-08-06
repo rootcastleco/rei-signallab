@@ -14,7 +14,11 @@ class SignalGeneratorNode(BaseNodeRuntime):
             "offset": float(self.params.get("offset", 0.0)),
             "sample_rate": int(self.params.get("sample_rate", 44100)),
             "duration": float(self.params.get("duration", 0.1)),
-            "noise_level": float(self.params.get("noise_level", 0.0))
+            "noise_level": float(self.params.get("noise_level", 0.0)),
+            "modulation_type": self.params.get("modulation_type", "none"),
+            "mod_frequency": float(self.params.get("mod_frequency", 50.0)),
+            "mod_index": float(self.params.get("mod_index", 0.5)),
+            "frequency2": float(self.params.get("frequency2", 880.0))
         })()
 
         t, sig = DSPEngine.generate_signal(gen_cfg)
