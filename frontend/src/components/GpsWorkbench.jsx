@@ -2,6 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Radio, Play, Download, Settings, RefreshCw, Navigation, Compass, Layers, AlertCircle, FileText, CheckCircle } from 'lucide-react';
 import { safeFetchJson } from '../config';
 
+const PRN_TAPS = {
+  1: [2, 6], 2: [3, 7], 3: [4, 8], 4: [5, 9], 5: [1, 9], 6: [2, 10], 7: [1, 8], 8: [2, 9],
+  9: [3, 10], 10: [2, 3], 11: [3, 4], 12: [5, 6], 13: [6, 7], 14: [7, 8], 15: [8, 9], 16: [9, 10],
+  17: [1, 4], 18: [2, 5], 19: [3, 6], 20: [4, 7], 21: [5, 8], 22: [6, 9], 23: [1, 3], 24: [4, 6],
+  25: [5, 7], 26: [6, 8], 27: [7, 9], 28: [8, 10], 29: [1, 6], 30: [2, 7], 31: [3, 8], 32: [4, 9]
+};
+
 export default function GpsWorkbench() {
   const [lat, setLat] = useState(37.7749);
   const [lon, setLon] = useState(-122.4194);
@@ -560,7 +567,7 @@ export default function GpsWorkbench() {
                 <span className="font-bold">Select PRN (1-32):</span>
                 <select value={selectedPrn} onChange={e => setSelectedPrn(parseInt(e.target.value))} className="font-mono text-xs">
                   {Array.from({ length: 32 }, (_, i) => i + 1).map(prn => (
-                    <option key={prn} value={prn}>PRN {prn} (Taps {GpsEngine.PRN_TAPS[prn]?.join(',')})</option>
+                    <option key={prn} value={prn}>PRN {prn} (Taps {PRN_TAPS[prn]?.join(',')})</option>
                   ))}
                 </select>
               </div>
