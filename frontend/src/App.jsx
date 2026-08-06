@@ -15,6 +15,7 @@ import VibrationWorkbench from './components/VibrationWorkbench';
 import ElectricalWorkbench from './components/ElectricalWorkbench';
 import AntennaWorkbench from './components/AntennaWorkbench';
 import GpsWorkbench from './components/GpsWorkbench';
+import UnpingcoDspLab from './components/UnpingcoDspLab';
 
 const PRESETS = {
   SINE_440: {
@@ -381,6 +382,12 @@ export default function App() {
               <Radio size={14} className="text-[#00FF00]" /> 🛰️ GPS SDR Simulator
             </button>
             <button
+              onClick={() => setActiveView('unpingco')}
+              className={`win98-tab font-bold text-xs flex items-center gap-1 ${activeView === 'unpingco' ? 'active font-black text-[#000080] bg-[#FFFFCC]' : ''}`}
+            >
+              <Code size={14} className="text-[#00FFFF]" /> 📘 Unpingco DSP Lab
+            </button>
+            <button
               onClick={() => setActiveView('python')}
               className={`win98-tab font-bold text-xs flex items-center gap-1 ${activeView === 'python' ? 'active font-black text-[#000080]' : ''}`}
             >
@@ -527,6 +534,10 @@ export default function App() {
 
             {activeView === 'gps' && (
               <GpsWorkbench />
+            )}
+
+            {activeView === 'unpingco' && (
+              <UnpingcoDspLab />
             )}
 
             {activeView === 'graph' && (

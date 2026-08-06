@@ -119,6 +119,11 @@ Graph project format supporting double-precision canonical signal types (`Signal
 | `POST` | `/api/python/execute` | Restricted Python script execution |
 | `POST` | `/api/render/plot` | Server-rendered Matplotlib PNG plot |
 | `POST` | `/api/export/wav` | Downloadable 16-bit PCM WAV audio buffer |
+| `POST` | `/api/dsp-lab/sampling-aliasing` | Sampling theorem & aliasing foldover simulation |
+| `POST` | `/api/dsp-lab/fir-parks-mcclellan` | Parks-McClellan equiripple FIR filter design |
+| `POST` | `/api/dsp-lab/autocorrelation` | Normalized autocorrelation & pitch detection |
+| `POST` | `/api/dsp-lab/lms-adaptive` | LMS adaptive noise canceller algorithm |
+| `POST` | `/api/dsp-lab/cwt-scalogram` | Continuous Wavelet Transform (CWT) scalogram |
 | `WS` | `/ws/stream` | Real-time WebSocket signal streaming |
 
 ---

@@ -99,6 +99,18 @@ The **REI Vibration Analysis Workbench** is an end-to-end industrial condition m
 
 ---
 
+## 📘 Python for Signal Processing Lab (J. Unpingco Algorithms)
+
+Modeled after Jose Unpingco's textbook [*Python for Signal Processing*](https://github.com/unpingco/Python-for-Signal-Processing) (Springer), this module provides interactive educational and analytical tools backed by SciPy API endpoints (`/api/dsp-lab/*`):
+
+- **Sampling Theorem & Aliasing Fold-Over**: Visualizes continuous signal $s(t) = \sin(2\pi f t)$ vs discrete samples $s[n]$, highlights Nyquist frequency $f_{\text{nyquist}} = f_s / 2$, and calculates folded aliased frequency $f_{\text{aliased}} = |f_{\text{signal}} - k \cdot f_{\text{sample}}|$.
+- **Parks-McClellan Optimal Equiripple FIR Filter Design**: Uses `scipy.signal.remez` to compute optimal Type I FIR impulse response $h[n]$ and magnitude response $|H(e^{j\omega})|$ dB with exact passband ripple and stopband attenuation metrics.
+- **Autocorrelation & Pitch Detector ($R_{xx}[\tau]$)**: Computes normalized autocorrelation sequence $R_{xx}[\tau] = \frac{\sum x[n]x[n+\tau]}{\sum x^2[n]}$ and extracts dominant fundamental pitch frequency $f_0$.
+- **Least Mean Squares (LMS) Adaptive Noise Canceller**: Implements LMS adaptive filter iteration ($y[n] = \mathbf{w}^T \mathbf{x}[n]$, $e[n] = d[n] - y[n]$, $\mathbf{w}[n+1] = \mathbf{w}[n] + 2\mu e[n] \mathbf{x}[n]$) demonstrating real-time interference rejection and SNR improvement.
+- **Continuous Wavelet Transform (CWT) Time-Frequency Scalogram**: Computes 2D wavelet scalogram matrix $|W(a,b)|$ using Morlet/Ricker wavelets for chirp time-frequency analysis.
+
+---
+
 ## ⚡ Electrical & 📡 Antenna RF Workbenches
 
 - **⚡ Electrical Workbench**: 3-phase symmetrical component decomposition ($V_0, V_1, V_2$) via Fortescue matrix transform, real/reactive/apparent power ($P, Q, S$), power factor ($\cos\phi$), and THD.
