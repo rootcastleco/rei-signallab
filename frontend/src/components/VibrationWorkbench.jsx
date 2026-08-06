@@ -37,6 +37,25 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
   const [trustMode, setTrustMode] = useState(null);
   const [vibrationFile, setVibrationFile] = useState(null);
 
+  const [selectedBrand, setSelectedBrand] = useState('ALL');
+  const [bearingDbList, setBearingDbList] = useState([
+    { brand: "SKF", model: "SKF 6205", num_elements: 9, ball_diameter_mm: 7.94, pitch_diameter_mm: 38.5, contact_angle_deg: 0.0 },
+    { brand: "SKF", model: "SKF 6208", num_elements: 9, ball_diameter_mm: 11.91, pitch_diameter_mm: 51.0, contact_angle_deg: 0.0 },
+    { brand: "SKF", model: "SKF 6310", num_elements: 8, ball_diameter_mm: 17.46, pitch_diameter_mm: 65.0, contact_angle_deg: 0.0 },
+    { brand: "SKF", model: "SKF 7208 BEP", num_elements: 10, ball_diameter_mm: 11.91, pitch_diameter_mm: 51.0, contact_angle_deg: 40.0 },
+    { brand: "SKF", model: "SKF 22210 E", num_elements: 17, ball_diameter_mm: 10.0, pitch_diameter_mm: 62.0, contact_angle_deg: 10.0 },
+    { brand: "NTN", model: "NTN 6205", num_elements: 9, ball_diameter_mm: 7.94, pitch_diameter_mm: 38.5, contact_angle_deg: 0.0 },
+    { brand: "NTN", model: "NTN 7208", num_elements: 10, ball_diameter_mm: 11.91, pitch_diameter_mm: 51.0, contact_angle_deg: 40.0 },
+    { brand: "Dodge", model: "Dodge Imperial IP200 2-3/16\"", num_elements: 10, ball_diameter_mm: 13.0, pitch_diameter_mm: 72.0, contact_angle_deg: 10.0 },
+    { brand: "Cooper", model: "Cooper 01E 100M", num_elements: 12, ball_diameter_mm: 14.0, pitch_diameter_mm: 130.0, contact_angle_deg: 0.0 }
+  ]);
+
+  useEffect(() => {
+    safeFetchJson('/api/vibration/bearing-database')
+      .then(data => { if (Array.isArray(data) && data.length > 0) setBearingDbList(data); })
+      .catch(() => {});
+  }, []);
+
   const [driverD1, setDriverD1] = useState(150);
   const [drivenD2, setDrivenD2] = useState(300);
   const [beltLength, setBeltLength] = useState(1200);
@@ -872,9 +891,53 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
             </select>
           </div>
 
-          {/* Bearing Geometry */}
+          {/* 2,700+ Bearing Catalog (SKF, NTN, Cooper, Dodge) */}
           <div className="flex flex-col gap-1 border-t border-[#808080] pt-1.5">
-            <span className="font-bold text-[#000080]">Bearing Geometry ($N, d, D$):</span>
+            <span className="font-bold text-[#000080] flex items-center justify-between">
+              <span>Bearing Catalog (2,700+):</span>
+            </span>
+            
+            {/* Brand Filter */}
+            <select
+              value={selectedBrand}
+              onChange={e => setSelectedBrand(e.target.value)}
+              className="text-[10px] font-mono w-full bg-[#FFFFFF] border border-[#808080]"
+            >
+              <option value="ALL">All Brands (SKF, NTN, Cooper, Dodge)</option>
+              <option value="SKF">SKF Bearings</option>
+              <option value="NTN">NTN Bearings</option>
+              <option value="Cooper">Cooper Split Bearings</option>
+              <option value="Dodge">Dodge Mounted Bearings</option>
+            </select>
+
+            {/* Quick Model Select */}
+            <select
+              onChange={e => {
+                const modelStr = e.target.value;
+                if (!modelStr) return;
+                const found = bearingDbList.find(b => b.model === modelStr);
+                if (found) {
+                  setNumElements(found.num_elements);
+                  setBallDiameter(found.ball_diameter_mm);
+                  setPitchDiameter(found.pitch_diameter_mm);
+                  setContactAngle(found.contact_angle_deg);
+                }
+              }}
+              className="text-[10px] font-mono w-full bg-[#FFFFFF] border border-[#808080]"
+            >
+              <option value="">-- Select Bearing Preset ({selectedBrand}) --</option>
+              {bearingDbList
+                .filter(b => selectedBrand === 'ALL' || b.brand === selectedBrand)
+                .slice(0, 100)
+                .map((b, idx) => (
+                  <option key={idx} value={b.model}>
+                    {b.model} ({b.brand}) - N:{b.num_elements}, d:{b.ball_diameter_mm}mm
+                  </option>
+                ))
+              }
+            </select>
+
+            <span className="font-bold text-[#000080] text-[10px] mt-1">Manual Kinematics Override ($N, d, D, \phi$):</span>
             <div className="grid grid-cols-3 gap-1">
               <div>
                 <label className="text-[10px]">Rollers (N):</label>

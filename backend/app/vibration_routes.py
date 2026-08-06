@@ -294,12 +294,15 @@ def compute_sdof(req: dict):
         raise HTTPException(status_code=422, detail=str(e))
 
 
+from app.bearing_catalog import BearingCatalog
+
 @router.get("/bearing-database")
-def bearing_database():
-    return [
-        {"model": "SKF 6205", "num_elements": 9, "ball_diameter_mm": 7.94, "pitch_diameter_mm": 38.5, "contact_angle_deg": 0.0},
-        {"model": "SKF 6208", "num_elements": 9, "ball_diameter_mm": 11.91, "pitch_diameter_mm": 51.0, "contact_angle_deg": 0.0},
-        {"model": "SKF 6310", "num_elements": 8, "ball_diameter_mm": 17.46, "pitch_diameter_mm": 65.0, "contact_angle_deg": 0.0},
-        {"model": "SKF 7208 BEP", "num_elements": 10, "ball_diameter_mm": 11.91, "pitch_diameter_mm": 51.0, "contact_angle_deg": 40.0},
-        {"model": "SKF 22210 E", "num_elements": 17, "ball_diameter_mm": 10.0, "pitch_diameter_mm": 62.0, "contact_angle_deg": 10.0}
-    ]
+def bearing_database(query: Optional[str] = None, brand: Optional[str] = None):
+    if query or brand:
+        return BearingCatalog.search_bearings(query or "", brand or "")
+    return BearingCatalog.get_all_bearings()[:100]
+
+
+@router.get("/bearing-search")
+def bearing_search(q: str = "", brand: str = ""):
+    return BearingCatalog.search_bearings(q, brand)
