@@ -59,8 +59,8 @@
 
 ## Application Screenshots
 
-### 1. REI SignalLab Application Interface
-![REI SignalLab 2.1 GUI Screenshot](docs/images/signallab_real_app_screenshot.png)
+### 1. REI SignalLab 2.1 Workspace & GPS SDR Simulator
+![REI SignalLab 2.1 Hero Screenshot](docs/images/signallab_v2.1_hero.png)
 
 ### 2. Dual CRT Oscilloscope & Spectrum Analyzer Workspace
 ![REI SignalLab 2.1 Workspace Overview](docs/images/signallab_ui_overview.png)
@@ -68,42 +68,41 @@
 ### 3. Signal Flow Studio Visual Canvas & Typed Node Catalog
 ![Signal Flow Studio Canvas](docs/images/node_flow_studio.png)
 
-### 4. Python DSP Code Sandbox & Matplotlib Plot Result
-![Python DSP Code Sandbox](docs/images/python_lab_preview.png)
+---
+
+## 🛰️ GPS SDR Signal Simulator Workbench (`gps-sdr-sim`)
+
+The **GPS L1 C/A SDR Signal Simulator Workbench** is modeled after Takuji Ebinuma's open-source [`gps-sdr-sim`](https://github.com/osqzss/gps-sdr-sim). It provides full constellation orbit propagation, baseband I/Q synthesis, and downloadable binary signal streams for software-defined radios.
+
+- **1023-Chip C/A Gold Code Generator**: Generates exact 1023-chip PRN 1–32 Gold Code sequences at $1.023\text{ MHz}$ using G1 ($x^{10} + x^3 + 1$) and G2 LFSR polynomials.
+- **Orbit Kinematics & Coordinate Transformations**: Computes WGS84 Geodetic $(Lat, Lon, Alt) \to$ ECEF $(X, Y, Z)$ and ENU vector coordinates for 32 MEO satellites.
+- **Doppler Shift & C/N0 Estimation**: Calculates line-of-sight range, propagation delay, Doppler frequency shift ($\pm 5\text{ kHz}$), and Carrier-to-Noise Ratio ($C/N_0 = 35\text{--}50\text{ dB-Hz}$).
+- **Dilution of Precision (DOP)**: Calculates GDOP, PDOP, HDOP, and VDOP from the satellite observation geometry matrix $G$.
+- **Polar Skyplot & Spectrum Visualizations**: Real-time canvas rendering of polar satellite skyplots ($0^\circ\text{--}360^\circ$ azimuth, $0^\circ\text{--}90^\circ$ elevation), baseband spectrum, I/Q scatter plot, and Gold Code auto-correlation peaks.
+- **Multi-SDR Binary Export**: Export raw binary baseband signal streams (`.bin`) formatted for HackRF, LimeSDR (8-bit signed `int8`), USRP, BladeRF (16-bit signed `int16`), and RTL-SDR (8-bit unsigned `uint8`).
+- **NMEA 0183 Generator**: Generates real-time `$GPGGA` and `$GPRMC` NMEA sentences with valid checksums.
 
 ---
 
-## ⚙️ REI Vibration Analysis Workbench
+## ⚙️ REI Vibration Analysis Workbench & RITEC Suite
 
-The **REI Vibration Analysis Workbench** is a dedicated workspace for industrial machinery diagnostics, rotor balancing, bearing condition monitoring, and telemetry reporting.
+The **REI Vibration Analysis Workbench** is an end-to-end industrial condition monitoring suite incorporating official tools from RITEC:
 
-```text
-Accelerometer / Proximity Probe
-        ↓
-Sensor Calibration (mV/g, Bias Voltage)
-        ↓
-High-Pass Regularized Integration (Acceleration → Velocity mm/s → Displacement μm)
-        ↓
-Time-Domain Statistics (RMS, Peak, Crest Factor, Kurtosis)
-        ↓
-FFT / 1X-10X Harmonic Order Spectrum / Hilbert Envelope Spectrum
-        ↓
-Bearing Defect Frequencies (FTF, BPFO, BPFI, BSF)
-        ↓
-Single-Plane Complex Vector Rotor Balancing
-        ↓
-Rule-Based Fault Classifier & Automated Vibration Diagnostic Report
-```
+- **13 Standard RITEC Vibration Units**: Supports simultaneous conversion across Acceleration ($g$ RMS/Peak, $\text{in/s}^2$, $\text{mm/s}^2$), Velocity ($\text{mm/s}$, $\text{in/s}$), and Displacement ($\text{mils}$ pk-pk, $\text{mm}$ pk-pk, $\mu\text{m}$ pk-pk).
+- **3,570+ Kinematic Bearing Catalog**: Integrated database of over 3,570 rolling element bearings across **SKF**, **NTN**, **Cooper**, and **Dodge** with an instant 🔍 Search button. Computes exact BPFO, BPFI, BSF, and FTF fault frequencies.
+- **Interactive Shaft Orbit Plot Simulator**:
+  - Superimposes up to 3 frequency components (F1 1X, F2 2X/Misalignment, F3 Sub-Synchronous Whirl).
+  - Configurable X/Y probe amplitudes, phase angles, and 5 probe pair orientations (e.g., $45^\circ\text{R} \ \& \ 45^\circ\text{L}$).
+  - Keyphasor TDC timing mark placement once per 1X revolution and Clockwise / Counter-Clockwise (CW/CCW) rotation direction.
+- **Visual Signal Tone Generator**: Dual sine wave acoustic tone generator demonstrating beating effects ($\Delta f = |F_1 - F_2|$) with real-time waveform and discrete peak spectrum visualization.
+- **Rotor Balancing & Fault Classification**: Single-plane complex vector balancing ($\vec{V}_0, \vec{V}_1, \vec{W}_{\text{trial}} \to \vec{W}_{\text{correction}}$) and rule-based diagnostic fault classifier.
 
-### Key Vibration Features:
-- **Sensor Calibration**: Converts raw ADC voltage signals using sensor sensitivity ($\text{mV/g}$, $\text{mV/mm/s}$) and bias voltage:
-  $$\text{Acc}_g = \frac{\text{InputVoltage} - \text{Bias}}{\text{Sensitivity}_{V/g}}$$
-- **Double Integration**: Frequency-domain regularized integration ($v(t) = \mathcal{F}^{-1}\left\{\frac{\mathcal{F}\{a(t)\}}{j 2\pi f}\right\}$) converting acceleration ($\text{m/s}^2$) to velocity ($\text{mm/s RMS}$) without low-frequency drift.
-- **Kinematic Bearing Defect Frequencies**: Calculates exact frequencies for FTF, BPFO, BPFI, and BSF using roller count $N$, ball diameter $d$, pitch diameter $D$, and contact angle $\phi$:
-  $$\text{BPFO} = \frac{N}{2} \cdot f_{\text{shaft}} \cdot \left(1 - \frac{d}{D}\cos\phi\right), \quad \text{BPFI} = \frac{N}{2} \cdot f_{\text{shaft}} \cdot \left(1 + \frac{d}{D}\cos\phi\right)$$
-- **Single-Plane Vector Rotor Balancing**: Solves influence coefficient complex vector balance equation ($\vec{V}_0, \vec{V}_1, \vec{W}_{\text{trial}} \to \vec{W}_{\text{correction}}$) rendering polar vector balance plots.
-- **1X-10X Harmonic Order Bar View**: Interactive order spectrum bar view displaying fundamental shaft speed 1X, misalignment 2X, looseness 3X, and up to 10X harmonics.
-- **Rule-Based Machine Fault Classifier**: Evaluates spectral evidence for Unbalance, Angular/Parallel Misalignment, Looseness, and Bearing Defects.
+---
+
+## ⚡ Electrical & 📡 Antenna RF Workbenches
+
+- **⚡ Electrical Workbench**: 3-phase symmetrical component decomposition ($V_0, V_1, V_2$) via Fortescue matrix transform, real/reactive/apparent power ($P, Q, S$), power factor ($\cos\phi$), and THD.
+- **📡 Antenna & RF Workbench**: VSWR & Return Loss ($S_{11}$), Friis Free Space Path Loss (FSPL), and Rectangular Waveguide Cutoff Frequency ($TE_{10}$).
 
 ---
 

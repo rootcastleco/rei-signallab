@@ -44,8 +44,13 @@ This wiki describes the public **REI SignalLab 2.1** application and repository.
 - Oscilloscope, spectrum, and spectrogram visualizations
 - 35+ canonical typed DSP and vibration nodes
 - Deterministic Kahn-scheduled node-graph experiments
-- Sensor calibration and conversion among acceleration, velocity, and displacement
-- Bearing BPFO, BPFI, BSF, and FTF frequency calculation
+- GPS L1 C/A SDR Signal Simulator (`gps-sdr-sim` integration): 1023-chip Gold code, WGS84 orbit kinematics, Doppler shifts, C/N0, GDOP/PDOP/HDOP/VDOP, NMEA stream, and SDR binary export (.bin)
+- Sensor calibration and conversion among acceleration, velocity, and displacement across 13 standard RITEC units
+- 3,570+ rolling element bearing database (SKF, NTN, Cooper, Dodge) with instant search
+- Interactive Shaft Orbit Plot simulator with 3-frequency superposition, probe orientations, Keyphasor timing marks, and CW/CCW rotation
+- Visual Signal Tone Generator with acoustic beating effect and discrete peak FFT spectrum
+- 3-Phase Symmetrical Components ($V_0, V_1, V_2$) and electrical power metrics
+- VSWR, Return Loss ($S_{11}$), Friis Path Loss, and Waveguide Cutoff Frequency ($TE_{10}$)
 - Hilbert envelope analysis and 1X–10X harmonic order bars
 - Single-plane complex-vector rotor balancing and fault classification
 - Numerical golden verification for transforms and graph operations
