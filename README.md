@@ -84,11 +84,11 @@ The **GPS L1 C/A SDR Signal Simulator Workbench** is modeled after Takuji Ebinum
 
 ---
 
-## ⚙️ REI Vibration Analysis Workbench & RITEC Suite
+## ⚙️ REI Vibration Analysis Workbench & Condition Monitoring Suite
 
-The **REI Vibration Analysis Workbench** is an end-to-end industrial condition monitoring suite incorporating official tools from RITEC:
+The **REI Vibration Analysis Workbench** is an end-to-end industrial condition monitoring suite incorporating comprehensive diagnostics tools:
 
-- **13 Standard RITEC Vibration Units**: Supports simultaneous conversion across Acceleration ($g$ RMS/Peak, $\text{in/s}^2$, $\text{mm/s}^2$), Velocity ($\text{mm/s}$, $\text{in/s}$), and Displacement ($\text{mils}$ pk-pk, $\text{mm}$ pk-pk, $\mu\text{m}$ pk-pk).
+- **13 Standard Industrial Vibration Units**: Supports simultaneous conversion across Acceleration ($g$ RMS/Peak, $\text{in/s}^2$, $\text{mm/s}^2$), Velocity ($\text{mm/s}$, $\text{in/s}$), and Displacement ($\text{mils}$ pk-pk, $\text{mm}$ pk-pk, $\mu\text{m}$ pk-pk).
 - **3,570+ Kinematic Bearing Catalog**: Integrated database of over 3,570 rolling element bearings across **SKF**, **NTN**, **Cooper**, and **Dodge** with an instant 🔍 Search button. Computes exact BPFO, BPFI, BSF, and FTF fault frequencies.
 - **Interactive Shaft Orbit Plot Simulator**:
   - Superimposes up to 3 frequency components (F1 1X, F2 2X/Misalignment, F3 Sub-Synchronous Whirl).

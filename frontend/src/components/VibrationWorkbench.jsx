@@ -89,7 +89,7 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
   const [sdofDamping, setSdofDamping] = useState(50);
   const [sdofX0, setSdofX0] = useState(10);
 
-  // Orbit Plot Advanced Simulator States (RITEC Interactive Orbit Simulator)
+  // Orbit Plot Advanced Simulator States (Interactive Orbit Simulator)
   const [orbF1, setOrbF1] = useState(60.0);
   const [orbF2, setOrbF2] = useState(120.0);
   const [orbF3, setOrbF3] = useState(28.2);
@@ -1418,7 +1418,7 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
           ) : activeTab === 'orbit' ? (
             <div className="win98-outset p-2 bg-[#C0C0C0] text-xs font-mono flex flex-col gap-2">
               <div className="font-bold text-[#000080] border-b border-[#808080] pb-1 flex items-center justify-between">
-                <span>Interactive Shaft Orbit Plot Simulator (RITEC Tool)</span>
+                <span>Interactive Shaft Orbit Plot Simulator</span>
                 <span className="text-[10px] text-[#008800]">Simulates 1X, 2X, Sub/Super-Synchronous Orbits & Keyphasor Timing Marks</span>
               </div>
 
@@ -1496,7 +1496,7 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
             </div>
           ) : activeTab === 'belt' ? (
             <div className="win98-outset p-3 bg-[#C0C0C0] text-xs font-mono flex flex-col gap-2">
-              <div className="font-bold text-[#000080] border-b border-[#808080] pb-1">Belt Vibration Frequency Calculator (RITEC Tool)</div>
+              <div className="font-bold text-[#000080] border-b border-[#808080] pb-1">Belt Vibration Frequency Calculator</div>
               <div className="grid grid-cols-2 gap-2">
                 <div><label>Driver Pulley D1 (mm):</label><input type="number" value={driverD1} onChange={e => setDriverD1(parseFloat(e.target.value))} className="w-full font-mono" /></div>
                 <div><label>Driven Pulley D2 (mm):</label><input type="number" value={drivenD2} onChange={e => setDrivenD2(parseFloat(e.target.value))} className="w-full font-mono" /></div>
@@ -1519,7 +1519,7 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
             </div>
           ) : activeTab === 'alignment' ? (
             <div className="win98-outset p-3 bg-[#C0C0C0] text-xs font-mono flex flex-col gap-2">
-              <div className="font-bold text-[#000080] border-b border-[#808080] pb-1">Face & Rim Shaft Alignment Calculator (RITEC Tool)</div>
+              <div className="font-bold text-[#000080] border-b border-[#808080] pb-1">Face & Rim Shaft Alignment Calculator</div>
               <div className="grid grid-cols-2 gap-2 text-[10px]">
                 <div><label>Coupling Diameter Dr (mm):</label><input type="number" value={couplingDr} onChange={e => setCouplingDr(parseFloat(e.target.value))} className="w-full font-mono" /></div>
                 <div><label>Dist to Front Feet L1 (mm):</label><input type="number" value={distL1} onChange={e => setDistL1(parseFloat(e.target.value))} className="w-full font-mono" /></div>
@@ -1545,7 +1545,7 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
           ) : activeTab === 'tonegen' ? (
             <div className="win98-outset p-3 bg-[#C0C0C0] text-xs font-mono flex flex-col gap-2">
               <div className="font-bold text-[#000080] border-b border-[#808080] pb-1 flex items-center justify-between">
-                <span>Signal Tone Generator with Audial Beating Effect (RITEC Tool)</span>
+                <span>Signal Tone Generator with Audial Beating Effect</span>
                 <span className="text-[10px] text-[#008800]">Audially & Visually Demonstrates Acoustic Beating ($\Delta f = |f_1 - f_2|$)</span>
               </div>
 
@@ -1607,7 +1607,7 @@ export default function VibrationWorkbench({ onVibrationProcessed }) {
           ) : activeTab === 'converter' ? (
             <div className="win98-outset p-3 bg-[#C0C0C0] text-xs font-mono flex flex-col gap-2.5">
               <div className="font-bold text-[#000080] border-b border-[#808080] pb-1 flex items-center justify-between">
-                <span>Vibration Unit Converter (RITEC Tool)</span>
+                <span>Vibration Unit Converter</span>
                 <span className="text-[10px] text-[#008800]">Converts Sine Wave Amplitude across 13 Acceleration, Velocity & Displacement Units</span>
               </div>
 

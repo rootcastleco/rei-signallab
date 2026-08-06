@@ -419,7 +419,7 @@ class VibrationEngine:
         driver_rpm: float
     ) -> Dict[str, Any]:
         """
-        Belt Vibration Frequency Calculator (RITEC Tool):
+        Belt Vibration Frequency Calculator:
         Belt Speed V = pi * D1 * N1 / (60 * 1000) m/s
         Belt Passing Frequency BPF = V / (L / 1000) = (pi * D1 * N1) / (60 * L) Hz
         """
@@ -453,7 +453,7 @@ class VibrationEngine:
         face_top: float, face_bottom: float
     ) -> Dict[str, Any]:
         """
-        Face & Rim Shaft Alignment Calculator (RITEC Tool):
+        Face & Rim Shaft Alignment Calculator:
         Offset = (Rim_Top - Rim_Bottom) / 2
         Angularity = (Face_Top - Face_Bottom) / Coupling_Diameter
         Front Feet Shim = Offset + Angularity * L1
@@ -484,7 +484,7 @@ class VibrationEngine:
         freq_hz: float
     ) -> Dict[str, Any]:
         """
-        Full RITEC Vibration Unit Converter:
+        Full Vibration Unit Converter:
         Converts between 13 standard Vibration Units (Acceleration, Velocity, Displacement in RMS, Peak, Pk-Pk).
         """
         if freq_hz <= 0:
@@ -582,7 +582,7 @@ class VibrationEngine:
         fs: float = 1000.0
     ) -> Dict[str, Any]:
         """
-        Mass-Spring-Damper SDOF Free Response Interactive Simulator (RITEC Tool):
+        Mass-Spring-Damper SDOF Free Response Interactive Simulator:
         Calculates undamped natural frequency, damping ratio, damped natural frequency, and time displacement trace.
         """
         if mass_kg <= 0 or stiffness_n_m <= 0:
