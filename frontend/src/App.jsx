@@ -64,6 +64,64 @@ export default function App() {
   const [dataTrustMode, setDataTrustMode] = useState('LOCAL_DSP'); // 'API_VERIFIED' | 'LOCAL_DSP' | 'DEMO_MODE'
   const [uploadedFileName, setUploadedFileName] = useState(null);
 
+  const [customPresets, setCustomPresets] = useState(() => {
+    try {
+      const saved = localStorage.getItem('signallab_custom_presets');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const loadPreset = (key) => {
+    setPresetKey(key);
+    setUploadedFileName(null);
+    const p = PRESETS[key] || customPresets[key];
+    if (p) {
+      if (p.generator) setGenCfg(p.generator);
+      if (p.math) setMathCfg(p.math);
+      if (p.filter) setFilterCfg(p.filter);
+      if (p.fft) setFFTCfg(p.fft);
+    }
+  };
+
+  const saveCustomPreset = () => {
+    const name = window.prompt('Enter Custom Preset Profile Name:', `Custom Preset #${Object.keys(customPresets).length + 1}`);
+    if (!name || !name.trim()) return;
+
+    const key = `CUSTOM_${Date.now()}`;
+    const newPreset = {
+      name: name.trim(),
+      generator: { ...genCfg },
+      math: { ...mathCfg },
+      filter: { ...filterCfg },
+      fft: { ...fftCfg }
+    };
+
+    const updated = { ...customPresets, [key]: newPreset };
+    setCustomPresets(updated);
+    try {
+      localStorage.setItem('signallab_custom_presets', JSON.stringify(updated));
+    } catch (e) {}
+
+    setPresetKey(key);
+    alert(`Preset '${name}' saved successfully!`);
+  };
+
+  const deleteCustomPreset = (keyToDelete) => {
+    if (!customPresets[keyToDelete]) return;
+    if (!window.confirm(`Are you sure you want to delete preset '${customPresets[keyToDelete].name}'?`)) return;
+
+    const updated = { ...customPresets };
+    delete updated[keyToDelete];
+    setCustomPresets(updated);
+    try {
+      localStorage.setItem('signallab_custom_presets', JSON.stringify(updated));
+    } catch (e) {}
+
+    loadPreset('SINE_440');
+  };
+
   const fileInputRef = useRef(null);
 
   // Real JS Browser-Side DSP Calculation Engine
@@ -179,12 +237,7 @@ export default function App() {
     }
   };
 
-  const loadPreset = (key) => {
-    setUploadedFileName(null);
-    setPresetKey(key);
-    const p = PRESETS[key];
-    if (p) { setGenCfg(p.generator); setMathCfg(p.math); setFilterCfg(p.filter); setFFTCfg(p.fft); }
-  };
+
 
   const exportCSV = () => {
     if (!dsp) return;
@@ -346,18 +399,37 @@ export default function App() {
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <span className="font-bold text-xs">Preset:</span>
             <select
               value={uploadedFileName ? 'upload' : presetKey}
               onChange={e => { if (e.target.value !== 'upload') loadPreset(e.target.value); }}
-              className="text-xs font-mono"
+              className="text-xs font-mono max-w-[200px]"
             >
               {uploadedFileName && <option value="upload">File: {uploadedFileName}</option>}
-              {Object.entries(PRESETS).map(([k, p]) => (
-                <option key={k} value={k}>{p.name}</option>
-              ))}
+              <optgroup label="System Presets">
+                {Object.entries(PRESETS).map(([k, p]) => (
+                  <option key={k} value={k}>{p.name}</option>
+                ))}
+              </optgroup>
+              {Object.keys(customPresets).length > 0 && (
+                <optgroup label="User Custom Presets">
+                  {Object.entries(customPresets).map(([k, p]) => (
+                    <option key={k} value={k}>{p.name}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
+
+            <button onClick={saveCustomPreset} className="win98-btn text-xs bg-[#000080] text-[#FFFFFF] font-bold">
+              ➕ Save Preset
+            </button>
+
+            {customPresets[presetKey] && (
+              <button onClick={() => deleteCustomPreset(presetKey)} className="win98-btn text-xs text-[#FF0000] font-bold">
+                🗑️
+              </button>
+            )}
           </div>
 
           <div className="win98-hitcounter flex-row items-center gap-2 py-0.5 px-2">
