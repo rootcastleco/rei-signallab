@@ -16,6 +16,7 @@ import ElectricalWorkbench from './components/ElectricalWorkbench';
 import AntennaWorkbench from './components/AntennaWorkbench';
 import GpsWorkbench from './components/GpsWorkbench';
 import DspLab from './components/DspLab';
+import SrwWorkbench from './components/SrwWorkbench';
 
 const PRESETS = {
   SINE_440: {
@@ -382,6 +383,12 @@ export default function App() {
               <Radio size={14} className="text-[#00FF00]" /> 🛰️ GPS SDR Simulator
             </button>
             <button
+              onClick={() => setActiveView('srw')}
+              className={`win98-tab font-bold text-xs flex items-center gap-1 ${activeView === 'srw' ? 'active font-black text-[#000080] bg-[#FFFFCC]' : ''}`}
+            >
+              <Radio size={14} className="text-[#FFFF00]" /> ☀️ SRW Synchrotron
+            </button>
+            <button
               onClick={() => setActiveView('dsplab')}
               className={`win98-tab font-bold text-xs flex items-center gap-1 ${activeView === 'dsplab' ? 'active font-black text-[#000080] bg-[#FFFFCC]' : ''}`}
             >
@@ -534,6 +541,10 @@ export default function App() {
 
             {activeView === 'gps' && (
               <GpsWorkbench />
+            )}
+
+            {activeView === 'srw' && (
+              <SrwWorkbench />
             )}
 
             {activeView === 'dsplab' && (

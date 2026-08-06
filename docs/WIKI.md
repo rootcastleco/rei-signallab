@@ -124,6 +124,7 @@ Graph project format supporting double-precision canonical signal types (`Signal
 | `POST` | `/api/dsp-lab/autocorrelation` | Normalized autocorrelation & pitch detection |
 | `POST` | `/api/dsp-lab/lms-adaptive` | LMS adaptive noise canceller algorithm |
 | `POST` | `/api/dsp-lab/cwt-scalogram` | Continuous Wavelet Transform (CWT) scalogram |
+| `POST` | `/api/srw/simulate` | SRW Synchrotron & Undulator radiation optics simulation |
 | `WS` | `/ws/stream` | Real-time WebSocket signal streaming |
 
 ---

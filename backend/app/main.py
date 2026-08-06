@@ -26,6 +26,7 @@ from app.electrical_routes import router as electrical_router
 from app.antenna_routes import router as antenna_router
 from app.gps_routes import router as gps_router
 from app.unpingco_routes import router as unpingco_router
+from app.srw_routes import router as srw_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("signallab")
@@ -245,3 +246,4 @@ app.include_router(electrical_router, prefix="/api/electrical")
 app.include_router(antenna_router, prefix="/api/antenna")
 app.include_router(gps_router, prefix="/api/gps")
 app.include_router(unpingco_router, prefix="/api/dsp-lab")
+app.include_router(srw_router, prefix="/api/srw")

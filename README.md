@@ -80,7 +80,17 @@ The **GPS L1 C/A SDR Signal Simulator Workbench** is modeled after Takuji Ebinum
 - **Dilution of Precision (DOP)**: Calculates GDOP, PDOP, HDOP, and VDOP from the satellite observation geometry matrix $G$.
 - **Polar Skyplot & Spectrum Visualizations**: Real-time canvas rendering of polar satellite skyplots ($0^\circ\text{--}360^\circ$ azimuth, $0^\circ\text{--}90^\circ$ elevation), baseband spectrum, I/Q scatter plot, and Gold Code auto-correlation peaks.
 - **Multi-SDR Binary Export**: Export raw binary baseband signal streams (`.bin`) formatted for HackRF, LimeSDR (8-bit signed `int8`), USRP, BladeRF (16-bit signed `int16`), and RTL-SDR (8-bit unsigned `uint8`).
-- **NMEA 0183 Generator**: Generates real-time `$GPGGA` and `$GPRMC` NMEA sentences with valid checksums.
+---
+
+## ☀️ SRW Synchrotron & Undulator Radiation Workbench
+
+Modeled after Oleg Chubar's [`SRW`](https://github.com/ochubar/SRW) (Synchrotron Radiation Workshop), this module provides relativistic electron beam kinematics and undulator radiation wave optics calculations backed by FastAPI endpoints (`/api/srw/*`):
+
+- **Relativistic Electron Beam Dynamics**: Calculates Lorentz factor $\gamma = E_e / (m_e c^2)$ and electron energy spread for 0.1–15 GeV storage rings.
+- **Undulator Deflection Parameter ($K$)**: Computes $K = \frac{e B_0 \lambda_u}{2\pi m_e c} \approx 0.9337 \cdot B_0 [\text{T}] \cdot \lambda_u [\text{cm}]$.
+- **Harmonic Photon Energies ($E_n$)**: Computes fundamental $E_1 = \frac{949.63 E_e^2}{\lambda_u (1 + K^2/2)}$ and odd harmonic energies $E_3, E_5, E_7$ (eV).
+- **Total Radiated Power ($P_{\text{rad}}$)**: Computes undulator total power $P_{\text{rad}} [\text{kW}] = 0.6331 E_e^2 B_0^2 L_u I_e$.
+- **Spectral Flux & Wavefront Intensity**: Visualizes spectral flux distribution $F(E)$, 2D transverse wavefront intensity heatmap $I(x,y)$ on observation screens, and angular power density $d^2P/d\Omega$.
 
 ---
 
